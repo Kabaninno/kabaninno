@@ -219,3 +219,25 @@ describe('focus core look (S2)', () => {
     expect(orbits.some((orbit) => !coreClearable(orbit))).toBe(true);
   });
 });
+
+describe('trail follows the planet speed (S1)', () => {
+  it('vanishes for a parked planet and shows while it orbits', async () => {
+    const { trailIntensity, PLANET_SPEED } = await import('./planet-math');
+    expect(trailIntensity(PLANET_SPEED.focused)).toBe(0);
+    expect(trailIntensity(PLANET_SPEED.normal)).toBe(1);
+    expect(trailIntensity(-PLANET_SPEED.normal)).toBe(1);
+    expect(trailIntensity(PLANET_SPEED.hovered)).toBeGreaterThan(0.3);
+    expect(trailIntensity(PLANET_SPEED.hovered)).toBeLessThan(1);
+  });
+
+  it('gives every trail material the speed-driven strength uniform', () => {
+    const cache = new SystemMaterialCache();
+    for (const node of model.categories) {
+      const materials = cache.get(node, false);
+      materials.planets.forEach((planet, i) => {
+        if (node.orbits[i]!.planet.trail) expect(planet.trail?.uniforms.uTrail).toBeDefined();
+      });
+    }
+    cache.dispose();
+  });
+});

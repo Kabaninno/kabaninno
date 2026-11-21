@@ -251,6 +251,8 @@ export function createTrailMaterial(
       uGlow: planet.uGlow,
       uFade: planet.uFade,
       uDim: planet.uDim,
+      /** Fades with the planet's speed: a parked (focused) planet has no trail. */
+      uTrail: { value: 1 },
       uHead: { value: 0 },
       uArc: { value: 1.1 },
       uRadius: { value: orbit.radius },

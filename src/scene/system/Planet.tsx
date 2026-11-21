@@ -26,7 +26,7 @@ import { HitZone } from '../universe/HitZone';
 import type { CategoryNodeModel, OrbitPreview } from '../universe/model';
 import { createMoonPose, moonPose } from './moon-layout';
 import { MOON_SHAPES, PLANET_SHAPES } from './planet-geometry';
-import { SHELL_SCALE, planetReach, planetScreenBoost } from './planet-math';
+import { SHELL_SCALE, planetReach, planetScreenBoost, trailIntensity } from './planet-math';
 import type { PlanetMaterials } from './planet-materials';
 
 /** Per-planet motion state, written by SystemContent before the planets read it. */
@@ -241,6 +241,7 @@ export function Planet({
       trail.uniforms.uArc.value = Math.sign(orbit.speed || 1) * 1.1;
       trail.uniforms.uScale.value = pointScale(state);
       trail.uniforms.uPixelRatio.value = state.viewport.dpr;
+      trail.uniforms.uTrail.value = trailIntensity(st.speed);
     }
     const m = materialsRef.current;
     m.glow.uniforms.uIntensity.value = (0.55 / boost) * st.fade * m.uniforms.uDim.value;

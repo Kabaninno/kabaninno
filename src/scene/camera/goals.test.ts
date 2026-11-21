@@ -19,6 +19,7 @@ import {
   minCoreDiameterPx,
   CORE_KEEP_OUT,
   PLANET_VIEW,
+  orbitTangent,
   SYSTEM_FIT,
   resolveSafeFrame,
   selectionGoal,
@@ -816,6 +817,17 @@ describe('planet focus invariants for every service (S1, S2)', () => {
             const label = `${node.categoryId}/${orbit.serviceSlug} @${angle.toFixed(2)} ${view.width}`;
             expect(dist(camera, planet), label).toBeGreaterThanOrEqual(reach * 2.5);
             expect(dist(camera, planet), label).toBeGreaterThan(0.4);
+            // Never a view along the orbit (S1 mobile: tip-on dart, stacked trail).
+            const sight = normalize([
+              camera[0] - planet[0],
+              camera[1] - planet[1],
+              camera[2] - planet[2],
+            ]);
+            const tangent = orbitTangent(node, orbit, angle);
+            const cos = Math.abs(
+              sight[0] * tangent[0] + sight[1] * tangent[1] + sight[2] * tangent[2],
+            );
+            expect(cos, `${label} tangent`).toBeLessThanOrEqual(PLANET_VIEW.maxTangentCos + 1e-9);
             expect(dist(camera, node.position), label).toBeGreaterThan(CORE_CORONA_RADIUS);
             if (node.core === 'comet') {
               // Outside the comet core's particle tail.

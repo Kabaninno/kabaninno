@@ -84,3 +84,13 @@ export function focusCoreLook(orbit: OrbitPreview | undefined): { dim: number; c
   if (!orbit) return { dim: 1, corona: 1 };
   return coreClearable(orbit) ? { dim: 0.5, corona: 0.55 } : { dim: 0.28, corona: 0.4 };
 }
+
+/**
+ * Trail strength for a planet's current speed multiplier (1 orbiting, 0.22
+ * hovered, 0 parked): a parked — focused — planet streams no trail (S1: in
+ * planet focus the trail's planet-sized points stacked into a glowing streak).
+ */
+export function trailIntensity(speed: number): number {
+  const t = Math.min(Math.max((Math.abs(speed) - 0.03) / 0.37, 0), 1);
+  return t * t * (3 - 2 * t);
+}

@@ -168,6 +168,7 @@ uniform vec3 uColor;
 uniform vec3 uGlow;
 uniform float uFade;
 uniform float uDim;
+uniform float uTrail;
 
 varying float vAlpha;
 varying float vT;
@@ -175,7 +176,7 @@ varying float vT;
 ${softPointChunk}
 
 void main() {
-  float a = softPoint(gl_PointCoord, 10.0, 0.5) * vAlpha * uFade * uDim;
+  float a = softPoint(gl_PointCoord, 10.0, 0.5) * vAlpha * uFade * uDim * uTrail;
   if (a < 0.003) discard;
   gl_FragColor = vec4(mix(uGlow, uColor, vT), clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>

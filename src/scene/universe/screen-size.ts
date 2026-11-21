@@ -60,16 +60,17 @@ export function nodeVisualRadiusPx(
   const core = corePx / 2;
   switch (kind) {
     case 'category':
-      return Math.max(core * 1.6, systemRadius * 0.8 * pxPerUnit);
+      return Math.max(core * 1.8, systemRadius * 0.8 * pxPerUnit);
     case 'configurator':
-      return core * 2.6;
+      // The crystal is 1.6× taller than wide, grows with emphasis and glows.
+      return core * 3;
     case 'portfolio':
       return Math.max(core * 1.6, 2 * pxPerUnit);
   }
 }
 
 /** Presence fade: tolerance and fade distance beyond the free frame's edge, CSS px. */
-export const PRESENCE_EDGE = { tolerance: 6, fade: 28 } as const;
+export const PRESENCE_EDGE = { tolerance: 2, fade: 16 } as const;
 
 /**
  * Presence target (1 = shown, 0 = faded) of a node of on-screen radius

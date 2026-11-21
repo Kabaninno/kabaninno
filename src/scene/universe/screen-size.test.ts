@@ -59,7 +59,7 @@ describe('node presence by visual extent (MN-2, S5, S6)', () => {
   it('measures what a node visibly occupies, not just its core', () => {
     // A category's orbit preview reaches far beyond its core.
     expect(nodeVisualRadiusPx('category', 20, 40, 1.6)).toBeCloseTo(1.6 * 0.8 * 40, 9);
-    expect(nodeVisualRadiusPx('category', 20, 1, 1.6)).toBeCloseTo(16, 9);
+    expect(nodeVisualRadiusPx('category', 20, 1, 1.6)).toBeCloseTo(18, 9);
     // The beacon's crystal is stretched 1.6× and glows.
     expect(nodeVisualRadiusPx('configurator', 20, 40)).toBeGreaterThan(20);
     expect(nodeVisualRadiusPx('portfolio', 20, 40)).toBeGreaterThanOrEqual(80);
@@ -74,6 +74,8 @@ describe('node presence by visual extent (MN-2, S5, S6)', () => {
     const automation = nodeVisualRadiusPx('category', 18, 60, 1.6);
     expect(presenceInFrame(370, 250, automation, frame)).toBeLessThan(0.05);
     // Just touching the edge (within the tolerance) stays.
-    expect(presenceInFrame(200, 64 + 30 - 5, 30, frame)).toBe(1);
+    expect(presenceInFrame(200, 64 + 30 - 1, 30, frame)).toBe(1);
+    // Crossing by the fade distance hides it completely.
+    expect(presenceInFrame(200, 64 + 30 - 18, 30, frame)).toBe(0);
   });
 });

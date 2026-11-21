@@ -22,8 +22,8 @@
    - ui-engineer (без браузера): простий режим, індикатор завантаження й кнопка «Пропустити інтро», мобільні правки (M3-03, D40, QA N2, mn5–mn7, V5-05, MJ-1, V5-07, L-01), SEO/OG/JSON-LD, інструменти скриншотів, README.
    - scene-engineer (до 10 контрольних знімків): V5-01 (готовність архіву), MJ1, MJ2, кадр конфігуратора, L-04, мінори M3/M5, гейт `simpleMode`, `bootProgress`, інтро першого візиту.
 2. ✅ **F2:** e2e 91 пройдено / 0 збоїв / 6 пропущено (Telegram-плейсхолдер і 5 тестів чернеток — пройшли окремо на `--drafts`); axe 26 сканів — 0 порушень; HTML-перевірки (OG з basePath, JSON-LD лише на головних, hreflang і x-default, sitemap 84 URL, robots, inline-скрипт простого режиму, кореневий редирект) — ок. Скриншоти: `screenshots/F2/`, `F2-fix/`, `F2-drafts/`, `F2-rs/`. Сцена S1–S6: S2, S3, S4 виправлено на знімках; S1 (mobile Telegram) частково; S5 ні; S6 здебільшого (D111, D112).
-   - ⏳ scene-engineer доводить S1 mobile, S5, S6 з контрольними знімками.
-3. **F3:** аудит послідовно: perf-a11y (Lighthouse, gzip) → qa → visual.
+   - ✅ scene-engineer довів S1 mobile, S5, S6 (D113), контрольні знімки `screenshots/F2-scene/`; 553 тести.
+3. ⏳ **F3:** аудит послідовно: perf-a11y (Lighthouse, gzip) → qa → visual. Звіти `reports/{perf-a11y,qa,visual}/F3.md`.
 4. **F4:** виправлення blocker і major, повторна перевірка.
 5. **F5:** REPORT.md, фінальне повідомлення.
 

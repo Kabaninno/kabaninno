@@ -663,7 +663,24 @@ export const PLANET_VIEW = {
   ownOrbitSkip: 0.45,
   growth: 1.15,
   orbitSamples: 32,
+  /**
+   * The view never runs along the orbit: |cos| of the angle between the view
+   * direction and the orbit tangent stays under this (S1 mobile: a tangent
+   * view saw the dart planet tip-on and its trail stacked into a streak).
+   */
+  maxTangentCos: 0.8,
 } as const;
+
+/** Unit tangent of an orbit at `angle` (world space, direction of increasing angle). */
+export function orbitTangent(
+  node: CategoryNodeModel,
+  orbit: CategoryNodeModel['orbits'][number],
+  angle: number,
+): Vec3 {
+  const ahead = planetWorldPosition(node.position, orbit, angle + 1e-3);
+  const behind = planetWorldPosition(node.position, orbit, angle - 1e-3);
+  return normalize(sub(ahead, behind));
+}
 
 /** Distance range of a planet focus: [start, longest] (see PLANET_VIEW). */
 export function planetDistanceRange(
@@ -757,7 +774,9 @@ export function planetGoal(
       tanV,
       tanH,
     );
+  const tangent = orbitTangent(node, orbit, angle);
   const allowed = (offset: readonly [number, number], distance: number) =>
+    Math.abs(dot(viewDir(offset), tangent)) <= PLANET_VIEW.maxTangentCos &&
     planetCameraMargin(cameraAt(offset, distance), node, orbit, angle) >= 0;
   const key = `${node.categoryId}/${orbit.serviceSlug}`;
   const remember = (offset: readonly [number, number], distance: number): CameraGoal => {
