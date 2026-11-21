@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { isIntroEligible, isLocaleHomePath, keySkipsIntro } from './intro';
 
 describe('isIntroEligible', () => {
-  const base = { home: true, seen: false, reducedMotion: false, simple: false };
+  const base = { home: true, optedOut: false, reducedMotion: false, simple: false };
 
-  it('plays on the first visit to a home page', () => {
+  it('plays on every fresh load of a home page', () => {
     expect(isIntroEligible(base)).toBe(true);
   });
 
-  it('never plays elsewhere, twice, under reduced motion or in simple mode', () => {
+  it('never plays elsewhere, when opted out, under reduced motion or in simple mode', () => {
     expect(isIntroEligible({ ...base, home: false })).toBe(false);
-    expect(isIntroEligible({ ...base, seen: true })).toBe(false);
+    expect(isIntroEligible({ ...base, optedOut: true })).toBe(false);
     expect(isIntroEligible({ ...base, reducedMotion: true })).toBe(false);
     expect(isIntroEligible({ ...base, simple: true })).toBe(false);
   });

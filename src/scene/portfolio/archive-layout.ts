@@ -1,3 +1,4 @@
+import { degToRad } from '../orbit-math';
 import type { Vec3 } from '../types';
 
 /**
@@ -109,3 +110,62 @@ export function archiveExtents(count: number): { halfWidth: number; halfHeight: 
 
 /** Radius of a card's bounding sphere. */
 export const CARD_RADIUS = Math.hypot(ARCHIVE.cardWidth, ARCHIVE.cardHeight) / 2;
+
+/**
+ * The observatory rings are a real orbit around the cluster, not a frame
+ * around the wall: their plane is tilted `tilt` away from the wall's plane
+ * about the wall's horizontal axis (the lower arc comes toward the viewer,
+ * in front of the cards, while the upper arc passes behind them and the
+ * cluster) and then rolled `roll` about the viewing axis so it reads as an
+ * inclined orbit rather than a level one. Seen head-on the circle is an
+ * ellipse of minor/major ratio cos(tilt).
+ */
+export const OBSERVATORY = { tilt: degToRad(72), roll: degToRad(12) } as const;
+
+/**
+ * Radius (world units) of the cluster's dense core that hides the part of the
+ * orbit passing behind it (the Plummer core of the star cloud, see
+ * PortfolioCluster, is 0.85; the glow reads a little wider).
+ */
+export const OBSERVATORY_BODY_RADIUS = 1.15;
+
+/**
+ * Local axes of the ring plane in world space (x, y span the plane, z is its
+ * normal), a right-handed orthonormal basis: the wall's basis (right, up,
+ * facing) tilted about `right` and rolled about `facing`.
+ */
+export function observatoryAxes(
+  facing: Vec3 = ARCHIVE_FACING,
+  tilt: number = OBSERVATORY.tilt,
+  roll: number = OBSERVATORY.roll,
+): { x: Vec3; y: Vec3; z: Vec3 } {
+  const basis = archiveBasis(facing);
+  const cos = Math.cos(tilt);
+  const sin = Math.sin(tilt);
+  // Tilt about `right` by -tilt: the ring's lower arc (−y) swings toward the viewer.
+  const up = combine(basis.up, cos, basis.facing, -sin);
+  const normal = combine(basis.facing, cos, basis.up, sin);
+  const turn = (v: Vec3): Vec3 => rotateAbout(v, basis.facing, roll);
+  return { x: turn(basis.right), y: turn(up), z: turn(normal) };
+}
+
+function combine(a: Vec3, ka: number, b: Vec3, kb: number): Vec3 {
+  return [a[0] * ka + b[0] * kb, a[1] * ka + b[1] * kb, a[2] * ka + b[2] * kb];
+}
+
+/** Rodrigues rotation of `v` about the unit `axis` by `angle`. */
+function rotateAbout(v: Vec3, axis: Vec3, angle: number): Vec3 {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const dot = axis[0] * v[0] + axis[1] * v[1] + axis[2] * v[2];
+  const cross: Vec3 = [
+    axis[1] * v[2] - axis[2] * v[1],
+    axis[2] * v[0] - axis[0] * v[2],
+    axis[0] * v[1] - axis[1] * v[0],
+  ];
+  return [
+    v[0] * cos + cross[0] * sin + axis[0] * dot * (1 - cos),
+    v[1] * cos + cross[1] * sin + axis[1] * dot * (1 - cos),
+    v[2] * cos + cross[2] * sin + axis[2] * dot * (1 - cos),
+  ];
+}

@@ -134,10 +134,12 @@ test.describe('loading indicator', () => {
   });
 });
 
-test.describe('first-visit intro', () => {
+test.describe('intro flight', () => {
   test.use({ introSeen: false });
 
-  test('plays once, can be skipped with Esc, and the hero comes back', async ({ page }) => {
+  test('plays on every fresh load, can be skipped with Esc, and the hero comes back', async ({
+    page,
+  }) => {
     await page.goto(homeUrl);
     const skip = page.locator('[data-intro-skip]');
     const playing = await skip
@@ -155,12 +157,11 @@ test.describe('first-visit intro', () => {
     await expect(skip).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`${homeUrl}$`));
     await expect(page.locator(HERO)).toHaveCSS('opacity', '1');
-    expect(await page.evaluate(() => localStorage.getItem('kabaninno.intro.v1'))).toBe('true');
+    // Nothing is remembered: the next fresh load plays it again (D140).
+    expect(await page.evaluate(() => localStorage.getItem('kabaninno.intro.v2'))).toBeNull();
 
     await page.reload();
-    expect(await waitForScene(page)).toBe(true);
-    await page.waitForTimeout(4000);
-    await expect(skip).toHaveCount(0);
+    await expect(skip).toBeVisible({ timeout: 30_000 });
   });
 
   test.describe('reduced motion', () => {

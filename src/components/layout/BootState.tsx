@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { hasSeenIntro, isIntroEligible, isLocaleHomePath } from '@/lib/intro';
+import { isIntroEligible, isIntroOptedOut, isLocaleHomePath } from '@/lib/intro';
 import { prefersReducedMotion } from '@/lib/motion';
 import {
   applySimpleAttribute,
@@ -23,8 +23,8 @@ import { useUiStore } from '@/store/ui';
  *   low-end hints, D115); re-applied here in case the inline script could
  *   not run. A stored "WebGL failed here" marker also marks the UI store as
  *   `webglUnavailable` (switch disabled);
- * - `introEligible`: loaded on a locale home, first visit, no reduced motion,
- *   not in simple mode.
+ * - `introEligible`: freshly loaded on a locale home (not opted out), no
+ *   reduced motion, not in simple mode (D140).
  * Components still hydrate with the store's initial values (zustand's server
  * snapshot), so the server HTML and the first client render agree.
  */
@@ -38,7 +38,7 @@ function seedFromDocument(): void {
   store.setIntroEligible(
     isIntroEligible({
       home: isLocaleHomePath(window.location.pathname),
-      seen: hasSeenIntro(),
+      optedOut: isIntroOptedOut(),
       reducedMotion: prefersReducedMotion(),
       simple,
     }),

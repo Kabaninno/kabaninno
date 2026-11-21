@@ -37,11 +37,23 @@ export interface SceneDebugControls {
   setEmphasis: (ids: readonly string[]) => void;
 }
 
+/** Debug-only (`?debug=1`): where a universe node is on screen right now (CSS px, canvas space). */
+export interface SceneNodeProbe {
+  key: string;
+  x: number;
+  y: number;
+  /** Core diameter and the node's visible radius (orbit preview, glow), px. */
+  corePx: number;
+  visualPx: number;
+  presence: number;
+}
+
 declare global {
   interface Window {
     __sceneStats?: SceneStats;
     __scenePrewarm?: ScenePrewarmReport;
     __sceneDebug?: SceneDebugControls;
+    __sceneNodes?: () => SceneNodeProbe[];
   }
 }
 

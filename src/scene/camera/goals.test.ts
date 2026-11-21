@@ -22,7 +22,14 @@ import {
   frameAspect,
   frameCenter,
   frameTangents,
+  orbitPreviewRadiusPx,
   overviewGoal,
+  overviewSwayAmplitude,
+  tallElevation,
+  systemGoal,
+  usesTallOverview,
+  OVERVIEW,
+  PHONE_CORE_BOOST,
   minCoreDiameterPx,
   CORE_KEEP_OUT,
   PLANET_VIEW,
@@ -259,9 +266,17 @@ function sphereInRect(
   );
 }
 
-function goalFor(target: Parameters<typeof computeCameraGoal>[0], view: Viewport, rect: Rect) {
+function goalFor(
+  target: Parameters<typeof computeCameraGoal>[0],
+  view: Viewport,
+  rect: Rect,
+  viewport?: Viewport,
+) {
   const frame = resolveSafeFrame(rect, view.width, view.height);
-  return { goal: computeCameraGoal(target, model, view.width / view.height, frame), frame };
+  return {
+    goal: computeCameraGoal(target, model, view.width / view.height, frame, { viewport }),
+    frame,
+  };
 }
 
 describe('resolveSafeFrame', () => {
@@ -356,17 +371,18 @@ describe('rect-aware framing', () => {
         true,
       );
     }
-    // The free band is landscape-ish, so the landscape view is used (same constellation as desktop).
-    const direction = (g: CameraGoal) =>
-      normalize([
-        g.position[0] - g.lookAt[0],
-        g.position[1] - g.lookAt[1],
-        g.position[2] - g.lookAt[2],
-      ]);
+    // The free area is nearly square, so the tall phone view is used (B1): the same
+    // constellation as the desktop's, seen from higher up and more head-on.
+    const elevation = (g: CameraGoal) =>
+      Math.asin(
+        normalize([
+          g.position[0] - g.lookAt[0],
+          g.position[1] - g.lookAt[1],
+          g.position[2] - g.lookAt[2],
+        ])[1],
+      );
     const desktop = goalFor({ mode: 'universe' }, DESKTOP_VIEW, DESKTOP_HOME_RECT).goal;
-    direction(goal).forEach((value, axis) =>
-      expect(value).toBeCloseTo(direction(desktop)[axis]!, 6),
-    );
+    expect(elevation(goal)).toBeGreaterThan(elevation(desktop) + 0.2);
   });
 
   it('frames each system inside the free area: desktop panel and phone sheet', () => {
@@ -439,6 +455,165 @@ describe('rect-aware framing', () => {
       goal.position.forEach((value, axis) => expect(value).toBeCloseTo(full.position[axis]!, 9));
       expect(goal.lookAt).toEqual(full.lookAt);
     }
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* Phone home: the tall overview (B1)                                        */
+/* ------------------------------------------------------------------------ */
+
+describe('tall phone overview (B1)', () => {
+  /** Free areas published on phones: the band between the HUD and the hero block. */
+  const PHONES: Array<{ name: string; view: Viewport; rect: Rect }> = [
+    {
+      name: '360×740',
+      view: { width: 360, height: 740 },
+      rect: { x: 0, y: 68, width: 360, height: 273 },
+    },
+    { name: '390×844', view: PHONE_VIEW, rect: { x: 0, y: 68, width: 390, height: 423 } },
+    {
+      name: '412×915',
+      view: { width: 412, height: 915 },
+      rect: { x: 0, y: 68, width: 412, height: 450 },
+    },
+  ];
+
+  /**
+   * On-screen extent of the network: every node with the radius it is drawn at (cores at
+   * the phone minimum, category orbit previews widened to clear them, see CategoryNode).
+   */
+  function networkExtent(view: Viewport, rect: Rect) {
+    const { goal, frame } = goalFor({ mode: 'universe' }, view, rect, view);
+    const minCore = minCoreDiameterPx(
+      frame.width * view.width,
+      frame.height * view.height,
+      false,
+      PHONE_CORE_BOOST,
+    );
+    const spheres = model.nodes.map((node) => {
+      const p = projectPx(goal, node.position, view, frame);
+      const radius =
+        node.kind === 'category'
+          ? orbitPreviewRadiusPx(node, minCore)
+          : node.kind === 'portfolio'
+            ? minCore * 1.3
+            : minCore * 1.15;
+      return { x: p.x, y: p.y, r: radius };
+    });
+    return {
+      top: Math.min(...spheres.map((p) => p.y - p.r)),
+      bottom: Math.max(...spheres.map((p) => p.y + p.r)),
+      left: Math.min(...spheres.map((p) => p.x - p.r)),
+      right: Math.max(...spheres.map((p) => p.x + p.r)),
+    };
+  }
+
+  it.each(PHONES)('uses the tall view and fills the free height on $name', ({ view, rect }) => {
+    const aspect = view.width / view.height;
+    const frame = resolveSafeFrame(rect, view.width, view.height);
+    expect(usesTallOverview(aspect, frame)).toBe(true);
+    expect(usesPortraitOverview(aspect, frame)).toBe(false);
+    const extent = networkExtent(view, rect);
+    // At least 90 % of the free height is covered, nothing leaves the free rect.
+    expect((extent.bottom - extent.top) / rect.height).toBeGreaterThanOrEqual(0.9);
+    expect(extent.top).toBeGreaterThanOrEqual(rect.y - 4);
+    expect(extent.bottom).toBeLessThanOrEqual(rect.y + rect.height + 4);
+    // Nothing is clipped by the viewport edges either (orbit previews included).
+    expect(extent.left).toBeGreaterThanOrEqual(0);
+    expect(extent.right).toBeLessThanOrEqual(view.width);
+  });
+
+  it('beats the landscape view on the same phone frame by a wide margin', () => {
+    const view = PHONE_VIEW;
+    const rect = PHONES[1]!.rect;
+    const frame = resolveSafeFrame(rect, view.width, view.height);
+    const aspect = view.width / view.height;
+    const tall = overviewGoal(model, aspect, frame, 0.2);
+    const landscape = overviewGoal(model, aspect, frame, 0.2, { layout: 'legacy' });
+    const spread = (goal: CameraGoal) => {
+      const ys = model.nodes.map((n) => projectPx(goal, n.position, view, frame).y);
+      return Math.max(...ys) - Math.min(...ys);
+    };
+    expect(spread(tall)).toBeGreaterThan(spread(landscape) * 1.6);
+    // Closer, too: the nodes get larger on screen.
+    expect(dist(tall.position, tall.lookAt)).toBeLessThan(
+      dist(landscape.position, landscape.lookAt),
+    );
+  });
+
+  it('keeps every node inside the rect over the idle sway of the tall view', () => {
+    const view = PHONE_VIEW;
+    const rect = PHONES[1]!.rect;
+    const { frame } = goalFor({ mode: 'universe' }, view, rect);
+    const aspect = view.width / view.height;
+    const sway = 0.2;
+    const goal = computeCameraGoal({ mode: 'universe' }, model, aspect, frame, { sway });
+    const amplitude = overviewSwayAmplitude(aspect, frame, sway);
+    for (const angle of [-amplitude, amplitude]) {
+      const swung = { ...goal, position: rotateAround(goal.position, goal.lookAt, angle) };
+      for (const node of model.categories) {
+        expect(sphereInRect(swung, node.position, node.systemRadius, view, frame, rect)).toBe(true);
+      }
+    }
+  });
+
+  it('leaves the desktop, wide bands, narrow columns and the full viewport alone', () => {
+    const desktopFrame = goalFor({ mode: 'universe' }, DESKTOP_VIEW, DESKTOP_HOME_RECT).frame;
+    expect(usesTallOverview(DESKTOP_VIEW.width / DESKTOP_VIEW.height, desktopFrame)).toBe(false);
+    const desktopAspect = DESKTOP_VIEW.width / DESKTOP_VIEW.height;
+    expect(overviewGoal(model, desktopAspect, desktopFrame)).toEqual(
+      overviewGoal(model, desktopAspect, desktopFrame, 0, { layout: 'legacy' }),
+    );
+    // A short band above a tall hero (shape > 1.45) and the whole viewport stay as before.
+    const band = resolveSafeFrame({ x: 0, y: 68, width: 375, height: 246 }, 375, 667);
+    expect(usesTallOverview(375 / 667, band)).toBe(false);
+    expect(usesTallOverview(390 / 844, FULL_FRAME)).toBe(false);
+    const column = resolveSafeFrame({ x: 0, y: 0, width: 300, height: 800 }, 390, 844);
+    expect(usesTallOverview(390 / 844, column)).toBe(false);
+    // Landscape phones (wide viewport) never use it.
+    const sideways = resolveSafeFrame({ x: 0, y: 60, width: 844, height: 280 }, 844, 390);
+    expect(usesTallOverview(844 / 390, sideways)).toBe(false);
+  });
+
+  it('looks from higher up at taller frames, within its limits', () => {
+    expect(tallElevation(0.8)).toBeGreaterThan(tallElevation(1.2));
+    expect(tallElevation(0.01)).toBeLessThanOrEqual(OVERVIEW.tall.maxElevation);
+    expect(tallElevation(5)).toBeGreaterThanOrEqual(OVERVIEW.tall.minElevation);
+  });
+
+  it('approaches systems, the archive and the beacon as before (landscape overview side)', () => {
+    const view = PHONE_VIEW;
+    const rect = PHONES[1]!.rect;
+    const { frame } = goalFor({ mode: 'universe' }, view, rect);
+    const aspect = view.width / view.height;
+    const legacy = overviewGoal(model, aspect, frame, 0.2, { layout: 'legacy' });
+    const node = model.categories[0]!;
+    const goal = computeCameraGoal(
+      { mode: 'system', category: node.categoryId },
+      model,
+      aspect,
+      frame,
+      { sway: 0.2 },
+    );
+    expect(goal).toEqual(systemGoal(node, legacy.position, legacy.fov, aspect, frame));
+  });
+
+  it('shrinks the idle sway in the tall view only', () => {
+    const view = PHONE_VIEW;
+    const { frame } = goalFor({ mode: 'universe' }, view, PHONES[1]!.rect);
+    expect(overviewSwayAmplitude(view.width / view.height, frame, 0.2)).toBeLessThan(0.2);
+    const desktopFrame = goalFor({ mode: 'universe' }, DESKTOP_VIEW, DESKTOP_HOME_RECT).frame;
+    expect(overviewSwayAmplitude(DESKTOP_VIEW.width / DESKTOP_VIEW.height, desktopFrame, 0.2)).toBe(
+      0.2,
+    );
+  });
+
+  it('makes phone cores larger without touching the desktop floor', () => {
+    expect(minCoreDiameterPx(390, 423, false, PHONE_CORE_BOOST)).toBeCloseTo(
+      minCoreDiameterPx(390, 423) * PHONE_CORE_BOOST,
+    );
+    expect(minCoreDiameterPx(390, 423)).toBeCloseTo(19.5);
+    expect(minCoreDiameterPx(824, 564, true)).toBeCloseTo(28.2);
   });
 });
 

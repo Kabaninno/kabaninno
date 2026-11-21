@@ -401,7 +401,12 @@ function drawLayout(dom: LabelDom, layout: LabelLayout, label: LabelState) {
   dom.text.style.width = `${width}px`;
 }
 
+/** Phones and tablets read their labels at arm's length: a larger face than on a desktop. */
+const TOUCH_LABEL_SCALE = 1.18;
+
 function createLabelDom(reducedMotion: boolean): LabelDom {
+  const touch = !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const scale = touch ? TOUCH_LABEL_SCALE : 1;
   const root = document.createElement('div');
   root.setAttribute('aria-hidden', 'true');
   root.dataset.sceneLabels = '';
@@ -472,19 +477,19 @@ function createLabelDom(reducedMotion: boolean): LabelDom {
   });
   const index = document.createElement('span');
   Object.assign(index.style, {
-    font: '500 10px/1 var(--font-jetbrains), ui-monospace, Menlo, Consolas, monospace',
+    font: `500 ${10 * scale}px/1 var(--font-jetbrains), ui-monospace, Menlo, Consolas, monospace`,
     letterSpacing: '0.18em',
     color: MUTED,
   });
   const name = document.createElement('span');
   Object.assign(name.style, {
-    font: '500 12.5px/1.15 var(--font-manrope), system-ui, "Segoe UI", sans-serif',
+    font: `500 ${12.5 * scale}px/1.15 var(--font-manrope), system-ui, "Segoe UI", sans-serif`,
     letterSpacing: NAME_SPACING.normal,
     textTransform: 'uppercase',
   });
   const sub = document.createElement('span');
   Object.assign(sub.style, {
-    font: '400 11px/1.2 var(--font-manrope), system-ui, "Segoe UI", sans-serif',
+    font: `400 ${11 * scale}px/1.2 var(--font-manrope), system-ui, "Segoe UI", sans-serif`,
     letterSpacing: '0.06em',
     color: MUTED,
   });

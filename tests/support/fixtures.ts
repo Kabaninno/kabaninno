@@ -9,9 +9,10 @@ import { formatIssues, IssueCollector } from './issues';
  */
 export const test = base.extend<{ issues: IssueCollector; introSeen: boolean; seedIntro: void }>({
   /**
-   * The first-visit intro (D94) plays on a fresh profile's first home visit.
-   * Tests start as returning visitors by default, so flights and reveals stay
-   * deterministic; intro tests opt out with `test.use({ introSeen: false })`.
+   * The intro flight (D94, D140) plays on every fresh load of a home page.
+   * Tests opt out of it by default (the `kabaninno.intro.v2` switch), so
+   * flights and reveals stay deterministic; intro tests opt in with
+   * `test.use({ introSeen: false })`.
    */
   introSeen: [true, { option: true }],
   seedIntro: [
@@ -19,7 +20,7 @@ export const test = base.extend<{ issues: IssueCollector; introSeen: boolean; se
       if (introSeen) {
         await context.addInitScript(() => {
           try {
-            localStorage.setItem('kabaninno.intro.v1', 'true');
+            localStorage.setItem('kabaninno.intro.v2', 'true');
           } catch {
             // Storage blocked: the intro may play; tests that care check for it.
           }

@@ -129,27 +129,60 @@ attribute float aRing;
 varying float vAngle;
 varying float vRing;
 varying float vDepth;
+/** > 0 where the ring is nearer than its centre (the arc in front of the cluster), -1..1. */
+varying float vFront;
+/** View-space position of the vertex and of the ring's centre (the cluster's centre). */
+varying vec3 vViewPos;
+varying vec3 vCentre;
 
 void main() {
   vAngle = aAngle;
   vRing = aRing;
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 centre = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
   vDepth = -mv.z;
+  vFront = clamp((-centre.z - vDepth) / max(length(position.xy), 0.001), -1.0, 1.0);
+  vViewPos = mv.xyz;
+  vCentre = centre.xyz;
   gl_Position = projectionMatrix * mv;
 }
 `;
 
+/**
+ * The rings are an orbit with depth: the arc in front of the cluster is
+ * brighter, the arc behind it dimmer. The depth test hides it wherever a card
+ * is in front; the cluster's body (a sphere of `uBodyRadius` at the ring's
+ * centre) hides it analytically — the cluster is a cloud of additive points
+ * that writes no depth, so an invisible depth sphere would also have cut the
+ * stars behind it. Arcs that come close to the camera fade, so a focused
+ * card's face stays clean.
+ */
 export const observatoryRingsFragment = /* glsl */ `
 uniform vec3 uColor;
 uniform vec3 uAccent;
 uniform float uTime;
 uniform float uIntensity;
+uniform float uBodyRadius;
 
 varying float vAngle;
 varying float vRing;
 varying float vDepth;
+varying float vFront;
+varying vec3 vViewPos;
+varying vec3 vCentre;
 
 ${fogChunk}
+
+/** 1 where the body sphere lies between the camera and this fragment (soft edge), else 0. */
+float bodyCover() {
+  float dist = length(vViewPos);
+  vec3 ray = vViewPos / max(dist, 0.0001);
+  float along = dot(ray, vCentre);
+  float miss2 = max(dot(vCentre, vCentre) - along * along, 0.0);
+  float reach = sqrt(max(uBodyRadius * uBodyRadius - miss2, 0.0));
+  float edge = 1.0 - smoothstep(uBodyRadius * 0.6, uBodyRadius, sqrt(miss2));
+  return edge * step(along - reach, dist - 0.01) * step(0.0, along);
+}
 
 void main() {
   float direction = mod(vRing, 2.0) < 0.5 ? 1.0 : -1.0;
@@ -160,7 +193,11 @@ void main() {
 #else
   float ticks = step(0.9, fract(turn * 96.0)) * step(0.5, vRing) * step(vRing, 1.5);
 #endif
-  float alpha = (arcs * (0.3 - vRing * 0.06) + ticks * 0.35) * uIntensity * fogFactor(vDepth);
+  float depthCue = mix(0.42, 1.3, smoothstep(-0.9, 0.9, vFront));
+  float nearFade = smoothstep(1.4, 4.2, vDepth);
+  float hidden = mix(1.0, 0.06, bodyCover());
+  float alpha = (arcs * (0.3 - vRing * 0.06) + ticks * 0.35) * uIntensity * depthCue * nearFade
+    * hidden * fogFactor(vDepth);
   vec3 color = mix(uColor, uAccent, ticks * 0.6);
   gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
   #include <colorspace_fragment>

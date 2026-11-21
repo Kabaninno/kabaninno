@@ -12,6 +12,7 @@ import { debugSlowMotion } from '../debug/scene-stats';
 import { CAMERA, MOTION } from '../config';
 import { focusKeyForTarget } from '../node-ids';
 import { isPerspectiveCamera } from '../three-utils';
+import type { Vec3 } from '../types';
 import type { UniverseModel } from '../universe/model';
 import {
   FAST_REFRAME,
@@ -38,8 +39,11 @@ import {
 } from './flight';
 import {
   FULL_FRAME,
+  PHONE_CORE_BOOST,
   computeCameraGoal,
   SYSTEM_SWAY,
+  isPortrait,
+  overviewSwayAmplitude,
   usesSystemSway,
   type PlanetViewMemo,
   controlLimits,
@@ -50,6 +54,7 @@ import {
   type CameraGoal,
   type SafeFrame,
 } from './goals';
+import { createGyroPose, stepGyro, type GyroPose } from './gyro';
 
 type Timeline = ReturnType<typeof gsap.timeline>;
 
@@ -63,12 +68,27 @@ const MOUSE_BUTTONS = {
 } as const;
 const TOUCHES = { one: ACTION.TOUCH_ROTATE, two: ACTION.TOUCH_DOLLY, three: ACTION.NONE } as const;
 
-/** Opening shot: the camera settles in from slightly farther while the canvas fades in. */
 /**
- * First-visit intro (D94): from deep space into the overview, ≤ 3 s. Played
- * only on reveal on the home route when the UI marked the visit eligible.
+ * Intro (D94, D140, B1): ONE flight "from a system into the universe". The
+ * camera starts close to the core of the first category's system and pulls
+ * out, swinging around it, to the settled home framing (the same pose the
+ * visitor would get with no intro, portrait layout included), so there is
+ * nothing to reveal afterwards. Played only on reveal on the home route when
+ * the UI marked the load eligible.
  */
-const INTRO = { pullback: 3.4, azimuth: 0.55, polar: -0.16, duration: 2.8 } as const;
+const INTRO = {
+  duration: 2.3,
+  /** Start distance from the anchor core: its system's radius × closeness, at least minRadius. */
+  closeness: 1.9,
+  minRadius: 2.6,
+  /** Swing around the anchor during the pull-out (radians), and the start's elevation offset. */
+  azimuth: 0.7,
+  polar: -0.1,
+  /** FOV widening at mid-flight (degrees; less on portrait screens, like the other flights). */
+  punchDeg: 5,
+  /** The look target stays on the core for this share of the flight, then slides to the overview. */
+  lookDelay: 0.2,
+} as const;
 /** Safe-rect changes this early in the intro re-base it instead of sliding (D28). */
 const INTRO_SNAP_SECONDS = 0.5;
 /** CameraControls' smoothing of programmatic moves and inertia (seconds). */
@@ -89,6 +109,10 @@ const IDLE = {
 } as const;
 /** Inertia: share of the release velocity carried on after a drag (seconds of travel). */
 const FLING_SECONDS = 0.32;
+/** Idle sway share while the gyro parallax is live (the tilt already moves the view). */
+const GYRO_IDLE_SHARE = 0.35;
+/** The overview's viewing angles are re-aimed only when they changed more than this (radians). */
+const ANGLE_RETARGET = 0.05;
 /** FOV punch share on portrait screens. */
 const PORTRAIT_PUNCH_SHARE = 0.6;
 /** After an interrupt, the elevation is eased back within this range of the goal's (rad). */
@@ -189,6 +213,12 @@ interface DirectorState {
   /** Focal offset last sent to the controls (pointer parallax). */
   parallaxX: number;
   parallaxY: number;
+  /** Gyro parallax: the smoothed turn, and the part of it already sent to the controls (radians). */
+  gyro: GyroPose;
+  gyroApplied: { azimuth: number; polar: number };
+  /** Viewing angles the overview was last aimed at (re-aimed when the frame's layout changes). */
+  aimedAzimuth: number;
+  aimedPolar: number;
   refreshHover: boolean;
   /** `performance.now()` until which a settled reframe uses the fast smoothing (S3). */
   fastReframeUntil: number;
@@ -335,7 +365,12 @@ export function CameraDirector({
       frameChanged = !sameFrame(next, d.frame);
       if (frameChanged) d.frame = next;
     }
-    const minCore = minCoreDiameterPx(d.frame.width * width, d.frame.height * height, finePointer);
+    const minCore = minCoreDiameterPx(
+      d.frame.width * width,
+      d.frame.height * height,
+      finePointer,
+      isPortrait(aspect) ? PHONE_CORE_BOOST : 1,
+    );
     shared.minCorePx =
       !d.initialized || reducedMotion
         ? minCore
@@ -386,6 +421,7 @@ export function CameraDirector({
         planetAngle,
         emphasis,
         planetView: d.planetView,
+        viewport: { width, height },
       });
       d.goalPose = poseFromLookAt(d.goal.position, d.goal.lookAt);
       d.goalModel = model;
@@ -402,6 +438,7 @@ export function CameraDirector({
     if (!d.initialized) {
       d.initialized = true;
       applyPose(controls, goalPose);
+      markAimed(d, goalPose);
       setLimits(controls, target, goalPose);
       d.settledRadius = goalPose.radius;
       d.fov = { value: goal.fov, velocity: 0 };
@@ -420,8 +457,12 @@ export function CameraDirector({
       d.revealed = true;
       if (!d.cut && !d.flight && introWanted(target, reducedMotion)) {
         // First visit on the home route (D94): the intro flight, then interaction.
-        d.flight = createIntro(goalPose, goal.fov, center);
+        d.flight = createIntro(goalPose, goal.fov, center, introAnchor(model), aspect);
         applyPose(controls, d.flight.from);
+        resetGyro(d);
+        shared.interactive = false;
+        // The anchor system fills the frame at the start: it must not fade as "covered".
+        shared.presenceKey = model.categories[0]?.key ?? null;
         useSceneStore.getState().setIntroActive(true);
       } else if (!d.cut && !d.flight) {
         shared.interactive = isOverview(target);
@@ -435,7 +476,12 @@ export function CameraDirector({
     // 5. User input interrupts programmatic motion (never the reduced-motion cut).
     if (d.inputPending) {
       d.inputPending = false;
-      if (d.flight) interruptFlight(d, shared, controls, target, goalPose, d.inputWheel);
+      if (d.flight?.kind === 'intro') {
+        // Any touch ends the intro at once on the finished overview: no second glide (B1).
+        settle(d, shared, controls, target, goalPose, goal, center);
+      } else if (d.flight) {
+        interruptFlight(d, shared, controls, target, goalPose, d.inputWheel);
+      }
       d.idleClock = 0;
       d.swayApplied = 0;
     }
@@ -446,7 +492,7 @@ export function CameraDirector({
     } else if (d.flight) {
       const flight = d.flight;
       if (flight.kind === 'intro' && frameChanged && flight.elapsed < INTRO_SNAP_SECONDS) {
-        flight.from = introStart(goalPose);
+        flight.from = introStart(goalPose, introAnchor(model));
         flight.fromCenter = center;
         snapCenter(d, center);
       }
@@ -466,6 +512,7 @@ export function CameraDirector({
       if (reducedMotion) {
         d.fov = { value: goal.fov, velocity: 0 };
         snapCenter(d, center);
+        releaseGyro(d, controls);
       } else {
         const centerSmooth = reframeSmoothTime(now, d.fastReframeUntil, MOTION.cameraSmoothTime);
         smoothDamp(
@@ -476,7 +523,11 @@ export function CameraDirector({
         );
         smoothDamp(d.centerX, center.x, centerSmooth, dt);
         smoothDamp(d.centerY, center.y, centerSmooth, dt);
-        idleMotion(d, shared, controls, target, dt);
+        const overviewAmplitude =
+          overviewSwayAmplitude(aspect, d.frame, IDLE.overview.amplitude) *
+          (shared.gyro.live ? GYRO_IDLE_SHARE : 1);
+        idleMotion(d, shared, controls, target, dt, overviewAmplitude);
+        applyGyro(d, shared, controls, target, dt);
         if (finePointer && !d.dragging) {
           const distance = controls.distance;
           parallax(
@@ -547,8 +598,9 @@ function startFlight(
   aspect: number,
 ) {
   d.flight?.timeline.kill();
-  endIntro();
+  endIntro(shared);
   d.cut = null;
+  resetGyro(d);
   const kind = classifyFlight(from, to);
   const profile = FLIGHT_PROFILES[kind];
   // Portrait screens stretch the frame edges more under a wide FOV (visual N2-03).
@@ -630,24 +682,49 @@ function startFlight(
   publishFlight(true, 0, path);
 }
 
-function createIntro(goalPose: OrbitPose, fov: number, center: { x: number; y: number }): Flight {
+/** The system the intro starts in: the first category (content order), else none. */
+function introAnchor(model: UniverseModel): { position: Vec3; radius: number } | null {
+  const node = model.categories[0];
+  if (!node) return null;
+  return {
+    position: node.position,
+    radius: Math.max(INTRO.minRadius, node.systemRadius * INTRO.closeness),
+  };
+}
+
+function createIntro(
+  goalPose: OrbitPose,
+  fov: number,
+  center: { x: number; y: number },
+  anchor: { position: Vec3; radius: number } | null,
+  aspect: number,
+): Flight {
   const channels: Channels = { look: 0, dolly: 0, orbit: 0, arc: 0, punch: 0, flash: 0 };
+  const duration = INTRO.duration;
+  const punchDeg = INTRO.punchDeg * (aspect < 1 ? PORTRAIT_PUNCH_SHARE : 1);
   const timeline = gsap.timeline({ paused: true });
-  timeline.to(
-    channels,
-    { look: 1, dolly: 1, orbit: 1, duration: INTRO.duration, ease: 'power3.out' },
-    0,
-  );
+  // One pull-out: the camera backs away from the core on a heavy in-out curve while it swings
+  // around it; the look target stays on the core first, then slides to the overview's centre.
+  timeline
+    .to(
+      channels,
+      { look: 1, duration: duration * (1 - INTRO.lookDelay), ease: 'power3.inOut' },
+      duration * INTRO.lookDelay,
+    )
+    .to(channels, { dolly: 1, duration, ease: 'power3.inOut' }, 0)
+    .to(channels, { orbit: 1, duration, ease: 'power2.inOut' }, 0)
+    .to(channels, { punch: 1, duration: duration * 0.5, ease: 'sine.inOut' }, 0)
+    .to(channels, { punch: 0, duration: duration * 0.5, ease: 'sine.inOut' }, duration * 0.5);
   return {
     kind: 'intro',
     timeline,
     channels,
-    from: introStart(goalPose),
+    from: introStart(goalPose, anchor),
     fromFov: fov,
     fromCenter: center,
     hop: 0,
-    duration: INTRO.duration,
-    punchDeg: 0,
+    duration,
+    punchDeg,
     elapsed: 0,
     path: null,
     focusFrom: null,
@@ -655,12 +732,26 @@ function createIntro(goalPose: OrbitPose, fov: number, center: { x: number; y: n
   };
 }
 
-function introStart(goalPose: OrbitPose): OrbitPose {
+/** Where the intro starts: close to the anchor core, turned a little off the final view. */
+function introStart(
+  goalPose: OrbitPose,
+  anchor: { position: Vec3; radius: number } | null,
+): OrbitPose {
+  const polar = Math.min(Math.max(goalPose.polar + INTRO.polar, 0.3), Math.PI - 0.3);
+  if (!anchor) {
+    // No category to start in: a pull-back from close to the overview's centre.
+    return {
+      target: [...goalPose.target],
+      radius: goalPose.radius * 0.25,
+      azimuth: goalPose.azimuth + INTRO.azimuth,
+      polar,
+    };
+  }
   return {
-    target: [...goalPose.target],
-    radius: goalPose.radius * INTRO.pullback,
+    target: [...anchor.position],
+    radius: anchor.radius,
     azimuth: goalPose.azimuth + INTRO.azimuth,
-    polar: goalPose.polar + INTRO.polar,
+    polar,
   };
 }
 
@@ -706,7 +797,7 @@ function settle(
   center: { x: number; y: number },
 ) {
   const flight = d.flight;
-  if (flight && flight.timeline.duration() > flight.elapsed + 1e-3) {
+  if (flight && flight.kind !== 'intro' && flight.timeline.duration() > flight.elapsed + 1e-3) {
     // The bloom flash decays after arrival.
     d.flashTail = { timeline: flight.timeline, channels: flight.channels, elapsed: flight.elapsed };
   } else {
@@ -714,6 +805,7 @@ function settle(
   }
   d.flight = null;
   applyPose(controls, goalPose);
+  markAimed(d, goalPose);
   setLimits(controls, target, goalPose);
   d.settledRadius = goalPose.radius;
   d.fov = { value: goal.fov, velocity: 0 };
@@ -761,13 +853,15 @@ function introWanted(target: SceneTarget, reducedMotion: boolean): boolean {
 }
 
 /** The intro ended (settled, skipped, interrupted or replaced by a navigation). */
-function endIntro() {
+function endIntro(shared: SceneBus) {
+  shared.presenceKey = null;
   const store = useSceneStore.getState();
   if (store.introActive) store.setIntroActive(false);
 }
 
 function finishMotion(d: DirectorState, shared: SceneBus, target: SceneTarget) {
-  endIntro();
+  endIntro(shared);
+  resetGyro(d);
   shared.flying = false;
   shared.focusDriven = false;
   shared.interactive = isOverview(target) && d.revealed;
@@ -794,8 +888,9 @@ function startCut(
   path: string,
 ) {
   d.flight?.timeline.kill();
-  endIntro();
+  endIntro(shared);
   d.flight = null;
+  resetGyro(d);
   d.cut = {
     elapsed: 0,
     path,
@@ -846,6 +941,7 @@ function stepCut(
     canvas.style.opacity = '';
     d.cut = null;
     applyPose(controls, goalPose);
+    markAimed(d, goalPose);
     setLimits(controls, target, goalPose);
     d.settledRadius = goalPose.radius;
     finishMotion(d, shared, target);
@@ -871,6 +967,29 @@ function reframe(
   const animate = !reducedMotion;
   void controls.setTarget(goalPose.target[0], goalPose.target[1], goalPose.target[2], animate);
   void controls.dollyTo(goalPose.radius * zoom, animate);
+  // The home layout can change with the frame (a phone turned sideways: tall ↔ landscape view):
+  // re-aim the angles then, but never fight a visitor's own rotation over small refits.
+  if (isOverview(target)) {
+    const turn = shortestAngleDelta(d.aimedAzimuth, goalPose.azimuth);
+    const lift = goalPose.polar - d.aimedPolar;
+    if (Math.abs(turn) > ANGLE_RETARGET || Math.abs(lift) > ANGLE_RETARGET) {
+      markAimed(d, goalPose);
+      const azimuth = controls.azimuthAngle;
+      void controls.rotateTo(
+        azimuth + shortestAngleDelta(azimuth, goalPose.azimuth),
+        goalPose.polar,
+        animate,
+      );
+      d.swayApplied = 0;
+      resetGyro(d);
+    }
+  }
+}
+
+/** Remembers the viewing angles the camera was last aimed at. */
+function markAimed(d: DirectorState, pose: OrbitPose) {
+  d.aimedAzimuth = pose.azimuth;
+  d.aimedPolar = pose.polar;
 }
 
 function idleMotion(
@@ -879,6 +998,7 @@ function idleMotion(
   controls: CameraControlsImpl,
   target: SceneTarget,
   dt: number,
+  overviewAmplitude: number,
 ) {
   const lastActivity = Math.max(shared.lastInputAt, d.settledAt);
   const idle = performance.now() - lastActivity > IDLE.delayMs && !d.dragging;
@@ -904,7 +1024,7 @@ function idleMotion(
       : target.mode === 'system'
         ? { amplitude: SYSTEM_SWAY, period: IDLE.anchor.period }
         : isOverview(target)
-          ? IDLE.overview
+          ? { amplitude: overviewAmplitude, period: IDLE.overview.period }
           : IDLE.anchor;
   const sway = idleSway(d.idleClock, amplitude, period, IDLE.rampIn);
   void controls.rotate(sway - d.swayApplied, 0, false);
@@ -922,6 +1042,48 @@ function parallax(d: DirectorState, controls: CameraControlsImpl, x: number, y: 
   d.parallaxX = x;
   d.parallaxY = y;
   void controls.setFocalOffset(x, y, 0, true);
+}
+
+/**
+ * Gyro parallax (B1): the home view turns a few degrees with the phone's tilt,
+ * smoothed, as increments on the controls' angles (like the idle sway, so the
+ * visitor's own rotation is kept). Frozen while the visitor drags and during
+ * flights; only on the overview; never under reduced motion (`releaseGyro`).
+ */
+function applyGyro(
+  d: DirectorState,
+  shared: SceneBus,
+  controls: CameraControlsImpl,
+  target: SceneTarget,
+  dt: number,
+) {
+  if (!shared.gyro.live && d.gyro.azimuthDeg === 0 && d.gyro.polarDeg === 0) return;
+  const enabled = isOverview(target) && d.revealed && !d.dragging && !d.flight && !d.cut;
+  const pose = stepGyro(d.gyro, shared.gyro, dt, enabled);
+  const azimuth = (pose.azimuthDeg * Math.PI) / 180;
+  const polar = (pose.polarDeg * Math.PI) / 180;
+  const dAzimuth = azimuth - d.gyroApplied.azimuth;
+  const dPolar = polar - d.gyroApplied.polar;
+  if (Math.abs(dAzimuth) < 1e-5 && Math.abs(dPolar) < 1e-5) return;
+  d.gyroApplied.azimuth = azimuth;
+  d.gyroApplied.polar = polar;
+  void controls.rotate(dAzimuth, dPolar, false);
+}
+
+/** The pose was set absolutely (flight, cut, re-aim): the gyro's contribution starts again from rest. */
+function resetGyro(d: DirectorState) {
+  d.gyro.azimuthDeg = 0;
+  d.gyro.polarDeg = 0;
+  d.gyroApplied.azimuth = 0;
+  d.gyroApplied.polar = 0;
+}
+
+/** Reduced motion: take back whatever the gyro had added. */
+function releaseGyro(d: DirectorState, controls: CameraControlsImpl) {
+  const { azimuth, polar } = d.gyroApplied;
+  if (azimuth === 0 && polar === 0) return;
+  void controls.rotate(-azimuth, -polar, false);
+  resetGyro(d);
 }
 
 /** Release velocity of a drag, for the inertia fling. */
@@ -1045,6 +1207,10 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     settledAt: 0,
     parallaxX: 0,
     parallaxY: 0,
+    gyro: createGyroPose(),
+    gyroApplied: { azimuth: 0, polar: 0 },
+    aimedAzimuth: 0,
+    aimedPolar: 0,
     refreshHover: false,
   };
 }

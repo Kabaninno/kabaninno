@@ -120,7 +120,7 @@ test('axe audit of key routes', async ({ browser, baseURL }) => {
     // A returning visitor: the first-visit intro (D94) would hide the home hero.
     await context.addInitScript(() => {
       try {
-        localStorage.setItem('kabaninno.intro.v1', 'true');
+        localStorage.setItem('kabaninno.intro.v2', 'true');
       } catch {
         // ignore
       }

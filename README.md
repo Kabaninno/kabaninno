@@ -170,9 +170,10 @@ Pages deploy.
 
 - **Loading indicator**: a hairline under the HUD bar fills while the 3D scene boots; the HTML is
   usable all along.
-- **First-visit intro** (≤ 3 s): only on the first visit to a home page, never under reduced
-  motion or in simple mode. "Skip intro", Esc or any key/click ends it; the visit is then stored
-  (`kabaninno.intro.v1`). To see it again, clear that key in the browser's storage.
+- **Intro flight** (≤ 3 s): on every fresh load of a home page (not on in-app navigation), never
+  under reduced motion or in simple mode. The camera starts at a system's core and pulls out to
+  the whole universe. "Skip intro", Esc, any key, click, touch or scroll ends it. Nothing is
+  stored; automation can switch it off with `localStorage['kabaninno.intro.v2'] = 'true'`.
 
 ## SEO
 

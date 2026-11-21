@@ -24,7 +24,7 @@ import {
 } from '../system/planet-materials';
 import { fogUniforms } from '../three-utils';
 import type { ArchiveProjectModel, PortfolioNodeModel } from '../universe/model';
-import { ARCHIVE } from './archive-layout';
+import { ARCHIVE, OBSERVATORY_BODY_RADIUS } from './archive-layout';
 
 /** Per-card uniforms: the planet set (hover, fade, dim) plus the filter emphasis. */
 export interface CardUniforms extends PlanetUniforms {
@@ -150,6 +150,8 @@ function createRingsMaterial(system: SystemUniforms, lowQuality: boolean): Shade
       uColor: { value: new Color(PALETTE.portfolio) },
       uAccent: { value: new Color(PALETTE.portfolioGlow) },
       uIntensity: { value: 0 },
+      // The cluster's dense core hides the orbit where it passes behind (world units).
+      uBodyRadius: { value: OBSERVATORY_BODY_RADIUS },
     },
     transparent: true,
     depthWrite: false,

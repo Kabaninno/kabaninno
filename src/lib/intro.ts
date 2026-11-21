@@ -3,14 +3,22 @@ import { stripBasePath } from './base-path';
 import { safeStorage } from './storage';
 
 /**
- * First-visit intro (BRIEF: ≤ 3 s, skippable, first visit only; D94). The UI
- * decides eligibility (`introEligible` in the scene store) once per page
- * load; the scene plays the intro flight and reports `introActive`; the UI
- * shows "Skip intro" meanwhile and remembers the visit when it ends.
+ * Intro flight (BRIEF: ≤ 3 s, skippable; D94, D140). The UI decides
+ * eligibility (`introEligible` in the scene store) once per page load: every
+ * fresh load of a locale home, never a client-side navigation. The scene
+ * plays the flight from a system's core out to the whole universe and reports
+ * `introActive`; the UI shows "Skip intro" meanwhile, and any touch, click,
+ * scroll or key ends it at once.
  */
 
-/** localStorage key: `true` once the intro has played or was skipped. */
-export const INTRO_STORAGE_KEY = 'kabaninno.intro.v1';
+/**
+ * localStorage key that switches the intro off when it holds `true`. The site
+ * never writes it (the intro is not "first visit only" any more, D140); it is
+ * a manual / automation opt-out (e2e and screenshot runs set it). The earlier
+ * `kabaninno.intro.v1` ("seen") flag is ignored on purpose, so returning
+ * visitors see the new intro too.
+ */
+export const INTRO_OPT_OUT_KEY = 'kabaninno.intro.v2';
 
 /** Attribute on `<html>` while the intro plays (hides `[data-intro-hide]`, globals.css). */
 export const INTRO_ACTIVE_ATTRIBUTE = 'data-intro-active';
@@ -25,13 +33,19 @@ export const INTRO_MAX_MS = 4500;
 export interface IntroConditions {
   /** The page was loaded on a locale home ("/pl/", "/en/", "/uk/"). */
   home: boolean;
-  seen: boolean;
+  /** The opt-out key is set (automation, manual). */
+  optedOut: boolean;
   reducedMotion: boolean;
   simple: boolean;
 }
 
-export function isIntroEligible({ home, seen, reducedMotion, simple }: IntroConditions): boolean {
-  return home && !seen && !reducedMotion && !simple;
+export function isIntroEligible({
+  home,
+  optedOut,
+  reducedMotion,
+  simple,
+}: IntroConditions): boolean {
+  return home && !optedOut && !reducedMotion && !simple;
 }
 
 /** "/kabaninno/pl/" (with the base path) → true; any other route → false. */
@@ -42,12 +56,8 @@ export function isLocaleHomePath(pathname: string, basePath?: string): boolean {
   return match !== null && (locales as readonly string[]).includes(match[1]!);
 }
 
-export function hasSeenIntro(): boolean {
-  return safeStorage.getJSON(INTRO_STORAGE_KEY) === true;
-}
-
-export function markIntroSeen(): void {
-  safeStorage.setJSON(INTRO_STORAGE_KEY, true);
+export function isIntroOptedOut(): boolean {
+  return safeStorage.getJSON(INTRO_OPT_OUT_KEY) === true;
 }
 
 const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'Fn']);

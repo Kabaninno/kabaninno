@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { createGyroInput, type GyroInput } from './camera/gyro';
 
 /**
  * Mutable per-frame state shared by the camera director, the universe, the
@@ -56,6 +57,14 @@ export interface SceneBus {
   readyContent: Set<string>;
   /** Text box of the visible canvas label, device px, GL origin (bottom-left), or null. */
   labelRect: [number, number, number, number] | null;
+  /**
+   * A universe node that keeps full presence while the camera is close to it
+   * even though it fills the free frame (the intro starts inside the first
+   * category's system, B1); null otherwise.
+   */
+  presenceKey: string | null;
+  /** Device tilt from `deviceorientation` (phones only, see GyroParallax); `live` once real readings arrive. */
+  gyro: GyroInput;
 }
 
 /** A planet (or an archive card) as the labels see it (CSS px, canvas space). */
@@ -100,6 +109,8 @@ export function createSceneBus(): SceneBus {
     projectTargets: new Map(),
     readyContent: new Set(),
     labelRect: null,
+    presenceKey: null,
+    gyro: createGyroInput(),
   };
 }
 

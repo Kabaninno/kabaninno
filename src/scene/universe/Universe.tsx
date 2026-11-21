@@ -7,6 +7,7 @@ import { useSceneStore } from '@/store/scene';
 import { keepAlive, type SceneBusRef } from '../bus';
 import { MOTION } from '../config';
 import { dampFactor } from '../camera/damp';
+import { isSceneDebugEnabled } from '../debug/scene-stats';
 import { sceneNodeId, universeKeyForHighlight } from '../node-ids';
 import {
   ARCHIVE_PREWARM_KEY,
@@ -39,6 +40,7 @@ import { SelectionLinks } from './SelectionLinks';
 import {
   coreWorldRadius,
   nodeVisualRadiusPx,
+  orbitClearanceScale,
   pixelsPerUnit,
   presenceInFrame,
   smallCoreBoost,
@@ -125,6 +127,42 @@ export function Universe({
       if (state.highlighted !== previous.highlighted) apply(state.highlighted);
     });
   }, [busRef, model, prewarm]);
+
+  // `?debug=1`: node projections for reviewers (how much of the free area the network fills).
+  useEffect(() => {
+    if (!isSceneDebugEnabled(window.location.search)) return;
+    window.__sceneNodes = () =>
+      model.nodes.map((node) => {
+        const i = node.index;
+        const rt = runtime.current;
+        const corePx = rt?.corePx[i] ?? 0;
+        const ppu = rt?.pxPerUnit[i] ?? 0;
+        let visualPx = nodeVisualRadiusPx(
+          node.kind,
+          corePx,
+          ppu,
+          node.kind === 'category' ? node.systemRadius : 0,
+        );
+        if (node.kind === 'category') {
+          // What is really drawn: the outer orbit of the preview, widened to clear the core.
+          const inner = Math.min(...node.orbits.map((orbit) => orbit.radius));
+          const outer = Math.max(...node.orbits.map((orbit) => orbit.radius));
+          const orbitScale = orbitClearanceScale(rt?.coreRadius[i] ?? 0, inner);
+          visualPx = Math.max(visualPx, outer * orbitScale * ppu);
+        }
+        return {
+          key: node.key,
+          x: rt?.screenX[i] ?? 0,
+          y: rt?.screenY[i] ?? 0,
+          corePx,
+          visualPx,
+          presence: rt?.presence[i] ?? 0,
+        };
+      });
+    return () => {
+      delete window.__sceneNodes;
+    };
+  }, [model]);
 
   useEffect(() => {
     const apply = (ids: readonly string[]) => {
@@ -221,7 +259,9 @@ export function Universe({
       rt.screenY[i] = sy;
       rt.inFront[i] = inFront;
       const focusTarget =
-        node.key === focusKey || (shared.focusDriven && node.key === shared.focusTo);
+        node.key === focusKey ||
+        node.key === shared.presenceKey ||
+        (shared.focusDriven && node.key === shared.focusTo);
       // What the node visibly occupies, not just its centre: it never shows clipped
       // by the free frame's edge (HUD, panel, sheet) — it fades once that crosses it.
       const visual = nodeVisualRadiusPx(

@@ -18,7 +18,11 @@ import {
   archiveGrid,
   archiveOffsets,
   archiveSlots,
+  observatoryAxes,
+  OBSERVATORY,
+  CARD_RADIUS,
 } from './archive-layout';
+import { observatoryRadii } from './archive-geometry';
 import { FILTER_DIM, PROJECT_SIBLING_DIM, archiveCardTargets } from './archive-state';
 import { EMBLEMS } from './emblems';
 
@@ -316,5 +320,101 @@ describe('archive framing', () => {
     const dormant = computeCameraGoal({ mode: 'portfolio' }, empty, aspect, frame);
     expect(dormant.lookAt).toEqual(empty.portfolio.position);
     expect(dist(dormant.position, dormant.lookAt)).toBeGreaterThan(9 - 1e-9);
+  });
+});
+
+describe('observatory rings are a tilted orbit (B2)', () => {
+  const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a: Vec3, b: Vec3): Vec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+  const axes = observatoryAxes();
+  /** World offset (from the cluster) of the ring point at `angle` on a ring of `radius`. */
+  const ringPoint = (radius: number, angle: number): Vec3 => [
+    (axes.x[0] * Math.cos(angle) + axes.y[0] * Math.sin(angle)) * radius,
+    (axes.x[1] * Math.cos(angle) + axes.y[1] * Math.sin(angle)) * radius,
+    (axes.x[2] * Math.cos(angle) + axes.y[2] * Math.sin(angle)) * radius,
+  ];
+
+  it('is a right-handed orthonormal basis', () => {
+    for (const axis of [axes.x, axes.y, axes.z]) expect(Math.hypot(...axis)).toBeCloseTo(1, 9);
+    expect(dot(axes.x, axes.y)).toBeCloseTo(0, 9);
+    expect(dot(axes.x, axes.z)).toBeCloseTo(0, 9);
+    expect(dot(axes.y, axes.z)).toBeCloseTo(0, 9);
+    const handed = cross(axes.x, axes.y);
+    handed.forEach((value, i) => expect(value).toBeCloseTo(axes.z[i]!, 9));
+  });
+
+  it('tilts the ring plane well away from the wall, so it reads as an ellipse, not a frame', () => {
+    // The roll about the viewing axis keeps the angle between the normals.
+    expect(dot(axes.z, ARCHIVE_FACING)).toBeCloseTo(Math.cos(OBSERVATORY.tilt), 9);
+    expect(OBSERVATORY.tilt).toBeGreaterThan((60 * Math.PI) / 180);
+    const { right, up } = archiveBasis();
+    let major = 0;
+    let minor = Infinity;
+    for (let k = 0; k < 360; k++) {
+      const p = ringPoint(1, (k / 360) * Math.PI * 2);
+      const onScreen = Math.hypot(dot(p, right), dot(p, up));
+      major = Math.max(major, onScreen);
+      minor = Math.min(minor, onScreen);
+    }
+    expect(major).toBeCloseTo(1, 3);
+    expect(minor).toBeCloseTo(Math.cos(OBSERVATORY.tilt), 3);
+    expect(minor).toBeLessThan(0.5);
+  });
+
+  it('passes in front of the wall on one side and behind the cluster on the other', () => {
+    for (const radius of observatoryRadii(
+      archiveExtents(4).halfWidth,
+      archiveExtents(4).halfHeight,
+    )) {
+      let front = -Infinity;
+      let back = Infinity;
+      for (let k = 0; k < 360; k++) {
+        const depth = dot(ringPoint(radius, (k / 360) * Math.PI * 2), ARCHIVE_FACING);
+        front = Math.max(front, depth);
+        back = Math.min(back, depth);
+      }
+      // Nearer the viewer than the cards, farther than the cluster centre.
+      expect(front).toBeGreaterThan(ARCHIVE.forward + 0.5);
+      expect(back).toBeLessThan(-ARCHIVE.forward);
+    }
+  });
+
+  it('keeps its lower arc toward the viewer, like a level orbit seen from above', () => {
+    const { up } = archiveBasis();
+    for (let k = 0; k < 360; k += 5) {
+      const p = ringPoint(1, (k / 360) * Math.PI * 2);
+      // Rolled about the viewing axis, "lower" means below the ring's own centre line.
+      const rolled = dot(p, up);
+      const toward = dot(p, ARCHIVE_FACING);
+      if (Math.abs(rolled) > 0.5 && Math.abs(toward) > 0.3) {
+        expect(Math.sign(toward)).toBe(rolled < 0 ? 1 : -1);
+      }
+    }
+  });
+
+  it.each([1, 2, 4, 6])('never cuts through a card of a wall of %i', (count) => {
+    const { halfWidth, halfHeight } = archiveExtents(count);
+    const offsets = archiveOffsets(count);
+    for (const radius of observatoryRadii(halfWidth, halfHeight)) {
+      for (const offset of offsets) {
+        let nearest = Infinity;
+        for (let k = 0; k < 720; k++) {
+          const p = ringPoint(radius, (k / 720) * Math.PI * 2);
+          nearest = Math.min(
+            nearest,
+            Math.hypot(p[0] - offset[0], p[1] - offset[1], p[2] - offset[2]),
+          );
+        }
+        expect(nearest).toBeGreaterThan(CARD_RADIUS);
+      }
+    }
+  });
+
+  it('keeps the dormant cluster inside its rings', () => {
+    for (const radius of observatoryRadii(0, 0)) expect(radius).toBeGreaterThan(3);
   });
 });

@@ -129,6 +129,33 @@ export const OVERVIEW = {
   portraitInRectBelowAspect: 0.65,
   minDistance: 18,
   maxDistance: 90,
+  /**
+   * Phone home (B1): on a portrait viewport whose free frame is roughly square
+   * (the band between the HUD and the hero block) the landscape view left the
+   * network a thin strip in the middle of it. The "tall" view is the landscape
+   * constellation seen from higher up and nearly head-on, so the ring's depth
+   * (z) spreads over the screen's height as well: the network fills the free
+   * frame's height (portfolio and beacon included) instead of a third of it.
+   * Searched numerically over the free frames of 360×740 … 412×915 phones
+   * (the elevation follows the frame's shape: a taller frame is looked at
+   * from higher up).
+   */
+  tall: {
+    azimuth: degToRad(-6),
+    minElevation: degToRad(28),
+    maxElevation: degToRad(66),
+    /** Elevation (degrees) at a square-ish frame, and its change per unit of frame shape (w/h). */
+    elevationDeg: 38,
+    elevationSlopeDeg: 65,
+    elevationShape: 1.2,
+    /** Frame shapes (w/h) the view is used for: wider free frames keep the landscape view. */
+    minShape: 0.65,
+    maxShape: 1.45,
+    /** Idle sway of the tall view relative to the landscape one (the fit must cover it). */
+    swayShare: 0.5,
+    /** Share of the half-frame a node may use (the free frame is nearly filled). */
+    margin: { category: 1, portfolio: 1, configurator: 1 },
+  },
 } as const;
 
 /** Vertical FOV for a viewport aspect: 50° on landscape, widening on portrait. */
@@ -174,17 +201,52 @@ export function fitDistance(
  * World radius a node needs on screen and the share of the half-frame it may
  * use: categories keep breathing room, anchors may sit closer to the edge.
  */
-function nodeFraming(node: UniverseNode): { radius: number; margin: number } {
+function nodeFraming(
+  node: UniverseNode,
+  tall: { minCorePx: number; pxToTan: (px: number) => number } | null = null,
+): { radius: number; margin: number; angular: number } {
+  if (tall) {
+    const { margin } = OVERVIEW.tall;
+    // On a phone the nodes are drawn at their minimum on-screen size (bigger cores, orbit
+    // previews widened to clear them): their extent is a size in px, not in world units.
+    const { pxToTan, minCorePx } = tall;
+    switch (node.kind) {
+      case 'category':
+        return {
+          radius: 0.25,
+          margin: margin.category,
+          angular: pxToTan(orbitPreviewRadiusPx(node, minCorePx)),
+        };
+      case 'portfolio':
+        return { radius: 0.5, margin: margin.portfolio, angular: pxToTan(minCorePx * 1.3) };
+      case 'configurator':
+        return { radius: 0.3, margin: margin.configurator, angular: pxToTan(minCorePx * 1.15) };
+    }
+  }
   switch (node.kind) {
     case 'category':
-      return { radius: Math.max(node.systemRadius, 1) + 0.4, margin: 0.86 };
+      return { radius: Math.max(node.systemRadius, 1) + 0.4, margin: 0.86, angular: 0 };
     case 'portfolio':
       // The cluster's visible star cloud (and its label reticle), not just its core
       // (S4: the reticle ran under the HUD).
-      return { radius: 2.3, margin: 0.94 };
+      return { radius: 2.3, margin: 0.94, angular: 0 };
     case 'configurator':
-      return { radius: 1.8, margin: 0.9 };
+      return { radius: 1.8, margin: 0.9, angular: 0 };
   }
+}
+
+/**
+ * On-screen radius (px) of a category's orbit preview when its core is drawn
+ * at `minCorePx`: the preview widens just enough to clear the enlarged core
+ * (CategoryNode: orbit scale = 1.3 × core radius / innermost orbit), so the
+ * outer orbit is 0.65 × minCorePx × outer / inner — whatever the distance —
+ * plus a little for the orbit sparks.
+ */
+export function orbitPreviewRadiusPx(node: CategoryNodeModel, minCorePx: number): number {
+  const radii = node.orbits.map((orbit) => orbit.radius).filter((radius) => radius > 0);
+  if (radii.length === 0) return minCorePx;
+  const ratio = Math.max(...radii) / Math.min(...radii);
+  return Math.max(minCorePx * 0.9, 0.65 * minCorePx * ratio) + 4;
 }
 
 export function isPortrait(aspect: number): boolean {
@@ -203,6 +265,45 @@ function isFullFrame(frame: SafeFrame): boolean {
 }
 
 /**
+ * Whether the home overview uses the "tall" phone view (see OVERVIEW.tall): a
+ * portrait viewport with a free frame that is neither a narrow column (the
+ * portrait layout) nor a wide band (the landscape layout).
+ */
+export function usesTallOverview(aspect: number, frame: SafeFrame = FULL_FRAME): boolean {
+  if (!isPortrait(aspect) || isFullFrame(frame)) return false;
+  const shape = frameAspect(aspect, frame);
+  return shape >= OVERVIEW.tall.minShape && shape <= OVERVIEW.tall.maxShape;
+}
+
+/** Elevation (radians) of the tall view for a free frame of shape `shape` (width / height). */
+export function tallElevation(shape: number): number {
+  const { elevationDeg, elevationSlopeDeg, elevationShape, minElevation, maxElevation } =
+    OVERVIEW.tall;
+  const degrees = elevationDeg + (elevationShape - shape) * elevationSlopeDeg;
+  return clamp(degToRad(degrees), minElevation, maxElevation);
+}
+
+/**
+ * Idle sway amplitude (radians) of the home overview for a viewport and free
+ * frame: the landscape view's `base`, a smaller one in the tall view, whose
+ * steep angle makes the footprint grow quickly when it turns.
+ */
+export function overviewSwayAmplitude(
+  aspect: number,
+  frame: SafeFrame = FULL_FRAME,
+  base = 0,
+): number {
+  return usesTallOverview(aspect, frame) ? base * OVERVIEW.tall.swayShare : base;
+}
+
+export interface OverviewOptions {
+  /** `legacy`: never the tall phone view (system approach sides, configurator limits). */
+  layout?: 'auto' | 'legacy';
+  /** Viewport size in CSS px (the tall view sizes nodes in px); a phone-sized one when absent. */
+  viewport?: { width: number; height: number };
+}
+
+/**
  * Fits the universe nodes into the frame from the overview direction.
  * Portrait frames leave the distant portfolio cluster out (D26). `sway`
  * (radians) widens the fit to cover the idle auto-rotate range, so the
@@ -213,11 +314,33 @@ export function overviewGoal(
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
   sway = 0,
+  options: OverviewOptions = {},
 ): CameraGoal {
   const fov = fovForAspect(aspect);
   const { tanV: frameTanV, tanH: frameTanH } = frameTangents(fov, aspect, frame);
   const portrait = usesPortraitOverview(aspect, frame);
-  const { elevation, azimuth } = portrait ? OVERVIEW.portrait : OVERVIEW.landscape;
+  const tall = options.layout !== 'legacy' && usesTallOverview(aspect, frame);
+  // Tall view: node sizes on screen come from the viewport's pixels (a phone-sized one when unknown).
+  const viewport = options.viewport ?? { width: aspect * 844, height: 844 };
+  const tallSizing = tall
+    ? {
+        minCorePx: minCoreDiameterPx(
+          frame.width * viewport.width,
+          frame.height * viewport.height,
+          false,
+          PHONE_CORE_BOOST,
+        ),
+        pxToTan: (px: number) =>
+          (px * 2 * Math.tan((fov * Math.PI) / 360)) / Math.max(viewport.height, 1),
+      }
+    : null;
+  const { elevation, azimuth } = tall
+    ? { elevation: tallElevation(frameAspect(aspect, frame)), azimuth: OVERVIEW.tall.azimuth }
+    : portrait
+      ? OVERVIEW.portrait
+      : OVERVIEW.landscape;
+  // The tall view's steep angle makes the fit grow fast with the sway: a smaller one.
+  const fitSway = tall ? sway * OVERVIEW.tall.swayShare : sway;
   const dir: Vec3 = [
     Math.sin(azimuth) * Math.cos(elevation),
     Math.sin(elevation),
@@ -232,12 +355,13 @@ export function overviewGoal(
     : [0, 0, 0];
   // Swaying the camera by ±sway around the vertical axis equals swaying the
   // nodes by ∓sway around it: fit those positions too.
-  const angles = sway > 0 ? [0, -sway, sway, -sway / 2, sway / 2] : [0];
+  const angles = fitSway > 0 ? [0, -fitSway, fitSway, -fitSway / 2, fitSway / 2] : [0];
   const points = framed.flatMap((node) => {
-    const { radius, margin } = nodeFraming(node);
+    const { radius, margin, angular } = nodeFraming(node, tallSizing);
     return angles.map((angle) => ({
       p: rotateY(node.position, centroid, angle),
       r: radius,
+      angular,
       tanV: frameTanV * margin,
       tanH: frameTanH * margin,
     }));
@@ -290,7 +414,7 @@ function balanceOnMass(
   let hiY = Infinity;
   for (const point of points) {
     const q = project(point.p);
-    const r = point.r / q.depth;
+    const r = point.r / q.depth + (point.angular ?? 0);
     // Moving the look target by s (tangent units at `distance`) moves this point by s·k.
     const k = distance / q.depth;
     loX = Math.max(loX, (q.x + r - point.tanH) / k);
@@ -307,6 +431,8 @@ function balanceOnMass(
 interface FitPoint {
   p: Vec3;
   r: number;
+  /** Extra extent in tangent units (a size in screen px, independent of the distance). */
+  angular?: number;
   tanV: number;
   tanH: number;
 }
@@ -332,11 +458,14 @@ function fitPoints(
   const up = cross(right, forward);
   const fitDistanceAt = (look: Vec3) => {
     let distance = minDistance;
-    for (const { p, r, tanV, tanH } of points) {
+    for (const { p, r, angular = 0, tanV, tanH } of points) {
       const rel = sub(p, look);
       const x = Math.abs(dot(rel, right)) + r;
       const y = Math.abs(dot(rel, up)) + r;
-      distance = Math.max(distance, Math.max(x / tanH, y / tanV) - dot(rel, forward));
+      // An angular extent grows with the distance too: it narrows the tangents instead.
+      const h = Math.max(tanH - angular, tanH * 0.05);
+      const v = Math.max(tanV - angular, tanV * 0.05);
+      distance = Math.max(distance, Math.max(x / h, y / v) - dot(rel, forward));
     }
     return Math.min(distance, maxDistance);
   };
@@ -350,15 +479,15 @@ function fitPoints(
     let maxX = -Infinity;
     let minY = Infinity;
     let maxY = -Infinity;
-    for (const { p, r } of points) {
+    for (const { p, r, angular = 0 } of points) {
       const rel = sub(p, look);
       const depth = Math.max(distance + dot(rel, forward), 0.1);
       const x = dot(rel, right) / depth;
       const y = dot(rel, up) / depth;
-      minX = Math.min(minX, x - r / depth);
-      maxX = Math.max(maxX, x + r / depth);
-      minY = Math.min(minY, y - r / depth);
-      maxY = Math.max(maxY, y + r / depth);
+      minX = Math.min(minX, x - r / depth - angular);
+      maxX = Math.max(maxX, x + r / depth + angular);
+      minY = Math.min(minY, y - r / depth - angular);
+      maxY = Math.max(maxY, y + r / depth + angular);
     }
     if (!Number.isFinite(minX)) break;
     look = add(
@@ -495,16 +624,24 @@ export function computeCameraGoal(
     emphasis?: readonly string[];
     /** Planet focus: keeps the chosen viewing side stable while the planet parks. */
     planetView?: PlanetViewMemo;
+    /** Viewport in CSS px: the phone's tall overview sizes its nodes on screen. */
+    viewport?: { width: number; height: number };
   } = {},
 ): CameraGoal {
-  const overview = overviewGoal(model, aspect, frame, options.sway ?? 0);
+  // Systems, the archive and the beacon are approached from the landscape overview's side
+  // and never zoom out past it; only the home view itself may use the tall phone layout.
+  const overview = overviewGoal(model, aspect, frame, options.sway ?? 0, { layout: 'legacy' });
   const fov = overview.fov;
+  const home = () =>
+    usesTallOverview(aspect, frame)
+      ? overviewGoal(model, aspect, frame, options.sway ?? 0, { viewport: options.viewport })
+      : overview;
 
   switch (target.mode) {
     case 'system':
     case 'planet': {
       const node = findCategory(model, target.category);
-      if (!node) return overview;
+      if (!node) return home();
       const system = systemGoal(node, overview.position, fov, aspect, frame);
       if (target.mode === 'planet') {
         const orbit = node.orbits.find((o) => o.serviceSlug === target.service);
@@ -552,7 +689,7 @@ export function computeCameraGoal(
       return liftInFrame(goal, [anchor, ...selected], aspect, frame, CONFIGURATOR_LIFT);
     }
     default:
-      return overview;
+      return home();
   }
 }
 
@@ -1012,12 +1149,17 @@ export function minCoreDiameterPx(
   frameWidthPx: number,
   frameHeightPx: number,
   desktop = false,
+  /** Portrait phones: cores read larger (the network is small on a narrow screen). */
+  boost = 1,
 ): number {
   const short = Math.min(frameWidthPx, frameHeightPx);
   const floor = desktop ? 18 : 12;
-  if (!(short > 0)) return Math.max(20, floor);
-  return clamp(short * 0.05, floor, 30);
+  if (!(short > 0)) return Math.max(20, floor) * boost;
+  return clamp(short * 0.05, floor, 30) * boost;
 }
+
+/** Core size boost on portrait phones (B1: "nodes larger"): 20 px → 26 px on a 390 px screen. */
+export const PHONE_CORE_BOOST = 1.3;
 
 /** Camera placed `distance` away from `center`, on the side of `from`, lifted by `lift`. */
 function approach(center: Vec3, from: Vec3, distance: number, fov: number, lift: number) {

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Quaternion, Vector3, type BufferGeometry, type Group } from 'three';
+import { Matrix4, Quaternion, Vector3, type BufferGeometry, type Group } from 'three';
 import { useSceneStore } from '@/store/scene';
 import { ARCHIVE_READY_KEY, keepAlive, type SceneBusRef } from '../bus';
 import { dampFactor } from '../camera/damp';
@@ -15,7 +15,7 @@ import type { PortfolioNodeModel } from '../universe/model';
 import type { UniverseRuntimeRef } from '../universe/runtime';
 import { pixelsPerUnit } from '../universe/screen-size';
 import { createCardGeometry, createObservatoryRings, observatoryRadii } from './archive-geometry';
-import { ARCHIVE, ARCHIVE_FACING, archiveCenterOffset, archiveExtents } from './archive-layout';
+import { ARCHIVE, archiveExtents, observatoryAxes } from './archive-layout';
 import type { ArchiveMaterials } from './archive-materials';
 import { ArchiveCard, type ArchiveRuntime } from './ArchiveCard';
 import { archiveCardTargets } from './archive-state';
@@ -109,11 +109,13 @@ export function ArchiveContent({
     [emblemGeometries],
   );
   useEffect(() => () => rings.dispose(), [rings]);
-  const ringsQuaternion = useMemo(
-    () => new Quaternion().setFromUnitVectors(new Vector3(0, 0, 1), new Vector3(...ARCHIVE_FACING)),
-    [],
-  );
-  const center = useMemo(() => archiveCenterOffset(), []);
+  // A tilted orbit around the cluster (the group's origin), not a frame around the wall.
+  const ringsQuaternion = useMemo(() => {
+    const { x, y, z } = observatoryAxes();
+    return new Quaternion().setFromRotationMatrix(
+      new Matrix4().makeBasis(new Vector3(...x), new Vector3(...y), new Vector3(...z)),
+    );
+  }, []);
 
   // Live content mounts at the start of the flight: compile through the queue
   // and show it only when ready, so a cold archive never stalls a frame.
@@ -197,7 +199,7 @@ export function ArchiveContent({
     const offset = rt.offsets[i];
     if (offset) world.add(offset);
     m.uniforms.uCorePos.value.copy(world);
-    m.rings.uniforms.uIntensity.value = fade * (focusedProject ? 0.45 : 1);
+    m.rings.uniforms.uIntensity.value = fade * (focusedProject ? 0.4 : 1);
 
     const hoverK = dampFactor(MOTION.hoverRate, dt);
     const dimK = rt.animated ? dampFactor(DIM_RATE, dt) : 1;
@@ -279,7 +281,6 @@ export function ArchiveContent({
       <lineSegments
         geometry={rings}
         material={materials.rings}
-        position={center}
         quaternion={ringsQuaternion}
         frustumCulled={false}
         renderOrder={2}

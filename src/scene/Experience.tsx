@@ -23,6 +23,7 @@ import {
   type SceneBusRef,
 } from './bus';
 import { CameraDirector } from './camera/CameraDirector';
+import { GyroParallax } from './camera/GyroParallax';
 import { CAMERA, MOTION, PALETTE } from './config';
 import { SceneStats } from './debug/SceneStats';
 import { useDocumentVisible } from './hooks/useDocumentVisible';
@@ -48,6 +49,7 @@ import type { SceneManifest } from './types';
 import { Backdrop } from './universe/Backdrop';
 import { buildUniverseModel } from './universe/model';
 import { Reveal } from './universe/Reveal';
+import { IdleTour } from './tour/IdleTour';
 import { Starfield } from './universe/Starfield';
 import { Universe } from './universe/Universe';
 import { useSceneTarget } from './useSceneTarget';
@@ -78,6 +80,8 @@ const CAMERA_PROPS = { fov: CAMERA.fov, near: 0.1, far: CAMERA.far } as const;
  * slow or stalled queue can never keep the scene invisible).
  */
 const REVEAL_DEADLINE_MS = 1500;
+/** Canvas fade-in when the intro flight plays right behind it (the flight is the reveal). */
+const INTRO_FADE_MS = 600;
 
 /**
  * Boot stages (perf P-01b), each mounted in its own task:
@@ -163,6 +167,12 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   const [archiveMaterials] = useState(() => new ArchiveMaterialCache());
 
   const model = useMemo(() => buildUniverseModel(manifest), [manifest]);
+  // Idle tour order: the categories, in content order.
+  const tourIds = useMemo(() => model.categories.map((category) => category.key), [model]);
+  // The intro plays behind a shorter fade-in (it starts at once and is the reveal itself).
+  const introPlanned = useSceneStore(
+    (state) => state.introEligible === true && !state.introSkip && target.mode === 'universe',
+  );
   const preset = QUALITY_PRESETS[tier];
   const bloom = preset.bloom !== null;
   const focusKey = focusKeyForTarget(target);
@@ -257,11 +267,20 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
       onCreated={handleCreated}
       style={{
         opacity: shown ? 1 : 0,
-        transition: `opacity ${reducedMotion ? MOTION.reducedCutMs : MOTION.fadeInMs}ms ease-out`,
+        transition: `opacity ${
+          reducedMotion ? MOTION.reducedCutMs : introPlanned ? INTRO_FADE_MS : MOTION.fadeInMs
+        }ms ease-out`,
       }}
     >
       <FirstFrameSignal onFirstFrame={handleFirstFrame} />
       <SceneReadySignal busRef={busRef} target={target} path={path} shown={shown} />
+      <IdleTour
+        ids={tourIds}
+        shown={shown}
+        home={target.mode === 'universe'}
+        reducedMotion={reducedMotion}
+      />
+      <GyroParallax busRef={busRef} enabled={visible && !reducedMotion} />
       <DemandDriver busRef={busRef} active={frameloop === 'demand'} booting={!shown} path={path} />
       <CompileService apiRef={compileRef} linearTarget={bloom} />
       <Backdrop preset={preset} />

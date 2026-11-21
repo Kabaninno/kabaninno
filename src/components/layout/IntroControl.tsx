@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ENTER_CLASS } from '@/components/motion/use-enter-animation';
 import { analytics } from '@/lib/analytics';
-import { INTRO_ACTIVE_ATTRIBUTE, INTRO_MAX_MS, keySkipsIntro, markIntroSeen } from '@/lib/intro';
+import { INTRO_ACTIVE_ATTRIBUTE, INTRO_MAX_MS, keySkipsIntro } from '@/lib/intro';
 import { prefersReducedMotion } from '@/lib/motion';
 import { useSceneStore } from '@/store/scene';
 import { focusHeading, pageHeading } from './RouteFocus';
@@ -41,8 +41,6 @@ function releaseHeldUi(): void {
  *   loaded, so LCP is not affected;
  * - a "Skip intro" button is shown; any key (Esc included) or pointer press
  *   skips as well (`skipIntro`, the scene jumps to the end);
- * - the visit is remembered (`markIntroSeen`) when the intro ends or is
- *   skipped, so it never plays again.
  * A safety cap releases the page if the scene never reports the end. Focus
  * on the skip button moves to the page heading when the button goes away.
  */
@@ -59,7 +57,6 @@ export function IntroControl({ label }: { label: string }) {
     const finish = () => {
       const hadFocus = buttonRef.current !== null && document.activeElement === buttonRef.current;
       releaseHeldUi();
-      markIntroSeen();
       if (hadFocus) {
         const heading = pageHeading();
         if (heading) focusHeading(heading);
@@ -81,6 +78,9 @@ export function IntroControl({ label }: { label: string }) {
     const onPointer = () => skip('pointer');
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('pointerdown', onPointer, true);
+    // Scrolling (wheel, touch drag) ends it as well.
+    window.addEventListener('wheel', onPointer, { capture: true, passive: true });
+    window.addEventListener('touchmove', onPointer, { capture: true, passive: true });
     const cap = window.setTimeout(() => {
       finish();
       setCapped(true);
@@ -89,6 +89,8 @@ export function IntroControl({ label }: { label: string }) {
     return () => {
       window.removeEventListener('keydown', onKey, true);
       window.removeEventListener('pointerdown', onPointer, true);
+      window.removeEventListener('wheel', onPointer, true);
+      window.removeEventListener('touchmove', onPointer, true);
       window.clearTimeout(cap);
       // The scene reported the end (or skipped to it), or this unmounted.
       finish();

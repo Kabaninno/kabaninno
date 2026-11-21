@@ -68,7 +68,7 @@ for (const state of STATES) {
       // A returning visitor: the first-visit intro (D94) does not play.
       await page.addInitScript(() => {
         try {
-          localStorage.setItem('kabaninno.intro.v1', 'true');
+          localStorage.setItem('kabaninno.intro.v2', 'true');
         } catch {
           // ignore
         }
