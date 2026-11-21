@@ -209,6 +209,8 @@ export const projectsSchema = z.array(projectSchema);
 export const categoryTextSchema = z.object({
   name: z.string().min(1),
   tagline: z.string().min(1).max(70),
+  /** Very short line on the home category cards (two columns on phones). */
+  caption: z.string().min(1).max(28),
   description: z.string().min(1),
   seoDescription: z.string().min(1).max(155),
 });

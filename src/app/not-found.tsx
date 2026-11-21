@@ -4,6 +4,7 @@ import { NodeMark } from '@/components/hud/NodeMark';
 import { getMessagesFor } from '@/i18n/messages';
 import { defaultLocale, locales } from '@/i18n/routing';
 import { withBasePath } from '@/lib/base-path';
+import { LOCALE_CODES } from '@/lib/locale-choice';
 import { localizedPath } from '@/lib/metadata';
 import { NOT_FOUND_SKY, starLayer } from '@/lib/starfield';
 import { bindShortWords } from '@/lib/typography';
@@ -66,7 +67,7 @@ export default function NotFound() {
                   className="corner-brackets flex flex-col items-center gap-3 bg-[rgb(10_14_28/0.72)] px-5 py-6 backdrop-blur-md supports-[not(backdrop-filter:blur(1px))]:bg-[rgb(10_14_28/0.92)]"
                 >
                   <span aria-hidden="true" className="mono-index text-faint">
-                    {locale.toUpperCase()}
+                    {LOCALE_CODES[locale]}
                   </span>
                   <h2 className="font-display text-lg leading-tight font-medium text-balance text-ink">
                     {bindShortWords(texts.title, locale)}

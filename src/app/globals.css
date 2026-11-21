@@ -188,6 +188,68 @@
 }
 
 /*
+ * Checkbox and radio of the configurator (D139): the same rounded control on
+ * every platform instead of the browser's default (a square on desktop). A
+ * native input underneath, so keyboard, screen readers and forms work as
+ * usual; only the drawing is ours. The accent follows the option's own
+ * `--accent` (category colour) and falls back to the brand colour. In forced
+ * colours mode the system control is used again.
+ */
+@utility choice-box {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  border: 1.5px solid rgb(255 255 255 / 0.34);
+  background-color: rgb(255 255 255 / 0.03);
+  background-position: center;
+  background-repeat: no-repeat;
+  transition:
+    background-color 150ms var(--ease-calm),
+    border-color 150ms var(--ease-calm),
+    box-shadow 150ms var(--ease-calm);
+
+  &[type='checkbox'] {
+    border-radius: 0.4375rem;
+    background-size: 0.875rem;
+  }
+
+  &[type='radio'] {
+    border-radius: 9999px;
+    background-size: 100% 100%;
+  }
+
+  &:hover {
+    border-color: rgb(255 255 255 / 0.6);
+  }
+
+  &:checked {
+    border-color: var(--accent, var(--color-brand));
+  }
+
+  &[type='checkbox']:checked {
+    background-color: var(--accent, var(--color-brand));
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.5 8.5 3 3 6-7' fill='none' stroke='%2305070d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+
+  &[type='radio']:checked {
+    background-color: transparent;
+    background-image: radial-gradient(
+      circle at center,
+      var(--accent, var(--color-brand)) 0 36%,
+      transparent 40%
+    );
+  }
+
+  @media (forced-colors: active) {
+    appearance: auto;
+    -webkit-appearance: auto;
+  }
+}
+
+/*
  * Spaced uppercase micro-label. Uses the sans font on purpose: the mono font
  * is latin-only and must never render localized (Polish/Ukrainian) words.
  */

@@ -439,3 +439,15 @@ uk:
 | Простий режим 2D             | Tryb prosty 2D                | Simple 2D mode                                | Простий режим 2D                         | перемикач «2D» у HUD; назва має містити «2D»                                                                                   |
 | Пропустити інтро             | Pomiń intro                   | Skip intro                                    | Пропустити інтро                         | кнопка під час інтро першого візиту                                                                                            |
 | Апостроф                     | —                             | `'` у скороченнях (it's, don't)               | `’` (U+2019): Ім’я, з’явиться, пов’язані | D38; в uk не `'` (U+0027, escape-символ ICU) і не `ʼ` (U+02BC, немає гарантії в шрифтах). В en `'` не ставити поруч із `{`/`}` |
+
+### Раунд правок після перевірки власником (D136–D138)
+
+Нові й змінені рядки (pl, en, uk):
+
+- `home.cta` — «Dobierz rozwiązanie» / «Find your solution» / «Підібрати рішення» (HUD `hud.cta` без змін).
+- `home.ctaNote` — «2 minuty, bez zobowiązań» / «2 minutes, no obligation» / «2 хвилини, без зобов’язань».
+- `home.portfolioCaption` — «Nasze realizacje» / «Our work» / «Наші роботи».
+- `categories.<id>.caption` — короткий підпис на картках (≤ 16–18 символів, бо в двох колонках на телефоні не вміщується більше): pl «Sklepy, landingi», «Klienci i zlecenia», «Mniej klikania», «Asystenci, analizy», «Sprzedaż i obsługa».
+- `configurator.budget.*` — суми з «netto» / «net» / «нетто» («ponad {min} {currency} netto», «over {currency} {min} net», «понад {min} {currency} нетто»); `budget.reset` — підказка після скидання діапазону; `hints.budget` — «Orientacyjna kwota netto…».
+- Питання «бюджет нетто чи брутто» знято: нетто (рішення власника).
+- Питання «UK чи UA» знято: у видимому коді «UA».

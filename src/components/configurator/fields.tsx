@@ -110,7 +110,7 @@ export function OptionGroup({
                 onChange={() => onToggle(option.value)}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={describedBy(hintId, errorId)}
-                className="size-4 shrink-0 accent-[var(--accent,var(--color-brand))]"
+                className="choice-box"
               />
               {option.accent ? (
                 <span

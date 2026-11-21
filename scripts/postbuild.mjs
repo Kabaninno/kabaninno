@@ -117,6 +117,11 @@ function writeMinimalRootRedirect() {
   };
   const target = pick(/<meta http-equiv="refresh" content="0; url=([^"]+)"/, 'meta refresh');
   const canonical = pick(/<link rel="canonical" href="([^"]+)"/, 'canonical link');
+  // The inline script that picks the visitor's language (src/lib/locale-choice.ts, D137).
+  const redirectScript = [...html.matchAll(/<script>([^]*?)<\/script>/g)]
+    .map((match) => match[1])
+    .find((code) => code.includes('location.replace'));
+  if (!redirectScript) fail('root redirect: could not find the redirect script in out/index.html');
   const title = pick(/<title>([^<]*)<\/title>/, 'title');
   const lang = pick(/<html lang="([^"]+)"/, 'html lang');
   const icon = /<link rel="icon" href="([^"]+)"[^>]*type="([^"]+)"/.exec(html);
@@ -133,9 +138,7 @@ function writeMinimalRootRedirect() {
     .join('');
   const page = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><link rel="canonical" href="${canonical}">${
     icon ? `<link rel="icon" href="${icon[1]}" type="${icon[2]}">` : ''
-  }<meta name="theme-color" content="#05070D"><meta http-equiv="refresh" content="0; url=${target}"><script>location.replace(${JSON.stringify(
-    target.replace(/&amp;/g, '&'),
-  )}+location.search+location.hash);</script><style>html{background:#05070d;color:#e8ecf5;color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:1.5rem;text-align:center}a{color:inherit;display:inline-flex;align-items:center;min-height:44px;padding:0 1rem;border-radius:999px;text-underline-offset:6px}a:hover,a:focus-visible{background:rgb(255 255 255/.06)}a:focus-visible{outline:2px solid #e8ecf5;outline-offset:3px}.brand{letter-spacing:.2em;font-size:1.125rem}ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem}</style></head><body><main><p><a class="brand" href="${target}">${escapeHtml(
+  }<meta name="theme-color" content="#05070D"><meta http-equiv="refresh" content="0; url=${target}"><script>${redirectScript}</script><style>html{background:#05070d;color:#e8ecf5;color-scheme:dark;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:1.5rem;text-align:center}a{color:inherit;display:inline-flex;align-items:center;min-height:44px;padding:0 1rem;border-radius:999px;text-underline-offset:6px}a:hover,a:focus-visible{background:rgb(255 255 255/.06)}a:focus-visible{outline:2px solid #e8ecf5;outline-offset:3px}.brand{letter-spacing:.2em;font-size:1.125rem}ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem}</style></head><body><main><p><a class="brand" href="${target}">${escapeHtml(
     title,
   )}</a></p><ul>${links}</ul></main></body></html>\n`;
   writeFileSync(file, page);

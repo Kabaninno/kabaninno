@@ -21,7 +21,7 @@ const DRAFT = {
   types: ['web', 'crm'],
   features: ['web/online-stores', 'web/seo', 'crm/custom-crm'],
   business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
-  budget: '15k-40k',
+  budget: '5000-10000',
   timeline: '1-3-months',
   contact: { name: 'Łucja Żółkiewska', comment: 'Sklep z integracją CRM.' },
 };
@@ -206,7 +206,7 @@ test.describe('summary and hand-off', () => {
   test('an edit made before an answer changed is flagged, then updated or kept (Q-F3-01)', async ({
     page,
   }) => {
-    await seedOnce(page, 'summary', { ...DRAFT, budget: 'up-to-5k' });
+    await seedOnce(page, 'summary', { ...DRAFT, budget: 'up-to-5000' });
     await open(page);
     const summary = ui.pl.configurator.summary;
     const message = panel(page).getByLabel(summary.message, { exact: true });
@@ -245,7 +245,7 @@ test.describe('summary and hand-off', () => {
   test('"Update the message" regenerates it from the changed answers (Q-F3-01)', async ({
     page,
   }) => {
-    await seedOnce(page, 'summary', { ...DRAFT, budget: 'up-to-5k' });
+    await seedOnce(page, 'summary', { ...DRAFT, budget: 'up-to-5000' });
     await open(page);
     const summary = ui.pl.configurator.summary;
     const message = panel(page).getByLabel(summary.message, { exact: true });

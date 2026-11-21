@@ -3,30 +3,35 @@
     "web": {
       "name": "Strony i aplikacje",
       "tagline": "Strona, która pracuje na Twoją firmę 24/7",
+      "caption": "Sklepy, landingi",
       "description": "Projektujemy i budujemy strony firmowe, sklepy internetowe, landing page i aplikacje webowe. Szybkie, wygodne na telefonie i gotowe do połączenia z CRM, płatnościami czy botem. Dbamy o to, żeby klient łatwo znalazł to, czego szuka, i od razu mógł działać.",
       "seoDescription": "Strony firmowe, sklepy internetowe, landing page i aplikacje webowe dla małych firm. Szybkie, mobilne i połączone z Twoimi narzędziami."
     },
     "crm": {
       "name": "CRM",
       "tagline": "Wszyscy klienci i zlecenia w jednym miejscu",
+      "caption": "Klienci i zlecenia",
       "description": "Wdrażamy gotowe systemy CRM i budujemy własne, dopasowane do sposobu pracy Twojej firmy. Porządkujemy kontakty, zapytania i sprzedaż, a raporty pokazują, co naprawdę przynosi pieniądze.",
       "seoDescription": "Wdrożenie CRM, CRM na zamówienie, lejki sprzedażowe i dashboardy dla małych firm. Uporządkuj klientów i sprzedaż w jednym systemie."
     },
     "automation": {
       "name": "Automatyzacja",
       "tagline": "Niech powtarzalne zadania robią się same",
+      "caption": "Mniej klikania",
       "description": "Łączymy usługi, z których już korzystasz, i przejmujemy żmudną pracę: przepisywanie danych, wystawianie dokumentów, wysyłanie przypomnień. Ty i Twój zespół zyskujecie czas na to, co naprawdę wymaga człowieka.",
       "seoDescription": "Integracje przez API, automatyzacja dokumentów, powiadomienia i przetwarzanie danych. Mniej ręcznej pracy i mniej błędów w Twojej firmie."
     },
     "ai": {
       "name": "AI",
       "tagline": "Sztuczna inteligencja do konkretnych zadań",
+      "caption": "Asystenci, analizy",
       "description": "Wdrażamy AI tam, gdzie daje realną korzyść: asystentów odpowiadających klientom, odczytywanie dokumentów, przygotowywanie treści i analizę danych. Bez eksperymentów na Twoim biznesie — zaczynamy od małego, mierzalnego kroku.",
       "seoDescription": "Asystenci AI i chatboty, przetwarzanie dokumentów, generowanie treści i analityka. Praktyczne wdrożenia AI dla małych i średnich firm."
     },
     "telegram": {
       "name": "Boty Telegram",
       "tagline": "Sprzedaż, zapisy i obsługa klienta w czacie",
+      "caption": "Sprzedaż i obsługa",
       "description": "Tworzymy boty i Mini Apps w Telegramie, które przyjmują zamówienia, zapisują na wizyty i odpowiadają na pytania klientów. Klient nie musi niczego instalować — wszystko dzieje się w aplikacji, której już używa.",
       "seoDescription": "Boty Telegram do sprzedaży, rezerwacji i obsługi klienta oraz Telegram Mini Apps. Obsługuj klientów tam, gdzie już są."
     }

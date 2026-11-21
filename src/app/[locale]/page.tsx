@@ -4,8 +4,6 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { siteConfig } from '~/site.config';
 import { CategoryIndex } from '@/components/home/CategoryIndex';
 import { Reveal } from '@/components/motion/Reveal';
-import { HighlightLink } from '@/components/nav/HighlightLink';
-import { ctaArrow, primaryButton } from '@/components/ui/styles';
 import { isLocale } from '@/i18n/routing';
 import { buildPageMetadata } from '@/lib/metadata';
 import { UI_MOTION } from '@/lib/motion';
@@ -13,12 +11,12 @@ import { buildNavCategories } from '@/lib/nav-data';
 import { paths } from '@/lib/routes';
 import { homeJsonLd, serializeJsonLd } from '@/lib/structured-data';
 import { bindShortWords } from '@/lib/typography';
-import { sceneNodeId } from '@/scene/node-ids';
 
 /**
  * Fixed frame of the home hero and the category index.
- * - Phones (portrait): hero, then the category chips, docked to the bottom.
- * - md+: hero bottom-left, index column bottom-right.
+ * - Phones (portrait): hero, then the category cards and the call to action,
+ *   docked to the bottom (slogan → cards → CTA, D136).
+ * - md+: hero bottom-left, card column (with the CTA under it) bottom-right.
  * - Short viewports (`short:`/`shorter:`, landscape phones and squat windows):
  *   compact type, the hero column on the left and one row of chips under it,
  *   so the scene keeps the area to the right (SafeAreaPublisher measures it).
@@ -35,7 +33,7 @@ import { sceneNodeId } from '@/scene/node-ids';
  * 1.75rem outside the hero and index at every width (V2-09).
  */
 const HERO_FRAME = [
-  'pointer-events-none fixed inset-x-0 bottom-0 z-10 flex flex-col gap-5',
+  'pointer-events-none fixed inset-x-0 bottom-0 z-10 flex flex-col gap-3.5',
   'max-h-[calc(100dvh-var(--hud-offset))] scroll-thin overflow-x-hidden overflow-y-auto',
   'bg-gradient-to-t from-void/90 via-void/55 to-transparent',
   'pt-16 pr-[max(1rem,env(safe-area-inset-right))] pb-[max(1.25rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))]',
@@ -113,27 +111,16 @@ export default async function HomePage({ params }: HomePageProps) {
           >
             {bindShortWords(t('title'), locale)}
           </h1>
-          <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only">
+          <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only [@media(max-width:47.99rem)_and_(min-height:30.0625rem)]:sr-only">
             {bindShortWords(t('lead'), locale)}
           </p>
-          {/* The CTA leads to the configurator beacon and lights it up on hover/focus. */}
-          <HighlightLink
-            href={paths.configurator()}
-            highlightId={sceneNodeId.configurator}
-            className={`${primaryButton} pointer-events-auto mt-5 min-h-12 px-6 text-sm md:mt-7 compact:mt-5 short:mt-3 short:min-h-11 short:px-5 shorter:mt-2.5`}
-          >
-            {t('cta')}
-            <span aria-hidden="true" className={ctaArrow}>
-              →
-            </span>
-          </HighlightLink>
         </section>
         <CategoryIndex
           hint={t('explore')}
           categoriesLabel={t('servicesNav')}
           categories={buildNavCategories(locale)}
-          portfolioLabel={tHud('portfolio')}
-          configuratorLabel={tHud('configurator')}
+          portfolio={{ label: tHud('portfolio'), caption: t('portfolioCaption') }}
+          cta={{ label: t('cta'), note: t('ctaNote') }}
         />
       </Reveal>
     </>

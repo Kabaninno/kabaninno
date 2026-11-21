@@ -7,6 +7,7 @@ import {
   firstInvalidStep,
   furthestEnterableStep,
   prefillDraft,
+  reconcileBudget,
   refsFromSearch,
   sanitizeDraft,
   toggleFeature,
@@ -23,7 +24,7 @@ function completeDraft(): ConfiguratorDraft {
     types: ['web', 'crm'],
     features: ['web/landing-pages', 'crm/custom-crm', 'web/seo'],
     business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
-    budget: '15k-40k',
+    budget: '5000-10000',
     timeline: '1-3-months',
     contact: { name: '  Ola  ', comment: 'Potrzebujemy sklepu z integracją CRM.' },
   };
@@ -67,6 +68,10 @@ describe('validateStep', () => {
       {},
     );
     expect(validateStep('budget', { ...completeDraft(), budget: '1m-plus' }, model)).toEqual({
+      budget: 'unknown',
+    });
+    // A range of another level is not offered for this selection (D138).
+    expect(validateStep('budget', { ...completeDraft(), budget: 'up-to-1500' }, model)).toEqual({
       budget: 'unknown',
     });
     expect(validateStep('timeline', emptyDraft(), model)).toEqual({ timeline: 'required' });
@@ -124,6 +129,38 @@ describe('toggleType / toggleFeature', () => {
     expect(toggleType(draft, 'nope', model)).toBe(draft);
     expect(toggleFeature(draft, 'crm/custom-crm', model)).toBe(draft);
     expect(toggleFeature(draft, 'web/nope', model)).toBe(draft);
+  });
+});
+
+describe('budget follows the selection (D138)', () => {
+  it('keeps a range that is still offered and "not sure" at any level', () => {
+    const draft = completeDraft();
+    expect(reconcileBudget(draft, model)).toBe(draft);
+    const unsure = { ...draft, budget: BUDGET_NOT_SURE };
+    expect(toggleFeature(unsure, 'web/seo', model).budget).toBe(BUDGET_NOT_SURE);
+  });
+
+  it('clears the range when the complexity level moves to another range set', () => {
+    // CRM (level 3) → 5000–10000; dropping the CRM feature leaves a level-1 set.
+    const draft = completeDraft();
+    const without = toggleFeature(draft, 'crm/custom-crm', model);
+    expect(without.features).not.toContain('crm/custom-crm');
+    expect(without.budget).toBeNull();
+    // Deselecting the CRM category drops its features and the range too.
+    expect(toggleType(draft, 'crm', model).budget).toBeNull();
+  });
+
+  it('keeps the range when the level changes but the same range is offered', () => {
+    // 'over-3000' exists at level 1 only; '3000-6000' at level 2 only: no overlap by design.
+    const draft = { ...completeDraft(), budget: '3000-6000', features: ['web/online-stores'] };
+    expect(reconcileBudget({ ...draft, types: ['web'] }, model).budget).toBe('3000-6000');
+    const upgraded = toggleFeature({ ...draft, types: ['web'] }, 'web/web-apps', model);
+    expect(upgraded.budget).toBeNull();
+  });
+
+  it('sanitizeDraft drops a stored range of another level', () => {
+    const stored = { ...completeDraft(), budget: 'up-to-1500' };
+    expect(sanitizeDraft(stored, model).budget).toBeNull();
   });
 });
 

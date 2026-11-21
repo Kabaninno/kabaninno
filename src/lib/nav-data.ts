@@ -9,6 +9,7 @@ export function buildNavCategories(locale: Locale): NavCategory[] {
   return getCategories().map((category, position) => ({
     id: category.id,
     name: getCategoryText(locale, category.id).name,
+    caption: getCategoryText(locale, category.id).caption,
     color: category.dna.color,
     index: position + 1,
   }));

@@ -68,6 +68,8 @@ export interface WizardLabels {
     unknown: string;
   };
   prefilled: string;
+  /** The budget range was cleared after the selection changed (D138). */
+  budgetReset: string;
   summary: {
     choices: string;
     message: string;
@@ -114,7 +116,9 @@ export function formatBudgetLabel(
   t: Translate,
 ): string {
   const amount = (value: number) =>
-    new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
+    new Intl.NumberFormat(locale, { maximumFractionDigits: 0, useGrouping: 'always' }).format(
+      value,
+    );
   if (range.min !== undefined && range.max !== undefined) {
     return t('budget.range', { min: amount(range.min), max: amount(range.max), currency });
   }
@@ -209,6 +213,7 @@ export function buildWizardLabels({
       unknown: t('errors.unknown'),
     },
     prefilled: t('prefilled'),
+    budgetReset: t('budget.reset'),
     summary: {
       choices: t('summary.choices'),
       message: t('summary.message'),

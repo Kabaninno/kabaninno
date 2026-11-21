@@ -64,7 +64,7 @@ const CONFIGURATOR_DRAFT = {
   types: ['web', 'crm'],
   features: ['web/online-stores', 'web/seo', 'crm/custom-crm'],
   business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
-  budget: '15k-40k',
+  budget: '5000-10000',
   timeline: '1-3-months',
   contact: {
     name: 'Łucja Żółkiewska',

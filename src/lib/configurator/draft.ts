@@ -83,7 +83,7 @@ export function validateStep(
     }
     case 'budget':
       if (draft.budget === null) errors.budget = 'required';
-      else if (!budgetIds(model).includes(draft.budget)) errors.budget = 'unknown';
+      else if (!budgetIds(model, draft).includes(draft.budget)) errors.budget = 'unknown';
       break;
     case 'timeline':
       if (draft.timeline === null) errors.timeline = 'required';
@@ -146,6 +146,19 @@ export function furthestEnterableStep(
 /* Edits                                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Clears the budget when the ranges offered for the current selection no
+ * longer include it (the complexity level moved, D138). "Not sure" always
+ * stays. Returns the same draft when nothing changes.
+ */
+export function reconcileBudget(
+  draft: ConfiguratorDraft,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  if (draft.budget === null || budgetIds(model, draft).includes(draft.budget)) return draft;
+  return { ...draft, budget: null };
+}
+
 /** Keeps only features of selected categories (after the types change). */
 function pruneFeatures(draft: ConfiguratorDraft): ConfiguratorDraft {
   return {
@@ -164,7 +177,7 @@ export function toggleType(
   const types = draft.types.includes(type)
     ? draft.types.filter((item) => item !== type)
     : model.types.filter((item) => item === type || draft.types.includes(item));
-  return pruneFeatures({ ...draft, types });
+  return reconcileBudget(pruneFeatures({ ...draft, types }), model);
 }
 
 /** Selects / deselects a feature of a selected category. Unknown or unselected ones are ignored. */
@@ -178,7 +191,7 @@ export function toggleFeature(
   const features = draft.features.includes(id)
     ? draft.features.filter((item) => item !== id)
     : [...draft.features, id];
-  return { ...draft, features };
+  return reconcileBudget({ ...draft, features }, model);
 }
 
 /* ------------------------------------------------------------------ */
@@ -241,7 +254,7 @@ export function sanitizeDraft(raw: unknown, model: ConfiguratorModel): Configura
       hasWebsite: yesNo(business.hasWebsite),
       hasCrm: yesNo(business.hasCrm),
     },
-    budget: pick(value.budget, budgetIds(model)),
+    budget: pick(value.budget, budgetIds(model, { types, features })),
     timeline: pick(value.timeline, model.timelines),
     contact: {
       name: clip(contact.name, model.limits.nameMax),

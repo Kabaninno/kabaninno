@@ -10,7 +10,7 @@ import ukUi from '~/messages/uk/ui.json';
 import { CONFIGURATOR_STEPS } from '../configurator-steps';
 import { buildWizardLabels, errorText, formatBudgetLabel, type Translate } from './labels';
 import { buildLeadMessage } from './message';
-import { BUDGET_NOT_SURE, getConfiguratorModel } from './model';
+import { BUDGET_NOT_SURE, allBudgetIds, getConfiguratorModel } from './model';
 
 const model = getConfiguratorModel();
 const dictionaries = {
@@ -52,10 +52,8 @@ describe('buildWizardLabels', () => {
     for (const id of model.industries) expect(labels.industries[id]).toBeTruthy();
     for (const id of model.companySizes) expect(labels.sizes[id]).toBeTruthy();
     for (const id of model.timelines) expect(labels.timelines[id]).toBeTruthy();
-    expect(Object.keys(labels.budgets)).toEqual([
-      ...model.budgetRanges.map((range) => range.id),
-      BUDGET_NOT_SURE,
-    ]);
+    expect(Object.keys(labels.budgets)).toEqual(allBudgetIds(model));
+    expect(labels.budgetReset).toBeTruthy();
     expect(labels.progress).toHaveLength(CONFIGURATOR_STEPS.length);
     const strings = JSON.stringify(labels);
     expect(strings).not.toMatch(/\{\w+|configurator\.|lead\./);
@@ -117,9 +115,12 @@ describe('formatBudgetLabel', () => {
   });
 
   it('produces real labels per locale (no-break spaces are normalised later, D35)', () => {
-    const pl = labelsFor('pl').budgets['15k-40k']!;
-    expect(pl.replace(/[\u00A0\u202F]/g, ' ')).toBe('15 000–40 000 PLN');
-    expect(labelsFor('en').budgets['up-to-5k']).toBe('up to PLN 5,000');
+    const pl = labelsFor('pl').budgets['5000-10000']!;
+    expect(pl.replace(/[  ]/g, ' ')).toBe('5 000–10 000 PLN netto');
+    expect(labelsFor('en').budgets['up-to-1500']).toBe('up to PLN 1,500 net');
+    expect(labelsFor('uk').budgets['over-6000']!.replace(/[  ]/g, ' ')).toBe(
+      'понад 6 000 PLN нетто',
+    );
   });
 });
 

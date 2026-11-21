@@ -10,13 +10,50 @@ import { categories, LOCALES, localized, paths, ui } from '../support/site';
  */
 
 test.describe('root redirect', () => {
-  test('/ redirects to /pl/ and keeps query and hash', async ({ page }) => {
-    await page.goto(`${sitePath('/')}?utm_source=e2e&x=1#explore`);
-    await expect(page).toHaveURL(
-      new RegExp(`${escapeRegExp(sitePath('/pl/'))}\\?utm_source=e2e&x=1#explore$`),
-    );
-    await expect(page.locator('html')).toHaveAttribute('lang', 'pl');
-    await expect(page.locator('main h1')).toHaveText(ui.pl.home.title);
+  test.describe('Polish browser', () => {
+    test.use({ locale: 'pl-PL' });
+
+    test('/ redirects to /pl/ and keeps query and hash', async ({ page }) => {
+      await page.goto(`${sitePath('/')}?utm_source=e2e&x=1#explore`);
+      await expect(page).toHaveURL(
+        new RegExp(`${escapeRegExp(sitePath('/pl/'))}\\?utm_source=e2e&x=1#explore$`),
+      );
+      await expect(page.locator('html')).toHaveAttribute('lang', 'pl');
+      await expect(page.locator('main h1')).toHaveText(ui.pl.home.title);
+    });
+  });
+
+  // D137: the browser's language picks the locale; anything else is Polish.
+  for (const [browser, target] of [
+    ['uk-UA', 'uk'],
+    ['en-GB', 'en'],
+    ['de-DE', 'pl'],
+  ] as const) {
+    test.describe(`${browser} browser`, () => {
+      test.use({ locale: browser });
+
+      test(`/ → /${target}/`, async ({ page }) => {
+        await page.goto(`${sitePath('/')}?utm_source=e2e#explore`);
+        await expect(page).toHaveURL(
+          new RegExp(`${escapeRegExp(sitePath(`/${target}/`))}\\?utm_source=e2e#explore$`),
+        );
+        await expect(page.locator('html')).toHaveAttribute('lang', target);
+      });
+    });
+  }
+
+  test.describe('remembered choice', () => {
+    test.use({ locale: 'en-GB' });
+
+    test('wins over the browser language; direct /pl/ links are not redirected', async ({
+      page,
+    }) => {
+      await page.goto(sitePath('/pl/'));
+      await expect(page).toHaveURL(urlFor('/pl/'));
+      await page.evaluate(() => localStorage.setItem('kabaninno.locale.v1', '"uk"'));
+      await page.goto(sitePath('/'));
+      await expect(page).toHaveURL(urlFor('/uk/'));
+    });
   });
 
   test.describe('without JavaScript', () => {

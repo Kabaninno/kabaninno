@@ -94,6 +94,7 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
         <div className="ml-auto flex items-center gap-2">
           <SimpleModeToggle className="max-md:hidden" />
           <LocaleSwitcher className="hidden md:block" />
+          <LocaleSwitcher variant="menu" className="md:hidden" />
           <Link
             href={paths.configurator()}
             onClick={() => analytics.track('cta_click', { placement: 'hud' })}

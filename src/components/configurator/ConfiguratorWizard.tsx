@@ -107,6 +107,8 @@ export function ConfiguratorWizard({
   const [notice, setNotice] = useState('');
   const [ready, setReady] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
+  // The budget range was cleared because the selection moved to another level (D138).
+  const [budgetReset, setBudgetReset] = useState(false);
   // The visitor's edit of the summary message and the default it was based on (Q-F3-01).
   const [message, setMessage] = useState<MessageEdit | null>(null);
   const draftRef = useRef(draft);
@@ -207,6 +209,9 @@ export function ConfiguratorWizard({
       const request = useRequestStore.getState();
       for (const ref of sync.add) request.add(ref);
       for (const ref of sync.remove) request.remove(ref);
+      // A changed selection can drop the chosen range: say so on the budget step.
+      if (draftRef.current.budget !== null && next.budget === null) setBudgetReset(true);
+      else if (next.budget !== null) setBudgetReset(false);
       draftRef.current = next;
       setDraft(next);
     },
@@ -259,6 +264,7 @@ export function ConfiguratorWizard({
     useRequestStore.getState().clear();
     draftRef.current = emptyDraft();
     setDraft(emptyDraft());
+    setBudgetReset(false);
     setAttempted({});
     setNotice('');
     setMessage(null);
@@ -405,11 +411,17 @@ export function ConfiguratorWizard({
             field="budget"
             legend={labels.fields.budget}
             type="radio"
-            options={budgetIds(model).map((id) => option(id, labels.budgets[id] ?? id))}
+            options={budgetIds(model, draft).map((id) => option(id, labels.budgets[id] ?? id))}
             selected={draft.budget ? [draft.budget] : []}
             onToggle={(id) => update({ ...draft, budget: id })}
             error={errorFor('budget')}
-          />
+          >
+            {budgetReset && draft.budget === null ? (
+              <p role="status" className="mb-3 text-sm leading-relaxed text-[#ffd79a]">
+                {labels.budgetReset}
+              </p>
+            ) : null}
+          </OptionGroup>
         ) : null}
 
         {step === 'timeline' ? (

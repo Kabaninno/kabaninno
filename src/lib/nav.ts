@@ -11,6 +11,8 @@ export interface NavCategory {
   name: string;
   /** DNA accent color (#RRGGBB). */
   color: string;
+  /** Very short card caption (`categories.<id>.caption`). */
+  caption: string;
   /** 1-based position in the category order. */
   index: number;
 }

@@ -1,21 +1,28 @@
 import type { Metadata } from 'next';
 import { siteConfig } from '~/site.config';
 import { getMessagesFor } from '@/i18n/messages';
-import { defaultLocale, locales } from '@/i18n/routing';
+import { defaultLocale, locales, type Locale } from '@/i18n/routing';
 import { withBasePath } from '@/lib/base-path';
+import { rootRedirectScript } from '@/lib/locale-choice';
 import { localizedPath } from '@/lib/metadata';
 import { absoluteUrl } from '@/lib/site-url';
 import { fontVariables } from './fonts';
 
 /*
- * `/` → `/pl/`. Static hosting has no server-side redirects, so this page
- * (out/index.html) redirects with a meta refresh, a JS fallback that keeps the
- * query string and hash, and visible links. The canonical points at `/pl/`.
+ * `/` → the visitor's language (D137). Static hosting has no server-side
+ * redirects, so this page (out/index.html) redirects with an inline script
+ * that picks the locale (remembered choice → browser languages: uk → /uk/,
+ * en → /en/, anything else → /pl/) and keeps the query string and hash, a
+ * meta refresh to `/pl/` for visitors without JS, and visible links. The
+ * canonical points at `/pl/`.
  * scripts/postbuild.mjs then rewrites the exported HTML into a minimal
  * document built from these values (no app scripts or font preloads, P-06).
  */
 
 const target = withBasePath(localizedPath(defaultLocale, '/'));
+const targets = Object.fromEntries(
+  locales.map((locale) => [locale, withBasePath(localizedPath(locale, '/'))]),
+) as Record<Locale, string>;
 
 export const metadata: Metadata = {
   title: { absolute: siteConfig.studioName },
@@ -30,9 +37,7 @@ export default function RootRedirectPage() {
         <meta httpEquiv="refresh" content={`0; url=${target}`} />
         <script
           // Runs before hydration; keeps ?query and #hash (deep links, campaigns).
-          dangerouslySetInnerHTML={{
-            __html: `location.replace(${JSON.stringify(target)}+location.search+location.hash);`,
-          }}
+          dangerouslySetInnerHTML={{ __html: rootRedirectScript(targets) }}
         />
       </head>
       <body>

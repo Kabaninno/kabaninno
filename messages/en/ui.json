@@ -39,7 +39,9 @@
     "eyebrow": "Digital studio for small companies",
     "title": "We bring your business together in one system",
     "lead": "Websites, CRM, automation, AI and Telegram bots — designed to work together.",
-    "cta": "Build your request",
+    "cta": "Find your solution",
+    "ctaNote": "2 minutes, no obligation",
+    "portfolioCaption": "Our work",
     "servicesNav": "Service categories",
     "explore": "Pick a system to explore"
   },
@@ -160,7 +162,7 @@
       "type": "Select one or more areas your project covers.",
       "features": "Choose what the solution should include. The list depends on the areas you picked.",
       "business": "A few details about your business help us suggest the right solution.",
-      "budget": "An approximate amount in PLN. You can also choose “Not sure yet”.",
+      "budget": "An approximate net amount in PLN, matched to the services you chose. You can also choose “Not sure yet”.",
       "timeline": "When should the solution be up and running?",
       "contact": "How should we address you? The comment is optional.",
       "summary": "Check the message, edit it if needed and send it via Telegram."
@@ -238,10 +240,11 @@
       "flexible": "Flexible"
     },
     "budget": {
-      "upTo": "up to {currency} {max}",
-      "range": "{currency} {min}–{max}",
-      "from": "{currency} {min}+",
-      "notSure": "Not sure yet"
+      "upTo": "up to {currency} {max} net",
+      "range": "{currency} {min}–{max} net",
+      "from": "over {currency} {min} net",
+      "notSure": "Not sure yet",
+      "reset": "Your selection changed, so the budget range was cleared. Please choose it again."
     },
     "errors": {
       "requiredMulti": "Choose at least one option.",

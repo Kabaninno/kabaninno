@@ -3,30 +3,35 @@
     "web": {
       "name": "Web Development",
       "tagline": "A website that works for your business 24/7",
+      "caption": "Sites & stores",
       "description": "We design and build company websites, online stores, landing pages and web apps. Fast, mobile-friendly and ready to connect with your CRM, payments or chatbot. We make sure customers find what they need and can act right away.",
       "seoDescription": "Company websites, online stores, landing pages and web apps for small businesses. Fast, mobile-friendly and connected to your tools."
     },
     "crm": {
       "name": "CRM",
       "tagline": "All your clients and deals in one place",
+      "caption": "Clients & deals",
       "description": "We implement off-the-shelf CRM systems and build custom ones that fit the way your team works. We bring order to contacts, inquiries and sales, and reports show what actually makes money.",
       "seoDescription": "CRM implementation, custom CRM, sales funnels and dashboards for small businesses. Keep clients and sales organised in one system."
     },
     "automation": {
       "name": "Automation",
       "tagline": "Let repetitive tasks take care of themselves",
+      "caption": "Less manual work",
       "description": "We connect the services you already use and take over the tedious work: copying data, issuing documents, sending reminders. You and your team get time back for work that truly needs a human.",
       "seoDescription": "API integrations, document automation, notifications and data processing. Less manual work and fewer errors in your small business."
     },
     "ai": {
       "name": "AI",
       "tagline": "Artificial intelligence for specific jobs",
+      "caption": "Assistants & data",
       "description": "We implement AI where it brings real value: assistants that answer customers, document reading, content preparation and data analysis. No experiments on your business — we start with a small, measurable step.",
       "seoDescription": "AI assistants and chatbots, document processing, content generation and analytics. Practical AI solutions for small and medium businesses."
     },
     "telegram": {
       "name": "Telegram Bots",
       "tagline": "Sales, bookings and support right in the chat",
+      "caption": "Sales & support",
       "description": "We build Telegram bots and Mini Apps that take orders, book appointments and answer customer questions. Your customers don't need to install anything — it all happens in an app they already use.",
       "seoDescription": "Telegram bots for sales, bookings and customer support, plus Telegram Mini Apps. Serve your customers where they already are."
     }

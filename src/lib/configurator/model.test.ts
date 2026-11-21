@@ -3,8 +3,12 @@ import { getCategories } from '~/content';
 import { configuratorData } from '~/content/configurator';
 import {
   BUDGET_NOT_SURE,
+  allBudgetIds,
   budgetIds,
+  budgetRangeId,
+  budgetRangesFor,
   buildConfiguratorModel,
+  complexityLevel,
   featuresFor,
   findFeature,
   getConfiguratorModel,
@@ -40,10 +44,20 @@ describe('configurator model', () => {
   });
 
   it('a new category needs no code change: it appears with its services', () => {
-    const extended = buildConfiguratorModel([
-      ...getCategories(),
-      { id: 'hardware', services: [{ slug: 'kiosks' }, { slug: 'printers' }] },
-    ]);
+    const extended = buildConfiguratorModel(
+      [
+        ...getCategories(),
+        { id: 'hardware', services: [{ slug: 'kiosks' }, { slug: 'printers' }] },
+      ],
+      {
+        ...configuratorData,
+        complexity: {
+          ...configuratorData.complexity,
+          'hardware/kiosks': 2,
+          'hardware/printers': 1,
+        },
+      },
+    );
     expect(extended.types.at(-1)).toBe('hardware');
     expect(extended.features.hardware!.map((option) => option.id)).toEqual([
       'hardware/kiosks',
@@ -66,9 +80,71 @@ describe('configurator model', () => {
     ).toThrow(/repeats a service/);
   });
 
-  it('lists budget ids with "not sure" and carries the currency', () => {
-    expect(budgetIds(model).at(-1)).toBe(BUDGET_NOT_SURE);
-    expect(budgetIds(model)).toHaveLength(configuratorData.budgetRanges.length + 1);
+  it('gives every service and extra feature a complexity level 1–3', () => {
+    for (const feature of Object.values(model.features).flat()) {
+      expect([1, 2, 3], feature.id).toContain(model.complexity[feature.id]);
+    }
+    expect(() =>
+      buildConfiguratorModel(getCategories(), { ...configuratorData, complexity: {} }),
+    ).toThrow(/no complexity level for/);
+    expect(() =>
+      buildConfiguratorModel(getCategories(), {
+        ...configuratorData,
+        complexity: { ...configuratorData.complexity, 'web/ghost': 1 },
+      }),
+    ).toThrow('unknown "web/ghost"');
+  });
+
+  it('derives range ids from the numbers', () => {
+    expect(budgetRangeId({ max: 1500 })).toBe('up-to-1500');
+    expect(budgetRangeId({ min: 1500, max: 3000 })).toBe('1500-3000');
+    expect(budgetRangeId({ min: 3000 })).toBe('over-3000');
+  });
+
+  it('offers the ranges of the highest level among the selected features (D138)', () => {
+    const basis = (features: string[]) => ({
+      types: [...new Set(features.map((id) => id.split('/')[0]!))],
+      features,
+    });
+    // Level 1: a landing page and its SEO.
+    const simple = basis(['web/landing-pages', 'web/seo']);
+    expect(complexityLevel(model, simple)).toBe(1);
+    expect(budgetRangesFor(model, simple).map((range) => range.id)).toEqual([
+      'up-to-1500',
+      '1500-3000',
+      'over-3000',
+    ]);
+    // Level 2: a store; level 3 wins as soon as a CRM is added.
+    const store = basis(['web/landing-pages', 'web/online-stores']);
+    expect(complexityLevel(model, store)).toBe(2);
+    expect(budgetIds(model, store)).toEqual([
+      'up-to-3000',
+      '3000-6000',
+      'over-6000',
+      BUDGET_NOT_SURE,
+    ]);
+    const crm = basis(['web/online-stores', 'crm/custom-crm']);
+    expect(complexityLevel(model, crm)).toBe(3);
+    expect(budgetIds(model, crm)).toEqual([
+      'up-to-5000',
+      '5000-10000',
+      'over-10000',
+      BUDGET_NOT_SURE,
+    ]);
+  });
+
+  it('ignores features of categories that are not selected', () => {
+    expect(
+      complexityLevel(model, { types: ['web'], features: ['web/landing-pages', 'crm/custom-crm'] }),
+    ).toBe(1);
+  });
+
+  it('knows every range of every level (labels) and carries the currency', () => {
+    expect(allBudgetIds(model).at(-1)).toBe(BUDGET_NOT_SURE);
+    const distinct = new Set(
+      Object.values(configuratorData.budgetLevels).flatMap((ranges) => ranges.map(budgetRangeId)),
+    );
+    expect(allBudgetIds(model)).toHaveLength(distinct.size + 1);
     expect(model.currency).toBe('PLN');
   });
 

@@ -39,7 +39,9 @@
     "eyebrow": "Studio cyfrowe dla małych firm",
     "title": "Łączymy Twój biznes w jeden system",
     "lead": "Strony WWW, CRM, automatyzacje, AI i boty Telegram — zaprojektowane tak, by działały razem.",
-    "cta": "Utwórz zapytanie",
+    "cta": "Dobierz rozwiązanie",
+    "ctaNote": "2 minuty, bez zobowiązań",
+    "portfolioCaption": "Nasze realizacje",
     "servicesNav": "Kategorie usług",
     "explore": "Wybierz system, by go zbadać"
   },
@@ -160,7 +162,7 @@
       "type": "Zaznacz jeden lub kilka obszarów, których dotyczy projekt.",
       "features": "Wybierz, co ma się znaleźć w rozwiązaniu. Lista zależy od wybranych obszarów.",
       "business": "Kilka informacji o firmie pomoże nam dobrać rozwiązanie.",
-      "budget": "Orientacyjna kwota w PLN. Możesz też wybrać „Jeszcze nie wiem”.",
+      "budget": "Orientacyjna kwota netto w PLN, dopasowana do wybranych usług. Możesz też wybrać „Jeszcze nie wiem”.",
       "timeline": "Kiedy rozwiązanie powinno zacząć działać?",
       "contact": "Jak mamy się do Ciebie zwracać? Komentarz jest opcjonalny.",
       "summary": "Sprawdź wiadomość, w razie potrzeby popraw ją i wyślij przez Telegram."
@@ -238,10 +240,11 @@
       "flexible": "Bez pośpiechu"
     },
     "budget": {
-      "upTo": "do {max} {currency}",
-      "range": "{min}–{max} {currency}",
-      "from": "od {min} {currency}",
-      "notSure": "Jeszcze nie wiem"
+      "upTo": "do {max} {currency} netto",
+      "range": "{min}–{max} {currency} netto",
+      "from": "ponad {min} {currency} netto",
+      "notSure": "Jeszcze nie wiem",
+      "reset": "Wybór usług się zmienił, więc zakres budżetu został wyczyszczony. Wybierz go ponownie."
     },
     "errors": {
       "requiredMulti": "Wybierz co najmniej jedną opcję.",

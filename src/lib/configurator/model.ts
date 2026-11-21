@@ -24,9 +24,21 @@ export interface FeatureOption {
 }
 
 export interface BudgetRange {
+  /** Derived from the numbers: `up-to-1500`, `1500-3000`, `over-3000` (D138). */
   id: string;
   min?: number;
   max?: number;
+}
+
+/** Complexity levels of features, and the budget ranges offered per level. */
+export const COMPLEXITY_LEVELS = [1, 2, 3] as const;
+export type ComplexityLevel = (typeof COMPLEXITY_LEVELS)[number];
+
+/** The id of a budget range, from its numbers (kebab-case, stable when labels change). */
+export function budgetRangeId(range: { min?: number; max?: number }): string {
+  if (range.min !== undefined && range.max !== undefined) return `${range.min}-${range.max}`;
+  if (range.max !== undefined) return `up-to-${range.max}`;
+  return `over-${range.min ?? 0}`;
 }
 
 export interface ConfiguratorModel {
@@ -36,14 +48,29 @@ export interface ConfiguratorModel {
   features: Record<string, FeatureOption[]>;
   industries: string[];
   companySizes: string[];
-  /** Budget ranges (without "not sure"; see `budgetIds`). */
+  /** Every distinct budget range (labels; without "not sure"). */
   budgetRanges: BudgetRange[];
+  /** The ranges offered per complexity level, lowest first (step 4, see `budgetRangesFor`). */
+  budgetLevels: Record<ComplexityLevel, BudgetRange[]>;
+  /** Complexity level of every feature, by id `"<category>/<key>"`. */
+  complexity: Record<string, ComplexityLevel>;
   currency: string;
   timelines: string[];
   limits: { nameMin: number; nameMax: number; commentMax: number };
 }
 
 const idSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Use kebab-case ids');
+const levelSchema = z.union([z.literal(1), z.literal(2), z.literal(3)]);
+const rangeSchema = z
+  .object({
+    min: z.number().nonnegative().optional(),
+    max: z.number().positive().optional(),
+  })
+  .refine((range) => range.min !== undefined || range.max !== undefined, 'Empty range')
+  .refine(
+    (range) => range.min === undefined || range.max === undefined || range.min < range.max,
+    'min must be below max',
+  );
 const idListSchema = z
   .array(idSchema)
   .min(1)
@@ -53,15 +80,12 @@ export const configuratorDataSchema = z.object({
   extraFeatures: z.record(z.string(), z.array(idSchema)),
   industries: idListSchema,
   companySizes: idListSchema,
-  budgetRanges: z
-    .array(
-      z.object({
-        id: idSchema.refine((id) => id !== BUDGET_NOT_SURE, 'Reserved id'),
-        min: z.number().nonnegative().optional(),
-        max: z.number().positive().optional(),
-      }),
-    )
-    .min(1),
+  complexity: z.record(z.string(), levelSchema),
+  budgetLevels: z.object({
+    1: z.array(rangeSchema).min(1),
+    2: z.array(rangeSchema).min(1),
+    3: z.array(rangeSchema).min(1),
+  }),
   timelines: idListSchema,
   contact: z.object({
     nameMin: z.number().int().positive(),
@@ -78,8 +102,9 @@ export interface CategoryLike {
 
 /**
  * Builds the model. Throws on inconsistent data (extras for an unknown
- * category, an extra repeating a service slug), so a content mistake fails
- * the build and the tests instead of reaching visitors.
+ * category, an extra repeating a service slug, a feature without a complexity
+ * level or a level for an unknown feature), so a content mistake fails the
+ * build and the tests instead of reaching visitors.
  */
 export function buildConfiguratorModel(
   categories: readonly CategoryLike[],
@@ -116,12 +141,37 @@ export function buildConfiguratorModel(
       })),
     ];
   }
+  const featureIds = new Set(
+    Object.values(features)
+      .flat()
+      .map((feature) => feature.id),
+  );
+  for (const id of featureIds) {
+    if (!(id in data.complexity)) throw new Error(`configurator: no complexity level for "${id}"`);
+  }
+  for (const id of Object.keys(data.complexity)) {
+    if (!featureIds.has(id)) throw new Error(`configurator: complexity level for unknown "${id}"`);
+  }
+  const withIds = (ranges: readonly { min?: number; max?: number }[]): BudgetRange[] =>
+    ranges.map((range) => ({ id: budgetRangeId(range), ...range }));
+  const budgetLevels = {
+    1: withIds(data.budgetLevels[1]),
+    2: withIds(data.budgetLevels[2]),
+    3: withIds(data.budgetLevels[3]),
+  };
+  const budgetRanges = [
+    ...new Map(
+      COMPLEXITY_LEVELS.flatMap((level) => budgetLevels[level]).map((range) => [range.id, range]),
+    ).values(),
+  ];
   return {
     types: categories.map((category) => category.id),
     features,
     industries: data.industries,
     companySizes: data.companySizes,
-    budgetRanges: data.budgetRanges,
+    budgetRanges,
+    budgetLevels,
+    complexity: data.complexity,
     currency,
     timelines: data.timelines,
     limits: data.contact,
@@ -136,8 +186,39 @@ export function getConfiguratorModel(): ConfiguratorModel {
   return cached;
 }
 
-/** Budget ids a draft may hold: the ranges plus "not sure". */
-export function budgetIds(model: ConfiguratorModel): string[] {
+/** The part of a draft that decides the budget ranges. */
+export interface BudgetBasis {
+  types: readonly string[];
+  features: readonly string[];
+}
+
+/**
+ * Complexity level of a request: the highest level among the selected
+ * features of the selected categories (D138). Level 1 when nothing is
+ * selected (that step is not reachable then).
+ */
+export function complexityLevel(model: ConfiguratorModel, basis: BudgetBasis): ComplexityLevel {
+  let level: ComplexityLevel = 1;
+  for (const id of basis.features) {
+    if (!basis.types.includes(id.split('/')[0] ?? '')) continue;
+    const own = model.complexity[id];
+    if (own !== undefined && own > level) level = own;
+  }
+  return level;
+}
+
+/** The budget ranges offered for this selection (without "not sure"). */
+export function budgetRangesFor(model: ConfiguratorModel, basis: BudgetBasis): BudgetRange[] {
+  return model.budgetLevels[complexityLevel(model, basis)];
+}
+
+/** Budget ids a draft may hold for this selection: its level's ranges plus "not sure". */
+export function budgetIds(model: ConfiguratorModel, basis: BudgetBasis): string[] {
+  return [...budgetRangesFor(model, basis).map((range) => range.id), BUDGET_NOT_SURE];
+}
+
+/** Every budget id the model knows (any level) plus "not sure"; for labels. */
+export function allBudgetIds(model: ConfiguratorModel): string[] {
   return [...model.budgetRanges.map((range) => range.id), BUDGET_NOT_SURE];
 }
 
