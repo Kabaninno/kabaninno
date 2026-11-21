@@ -25,9 +25,10 @@
 
 **Наступний крок (чекає на власника):** публікація на GitHub Pages.
 
-1. Власник створює репозиторій на GitHub і дає його адресу.
-2. Оркестратор виконує `git remote add origin <url>` і `git push -u origin main`.
-3. Власник вмикає Settings → Pages → Source = GitHub Actions.
+1. ✅ Репозиторій: https://github.com/Kabaninno/kabaninno (remote `origin` додано, `main` запушено 2026-11-21).
+2. ✅ Перший запуск «Deploy to GitHub Pages» упав на кроці «Configure GitHub Pages», бо Pages ще не ввімкнені. Код не винен, збірка не стартувала.
+3. ⏳ Власник вмикає Settings → Pages → Source = GitHub Actions і перезапускає workflow (Actions → Deploy to GitHub Pages → Re-run all jobs). Очікувана адреса: https://kabaninno.github.io/kabaninno/.
+   - Тепер, коли є remote, локальний `build:preview` сам бере `https://kabaninno.github.io/kabaninno` замість `.invalid` (D123).
 4. Деплой бере `base_url`/`base_path` з `actions/configure-pages` (D123).
 5. Домену поки немає (`[ДОМЕН]` у `site.config.ts` лишається). Коли з’явиться: Settings → Pages → Custom domain.
 
