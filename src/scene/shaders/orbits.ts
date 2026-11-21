@@ -87,6 +87,7 @@ void main() {
 
 export const orbitSparkFragment = /* glsl */ `
 uniform float uEmphasis;
+uniform float uOpacity;
 
 varying vec3 vColor;
 varying float vAlpha;
@@ -94,7 +95,7 @@ varying float vAlpha;
 ${softPointChunk}
 
 void main() {
-  float a = softPoint(gl_PointCoord, 14.0, 0.45) * vAlpha * (0.75 + 0.35 * uEmphasis);
+  float a = softPoint(gl_PointCoord, 14.0, 0.45) * vAlpha * (0.75 + 0.35 * uEmphasis) * uOpacity;
   if (a < 0.003) discard;
   vec3 color = mix(vColor, vec3(1.0), 0.35);
   gl_FragColor = vec4(color, clamp(a, 0.0, 1.0));

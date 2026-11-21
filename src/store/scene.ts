@@ -23,10 +23,37 @@ export interface SafeRect {
 }
 
 /**
+ * Camera flight state published by the scene (scene-engineer) so the UI can
+ * time its reveals to the flight (e.g. show the home hero at progress ≥ 0.6).
+ * `active` is true from the start of a programmatic flight until it settles;
+ * `progress` goes 0 → 1 during it (1 when idle). The scene may update it every
+ * frame while flying — consumers must select narrowly (e.g. a boolean
+ * threshold) or use `useSceneStore.subscribe` to avoid per-frame re-renders.
+ */
+export interface FlightState {
+  active: boolean;
+  progress: number;
+  /** Locale-less path the flight is heading to, or null when idle. */
+  to: string | null;
+}
+
+/**
  * Transient scene UI state. Where the camera is (universe/system/planet) is
  * NOT stored here: it is derived from the URL (see lib/route-state.ts).
  */
 interface SceneUiState {
+  flight: FlightState;
+  setFlight: (flight: FlightState) => void;
+  /**
+   * Locale-less path of the scene state the camera has SETTLED on (e.g.
+   * "/services/web/"), published by the scene when a flight settles, a
+   * reduced-motion cut completes, or the first frame of a deep link renders.
+   * `null` until the scene is ready (and forever without WebGL). The UI
+   * mirrors it to `html[data-scene-focus]` for automation (D45); it is
+   * not a second source of truth — the URL still drives the scene.
+   */
+  focus: string | null;
+  setFocus: (focus: string | null) => void;
   /** Highlighted node id, e.g. "category:web" — set from 3D hover or HTML focus. */
   highlighted: string | null;
   setHighlighted: (id: string | null) => void;
@@ -38,6 +65,10 @@ interface SceneUiState {
 }
 
 export const useSceneStore = create<SceneUiState>()((set) => ({
+  flight: { active: false, progress: 1, to: null },
+  setFlight: (flight) => set({ flight }),
+  focus: null,
+  setFocus: (focus) => set({ focus }),
   highlighted: null,
   setHighlighted: (highlighted) => set({ highlighted }),
   quality: 'high',

@@ -11,6 +11,8 @@ import { fontVariables } from './fonts';
  * `/` → `/pl/`. Static hosting has no server-side redirects, so this page
  * (out/index.html) redirects with a meta refresh, a JS fallback that keeps the
  * query string and hash, and visible links. The canonical points at `/pl/`.
+ * scripts/postbuild.mjs then rewrites the exported HTML into a minimal
+ * document built from these values (no app scripts or font preloads, P-06).
  */
 
 const target = withBasePath(localizedPath(defaultLocale, '/'));

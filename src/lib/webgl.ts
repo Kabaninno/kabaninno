@@ -1,22 +1,15 @@
-let cached: boolean | null = null;
-
-/** True when the browser can create a WebGL2 (preferred) or WebGL context. */
+/**
+ * Cheap WebGL capability check for SceneRoot (D55): the browser exposes the
+ * WebGL 2 API (three.js r163+ requires WebGL 2). No context is created here —
+ * the old throw-away probe context cost ~378 ms of hydration at 4× CPU
+ * (perf P-01). A real context can still fail (blocklisted GPU, policy, lost
+ * device); the scene creates exactly one context, its own, and falls back to
+ * "no scene" silently when that fails (see `createSceneRenderer`).
+ */
 export function isWebGLAvailable(): boolean {
-  if (cached !== null) return cached;
-  if (typeof document === 'undefined') return false;
-  try {
-    const canvas = document.createElement('canvas');
-    const context =
-      canvas.getContext('webgl2') ??
-      canvas.getContext('webgl') ??
-      canvas.getContext('experimental-webgl');
-    cached = context !== null;
-    // Release the probe context right away (mobile browsers cap live contexts).
-    if (context && 'getExtension' in context) {
-      (context as WebGLRenderingContext).getExtension('WEBGL_lose_context')?.loseContext();
-    }
-  } catch {
-    cached = false;
-  }
-  return cached;
+  if (typeof window === 'undefined') return false;
+  return (
+    typeof (window as Window & { WebGL2RenderingContext?: unknown }).WebGL2RenderingContext !==
+    'undefined'
+  );
 }

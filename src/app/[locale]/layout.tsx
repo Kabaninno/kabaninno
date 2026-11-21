@@ -5,7 +5,12 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { siteConfig } from '~/site.config';
 import { Hud } from '@/components/hud/Hud';
+import { EscapeToParent } from '@/components/layout/EscapeToParent';
+import { FlightStatus } from '@/components/layout/FlightStatus';
+import { RouteFocus } from '@/components/layout/RouteFocus';
 import { SafeAreaPublisher } from '@/components/layout/SafeAreaPublisher';
+import { SkipLink } from '@/components/layout/SkipLink';
+import { RouteExit } from '@/components/motion/RouteExit';
 import { getMessagesFor, pickMessages } from '@/i18n/messages';
 import { isLocale, locales } from '@/i18n/routing';
 import { buildNavCategories } from '@/lib/nav-data';
@@ -51,6 +56,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   setRequestLocale(locale);
 
   const t = await getTranslations('common');
+  const tHud = await getTranslations('hud');
   // Client components only get the namespaces they use (D05): the HUD and the
   // localized error boundary (`error.tsx`).
   const clientMessages = pickMessages(getMessagesFor(locale), ['hud', 'error']);
@@ -58,17 +64,20 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   return (
     <html lang={locale} className={fontVariables}>
       <body>
-        <a
-          href="#main"
-          className="fixed top-3 left-3 z-50 -translate-y-24 rounded-full glass px-5 py-3 text-sm text-ink transition-transform duration-200 focus-visible:translate-y-0"
-        >
-          {t('skipToContent')}
-        </a>
+        <SkipLink label={t('skipToContent')} />
         <div className="backdrop-cosmos" aria-hidden="true" />
         <NextIntlClientProvider messages={clientMessages}>
           <SceneRoot manifest={buildSceneManifest(locale)} />
           <SafeAreaPublisher />
-          <Hud categories={buildNavCategories(locale)} studioName={siteConfig.studioName} />
+          <FlightStatus />
+          <EscapeToParent />
+          <RouteFocus />
+          <RouteExit />
+          <Hud
+            categories={buildNavCategories(locale)}
+            studioName={siteConfig.studioName}
+            homeLabel={tHud('homeLabel', { studio: siteConfig.studioName })}
+          />
           <main id="main" tabIndex={-1} className="pointer-events-none relative z-10">
             {children}
           </main>

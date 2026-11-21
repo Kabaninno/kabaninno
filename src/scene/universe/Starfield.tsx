@@ -82,7 +82,7 @@ const STAR_TINTS = [
 ] as const;
 
 /** Tilt of the galactic band. */
-const BAND_ROTATION = new Euler(0.42, 0, 0.36);
+export const BAND_ROTATION = new Euler(0.42, 0, 0.36);
 
 interface StarfieldProps {
   preset: QualityPreset;

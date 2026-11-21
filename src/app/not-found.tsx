@@ -5,6 +5,7 @@ import { getMessagesFor } from '@/i18n/messages';
 import { defaultLocale, locales } from '@/i18n/routing';
 import { withBasePath } from '@/lib/base-path';
 import { localizedPath } from '@/lib/metadata';
+import { NOT_FOUND_SKY, starLayer } from '@/lib/starfield';
 import { bindShortWords } from '@/lib/typography';
 import { fontVariables } from './fonts';
 
@@ -15,11 +16,20 @@ import { fontVariables } from './fonts';
  * CSS/JS with absolute, base-path-prefixed URLs as well.
  *
  * No 3D here: a CSS star layer over the cosmos backdrop keeps it on-brand and
- * weightless. Next.js adds `<meta name="robots" content="noindex">` itself.
+ * weightless. The cards use the HUD glass (blurred, 72 % fill), so no star
+ * reads as a stray dot inside the text (visual M3-02). Next.js adds
+ * `<meta name="robots" content="noindex">` itself.
  */
 
 export const metadata: Metadata = {
   title: { absolute: `404 · ${siteConfig.studioName}` },
+};
+
+/** Seeded random star tiles, rendered once at build time. */
+const sky = NOT_FOUND_SKY.map(starLayer);
+const skyStyle = {
+  backgroundImage: sky.map((layer) => layer.image).join(', '),
+  backgroundSize: sky.map((layer) => layer.size).join(', '),
 };
 
 export default function NotFound() {
@@ -27,7 +37,7 @@ export default function NotFound() {
     <html lang={defaultLocale} className={fontVariables}>
       <body>
         <div className="backdrop-cosmos" aria-hidden="true" />
-        <div className="starfield-css" aria-hidden="true" />
+        <div className="starfield-css" aria-hidden="true" style={skyStyle} />
         <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col items-center justify-center px-4 py-16 text-center sm:px-8">
           <a
             href={withBasePath(localizedPath(defaultLocale, '/'))}
@@ -53,7 +63,7 @@ export default function NotFound() {
                 <li
                   key={locale}
                   lang={locale}
-                  className="corner-brackets flex flex-col items-center gap-3 bg-white/[0.02] px-5 py-6"
+                  className="corner-brackets flex flex-col items-center gap-3 bg-[rgb(10_14_28/0.72)] px-5 py-6 backdrop-blur-md supports-[not(backdrop-filter:blur(1px))]:bg-[rgb(10_14_28/0.92)]"
                 >
                   <span aria-hidden="true" className="mono-index text-faint">
                     {locale.toUpperCase()}

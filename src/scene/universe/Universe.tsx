@@ -2,26 +2,49 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Vector3 } from 'three';
 import { useSceneStore } from '@/store/scene';
+import { keepAlive, type SceneBusRef } from '../bus';
 import { MOTION } from '../config';
 import { dampFactor } from '../camera/damp';
 import { universeKeyForHighlight } from '../node-ids';
+import { systemPrewarmKey, type CompileApiRef, type PrewarmApiRef } from '../prewarm/api';
+import type { SystemMaterialCache } from '../prewarm/system-materials';
 import type { QualityPreset } from '../quality';
-import { motionTime } from '../three-utils';
+import { NODE_CORE_RADIUS } from '../system/SystemContent';
+import { isPerspectiveCamera, motionTime } from '../three-utils';
 import { CategoryNode } from './CategoryNode';
-import { ConfiguratorBeacon } from './ConfiguratorBeacon';
-import { Links } from './Links';
-import type { UniverseModel } from './model';
+import { BEACON_CORE_RADIUS, ConfiguratorBeacon } from './ConfiguratorBeacon';
+import type { UniverseModel, UniverseNode } from './model';
+import { Network } from './Network';
+import { NodeLabels } from './NodeLabels';
 import { PortfolioCluster } from './PortfolioCluster';
 import {
   DRIFT_AMPLITUDE,
+  FOCUSED_NETWORK,
   createUniverseRuntime,
   writeDrift,
   type UniverseRuntime,
 } from './runtime';
+import { coreWorldRadius, pixelsPerUnit, smallCoreBoost } from './screen-size';
 
-/** Network visibility while the camera is focused on a node (art direction: "the network fades"). */
-const FOCUSED_NETWORK = 0.18;
+/** True world radius of each node kind's core (portfolio: the cluster's bright core). */
+const BASE_RADIUS: Record<UniverseNode['kind'], number> = {
+  category: NODE_CORE_RADIUS,
+  configurator: BEACON_CORE_RADIUS,
+  portfolio: 1.1,
+};
+/** Presence fade: tolerance and fade distance outside the free frame, CSS px. */
+const PRESENCE_TOLERANCE_PX = 6;
+const PRESENCE_FADE_PX = 28;
+const PRESENCE_RATE = 6;
+
+/** Share of the minimum on-screen core size each kind gets. */
+const MIN_SIZE_SHARE: Record<UniverseNode['kind'], number> = {
+  category: 1,
+  configurator: 0.75,
+  portfolio: 1.6,
+};
 
 interface UniverseProps {
   model: UniverseModel;
@@ -30,59 +53,164 @@ interface UniverseProps {
   preset: QualityPreset;
   reducedMotion: boolean;
   onNavigate: (path: string) => void;
+  busRef: SceneBusRef;
+  prewarm: PrewarmApiRef;
+  compile: CompileApiRef;
+  systemMaterials: SystemMaterialCache;
 }
 
 /**
- * The universe network: category nodes, portfolio cluster, configurator beacon
- * and links. Owns the per-frame runtime (drift, eased hover/focus) that every
- * child reads, so hover and highlight never cause React re-renders.
+ * The universe: the neural network (minor nodes, links), the category nodes,
+ * the portfolio cluster, the configurator beacon and the hover labels. Owns
+ * the per-frame runtime every child reads — drift, eased hover, focus (in
+ * lockstep with camera flights through the bus), minimum on-screen core
+ * sizes and the network fade — so hover and highlight never re-render React.
  */
-export function Universe({ model, focusKey, preset, reducedMotion, onNavigate }: UniverseProps) {
+export function Universe({
+  model,
+  focusKey,
+  preset,
+  reducedMotion,
+  onNavigate,
+  busRef,
+  prewarm,
+  compile,
+  systemMaterials,
+}: UniverseProps) {
   const runtime = useRef<UniverseRuntime | null>(null);
   // Highlight id from the shared store (3D hover or HTML nav focus), kept in a ref.
   const highlightRef = useRef<string | null>(null);
+  const scratch = useRef({
+    world: new Vector3(),
+    forward: new Vector3(),
+    rel: new Vector3(),
+    ndc: new Vector3(),
+  });
 
   useEffect(() => {
-    highlightRef.current = universeKeyForHighlight(useSceneStore.getState().highlighted);
-    return useSceneStore.subscribe((state) => {
-      highlightRef.current = universeKeyForHighlight(state.highlighted);
+    const apply = (id: string | null) => {
+      const key = universeKeyForHighlight(id);
+      highlightRef.current = key;
+      keepAlive(busRef.current, 600);
+      // Desktop hover / keyboard focus on an HTML link warms that system up.
+      const node = key ? model.byKey.get(key) : undefined;
+      if (node?.kind === 'category') prewarm.current?.prioritize(systemPrewarmKey(node.categoryId));
+    };
+    apply(useSceneStore.getState().highlighted);
+    return useSceneStore.subscribe((state, previous) => {
+      if (state.highlighted !== previous.highlighted) apply(state.highlighted);
     });
-  }, []);
+  }, [busRef, model, prewarm]);
 
-  // Runs before the node components (priority -1) so they read fresh values.
+  // After CameraControls moved the camera (-1), before the node components (0).
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1);
     const time = motionTime(state, reducedMotion);
     const hoverK = dampFactor(MOTION.hoverRate, dt);
-    const focusK = dampFactor(MOTION.focusRate, dt);
+    const focusK = reducedMotion ? 1 : dampFactor(MOTION.focusRate, dt);
     const highlighted = highlightRef.current;
-    const rt = runtime.current ?? (runtime.current = createUniverseRuntime());
+    const rt = (runtime.current ??= createUniverseRuntime());
+    const shared = busRef.current;
+    const cam = state.camera;
+    const { world, forward, rel, ndc } = scratch.current;
+    cam.updateMatrixWorld();
+    cam.getWorldDirection(forward);
+    const fov = isPerspectiveCamera(cam) ? cam.fov : 50;
+    const { width: viewportWidth, height: viewportHeight, left, top } = state.size;
+    const presenceK = reducedMotion ? 1 : dampFactor(PRESENCE_RATE, dt);
+    // Free frame in canvas px (the whole canvas when the UI publishes none).
+    const rect = useSceneStore.getState().safeRect;
+    const frameLeft = rect ? rect.x - left : 0;
+    const frameTop = rect ? rect.y - top : 0;
+    const frameRight = rect ? frameLeft + rect.width : viewportWidth;
+    const frameBottom = rect ? frameTop + rect.height : viewportHeight;
 
     rt.time = time;
     rt.animated = !reducedMotion;
+    shared.hovering = highlighted !== null;
+    let maxFocus = 0;
+    let settling = false;
     for (const node of model.nodes) {
       const i = node.index;
-      const hover = rt.hover[i]! + ((node.key === highlighted ? 1 : 0) - rt.hover[i]!) * hoverK;
-      const focus = rt.focus[i]! + ((node.key === focusKey ? 1 : 0) - rt.focus[i]!) * focusK;
+      const hoverTarget = node.key === highlighted ? 1 : 0;
+      const hover = rt.hover[i]! + (hoverTarget - rt.hover[i]!) * hoverK;
+      let focus: number;
+      if (shared.focusDriven) {
+        focus = Math.min(
+          (node.key === shared.focusFrom ? shared.focusFromAmount : 0) +
+            (node.key === shared.focusTo ? shared.focusToAmount : 0),
+          1,
+        );
+      } else {
+        const focusTarget = node.key === focusKey ? 1 : 0;
+        focus = rt.focus[i]! + (focusTarget - rt.focus[i]!) * focusK;
+        if (Math.abs(focusTarget - focus) > 0.002) settling = true;
+      }
+      if (Math.abs(hoverTarget - hover) > 0.002) settling = true;
       rt.hover[i] = hover;
       rt.focus[i] = focus;
       rt.emphasis[i] = Math.max(hover, focus * 0.45);
+      maxFocus = Math.max(maxFocus, focus);
       writeDrift(rt.offsets[i]!, i, time, DRIFT_AMPLITUDE * (1 - focus));
+
+      // Minimum on-screen core size for the current framing (N-07, M3-04).
+      world.set(node.position[0], node.position[1], node.position[2]).add(rt.offsets[i]!);
+      const depth = rel.subVectors(world, cam.position).dot(forward);
+      const ppu = pixelsPerUnit(viewportHeight, fov, depth);
+      const base = BASE_RADIUS[node.kind] * (1 + 0.1 * focus);
+      const radius = coreWorldRadius(base, shared.minCorePx * MIN_SIZE_SHARE[node.kind], ppu);
+      rt.pxPerUnit[i] = ppu;
+      rt.coreRadius[i] = radius;
+      rt.corePx[i] = radius * 2 * ppu;
+      rt.small[i] = smallCoreBoost(rt.corePx[i]!);
+
+      // Presence: fade nodes the overlays would cover (never the camera's focus).
+      ndc.copy(world).project(cam);
+      const sx = (ndc.x * 0.5 + 0.5) * viewportWidth;
+      const sy = (0.5 - ndc.y * 0.5) * viewportHeight;
+      const inFront = ndc.z < 1;
+      rt.screenX[i] = sx;
+      rt.screenY[i] = sy;
+      rt.inFront[i] = inFront;
+      const focusTarget =
+        node.key === focusKey || (shared.focusDriven && node.key === shared.focusTo);
+      const outside = Math.max(frameLeft - sx, sx - frameRight, frameTop - sy, sy - frameBottom, 0);
+      const presenceTarget =
+        focusTarget || !inFront
+          ? 1
+          : 1 -
+            smoothstep(PRESENCE_TOLERANCE_PX, PRESENCE_TOLERANCE_PX + PRESENCE_FADE_PX, outside);
+      const presence = rt.presence[i]! + (presenceTarget - rt.presence[i]!) * presenceK;
+      rt.presence[i] = presence;
+      if (Math.abs(presenceTarget - presence) > 0.002) settling = true;
     }
-    const networkTarget = focusKey ? FOCUSED_NETWORK : 1;
-    rt.network += (networkTarget - rt.network) * focusK;
-  }, -1);
+
+    if (shared.focusDriven) {
+      rt.network = 1 - (1 - FOCUSED_NETWORK) * maxFocus;
+    } else {
+      const networkTarget = focusKey ? FOCUSED_NETWORK : 1;
+      rt.network += (networkTarget - rt.network) * focusK;
+      if (Math.abs(networkTarget - rt.network) > 0.002) settling = true;
+    }
+    // frameloop="demand" (reduced motion): keep drawing until the easing settles.
+    if (settling) keepAlive(shared, 100);
+  }, -0.5);
 
   return (
     <group>
-      <Links model={model} runtime={runtime} preset={preset} />
+      <Network model={model} runtime={runtime} preset={preset} />
       {model.categories.map((node) => (
         <CategoryNode
           key={node.key}
           node={node}
           runtime={runtime}
           preset={preset}
+          focused={node.key === focusKey}
           onNavigate={onNavigate}
+          busRef={busRef}
+          prewarm={prewarm}
+          compile={compile}
+          systemMaterials={systemMaterials}
         />
       ))}
       <PortfolioCluster
@@ -90,13 +218,21 @@ export function Universe({ model, focusKey, preset, reducedMotion, onNavigate }:
         runtime={runtime}
         preset={preset}
         onNavigate={onNavigate}
+        busRef={busRef}
       />
       <ConfiguratorBeacon
         node={model.configurator}
-        runtime={runtime}
+        runtimeRef={runtime}
         preset={preset}
         onNavigate={onNavigate}
+        busRef={busRef}
       />
+      <NodeLabels model={model} runtime={runtime} busRef={busRef} reducedMotion={reducedMotion} />
     </group>
   );
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * (3 - 2 * t);
 }

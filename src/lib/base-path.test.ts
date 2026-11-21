@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeBasePath, withBasePath } from './base-path';
+import { normalizeBasePath, stripBasePath, withBasePath } from './base-path';
 
 describe('normalizeBasePath', () => {
   it.each<[string | undefined | null, string]>([
@@ -42,5 +42,24 @@ describe('withBasePath', () => {
     '//cdn.example.com/x',
   ])('does not touch absolute URL %j', (url) => {
     expect(withBasePath(url, '/kabaninno')).toBe(url);
+  });
+});
+
+describe('stripBasePath', () => {
+  it('removes the base path', () => {
+    expect(stripBasePath('/kabaninno/pl/', '/kabaninno')).toBe('/pl/');
+    expect(stripBasePath('/kabaninno/pl/services/web/', '/kabaninno')).toBe('/pl/services/web/');
+    expect(stripBasePath('/kabaninno', '/kabaninno')).toBe('/');
+    expect(stripBasePath('/kabaninno/', '/kabaninno')).toBe('/');
+  });
+
+  it('returns null outside the base path', () => {
+    expect(stripBasePath('/other/pl/', '/kabaninno')).toBeNull();
+    expect(stripBasePath('/kabaninnox/pl/', '/kabaninno')).toBeNull();
+  });
+
+  it('keeps paths with an empty base path', () => {
+    expect(stripBasePath('/pl/', '')).toBe('/pl/');
+    expect(stripBasePath('', '')).toBe('/');
   });
 });

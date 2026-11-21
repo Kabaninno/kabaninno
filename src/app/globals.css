@@ -28,6 +28,11 @@
 }
 
 /*
+ * `compact:` = md+ windows up to 820 px tall (1366×768, 1280×720 laptops):
+ * the home hero shrinks to two headline lines so the universe keeps a usable
+ * band above it (visual V2-02). Declared before `short:`/`shorter:`, which
+ * still win on even shorter viewports.
+ *
  * Height-based variants for short viewports: landscape phones (667×375,
  * 568×320, 932×430…) and squat desktop windows. The width breakpoints alone
  * would give an 800×360 phone the desktop type scale, and fixed bottom
@@ -35,6 +40,7 @@
  * built-in breakpoints, so `short:` utilities win over `md:`/`lg:` ones and
  * `shorter:` wins over `short:`.
  */
+@custom-variant compact (@media (min-width: 48rem) and (max-height: 51.25rem));
 @custom-variant short (@media (max-height: 30rem));
 @custom-variant shorter (@media (max-height: 22.5rem));
 
@@ -249,34 +255,17 @@
 }
 
 /*
- * CSS-only star layer for pages without the 3D scene (404). Three tiled
- * layers with co-prime tile sizes, so the repetition is not noticeable.
+ * CSS-only star layer for pages without the 3D scene (404). The stars
+ * themselves are seeded random SVG tiles set inline (`src/lib/starfield.ts`):
+ * one large random tile per layer leaves no visible repeat grid (visual
+ * M3-01, which small tiled radial gradients produced).
  */
 @utility starfield-css {
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    radial-gradient(1px 1px at 12% 18%, rgb(255 255 255 / 0.9), transparent 75%),
-    radial-gradient(1px 1px at 63% 41%, rgb(255 255 255 / 0.7), transparent 75%),
-    radial-gradient(1px 1px at 37% 77%, rgb(255 255 255 / 0.8), transparent 75%),
-    radial-gradient(1px 1px at 86% 88%, rgb(232 236 245 / 0.65), transparent 75%),
-    radial-gradient(1px 1px at 91% 33%, rgb(232 236 245 / 0.6), transparent 75%),
-    radial-gradient(1.5px 1.5px at 24% 52%, rgb(255 255 255 / 0.85), transparent 75%),
-    radial-gradient(1.5px 1.5px at 78% 14%, rgb(232 236 245 / 0.7), transparent 75%),
-    radial-gradient(1.5px 1.5px at 8% 84%, rgb(255 255 255 / 0.6), transparent 75%),
-    radial-gradient(2px 2px at 52% 66%, rgb(255 255 255 / 0.75), transparent 75%);
-  background-size:
-    233px 233px,
-    233px 233px,
-    233px 233px,
-    233px 233px,
-    233px 233px,
-    347px 347px,
-    347px 347px,
-    347px 347px,
-    521px 521px;
+  background-repeat: repeat;
 }
 
 /*
@@ -307,9 +296,45 @@
   }
 }
 
+@keyframes ui-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @layer components {
   .ui-enter {
     animation: ui-enter 250ms var(--ease-calm) var(--ui-enter-delay, 0ms) both;
+  }
+
+  /*
+   * Held back until a gate opens (the home hero waits for the camera flight,
+   * see `useEnterAnimation`): invisible and not clickable, but laid out, so
+   * the safe-rect measurement already sees its final box.
+   */
+  .ui-enter-pending {
+    opacity: 0;
+  }
+
+  .ui-enter-pending,
+  .ui-enter-pending * {
+    pointer-events: none !important;
+  }
+
+  /*
+   * Ghost of the outgoing route UI (RouteExit, visual N-03): a fixed layer
+   * above the new route and below the HUD that fades out in 150 ms (keep in
+   * sync with UI_MOTION.exitFadeMs). Ghosts keep their own fixed positions.
+   */
+  .ui-exit-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    animation: ui-exit 150ms ease-out both;
   }
 }
 
@@ -326,5 +351,10 @@
   /* Reduced motion: a plain short fade instead of the translate + blur entrance. */
   .ui-enter {
     animation: ui-fade-in 200ms ease-out var(--ui-enter-delay-reduced, 0ms) both !important;
+  }
+
+  /* No exit fade under reduced motion (RouteExit also skips creating ghosts). */
+  .ui-exit-layer {
+    display: none;
   }
 }

@@ -53,7 +53,8 @@ void main() {
   float closeFade = mix(0.28, 1.0, smoothstep(2.0, 12.0, vDepth));
   float a = (core + glow + streak) * edge * uIntensity * (0.7 + 0.65 * uEmphasis) * closeFade;
   a *= fogFactor(vDepth);
-  vec3 color = mix(uColor, uGlow, clamp(core * 1.4, 0.0, 1.0));
+  // The centre tints toward the glow only halfway: the halo keeps the DNA hue (V-07).
+  vec3 color = mix(uColor, mix(uColor, uGlow, 0.5), clamp(core * 1.4, 0.0, 1.0));
   gl_FragColor = vec4(color, clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>
 }

@@ -1,13 +1,15 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useSyncExternalStore, type ComponentType } from 'react';
+import { useCallback, useState, useSyncExternalStore, type ComponentType } from 'react';
 import { isWebGLAvailable } from '@/lib/webgl';
 import { SceneErrorBoundary } from './SceneErrorBoundary';
 import type { SceneManifest } from './types';
 
 interface ExperienceProps {
   manifest: SceneManifest;
+  /** The WebGL context could not be created: continue without the scene, silently. */
+  onUnavailable: () => void;
 }
 
 /** Stand-in when the scene bundle cannot be loaded: the page works without 3D. */
@@ -39,14 +41,17 @@ const subscribe = () => () => {};
  * stay inside this layer (see SceneErrorBoundary).
  */
 export function SceneRoot({ manifest }: { manifest: SceneManifest }) {
-  // null on the server / first hydration pass, boolean afterwards.
+  // null on the server / first hydration pass, boolean afterwards. A cheap API
+  // check (no probe context, perf P-01); the real context may still fail.
   const webgl = useSyncExternalStore(subscribe, isWebGLAvailable, () => null);
+  const [unavailable, setUnavailable] = useState(false);
+  const handleUnavailable = useCallback(() => setUnavailable(true), []);
 
   return (
     <div className="fixed inset-0 z-0" aria-hidden="true" data-scene-root="">
-      {webgl ? (
+      {webgl && !unavailable ? (
         <SceneErrorBoundary>
-          <Experience manifest={manifest} />
+          <Experience manifest={manifest} onUnavailable={handleUnavailable} />
         </SceneErrorBoundary>
       ) : null}
     </div>

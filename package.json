@@ -15,6 +15,10 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "node scripts/vitest.mjs run",
     "test:watch": "node scripts/vitest.mjs",
+    "test:e2e": "playwright test",
+    "e2e:full": "npm run build:preview && npm run test:e2e",
+    "screenshots": "node scripts/screenshots.mjs",
+    "audit:a11y": "node scripts/audit-a11y.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run lint && npm run typecheck && npm run test",
@@ -35,6 +39,8 @@
     "zustand": "^5.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.1",
     "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",

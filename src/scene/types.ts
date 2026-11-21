@@ -8,6 +8,15 @@ import type { CategoryDna, Planet } from '~/content/schema';
 export interface SceneManifest {
   categories: SceneCategory[];
   projects: SceneProject[];
+  /** Localized labels for the non-category nodes (aria-hidden canvas labels). */
+  labels: SceneLabels;
+}
+
+export interface SceneLabels {
+  portfolio: string;
+  configurator: string;
+  /** Shown on the portfolio node when no published project exists. */
+  comingSoon: string;
 }
 
 export interface SceneCategory {

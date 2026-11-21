@@ -21,6 +21,8 @@ export interface UniverseNodeBase {
   glow: string;
   /** Locale-less route the node navigates to. */
   path: string;
+  /** Localized name for the (aria-hidden) canvas label. */
+  label: string;
 }
 
 export interface OrbitPreview extends OrbitShape {
@@ -37,7 +39,8 @@ export interface OrbitPreview extends OrbitShape {
 export interface CategoryNodeModel extends UniverseNodeBase {
   kind: 'category';
   categoryId: string;
-  label: string;
+  /** 1-based position among the categories (label index "02 / 05"). */
+  ordinal: number;
   core: CategoryDna['core'];
   orbits: OrbitPreview[];
   /** World-space radius enclosing the whole nested system (orbits + rings). */
@@ -47,6 +50,9 @@ export interface CategoryNodeModel extends UniverseNodeBase {
 export interface PortfolioNodeModel extends UniverseNodeBase {
   kind: 'portfolio';
   projectSlugs: string[];
+  /** No visible project yet: dimmer cluster and a "coming soon" label (BRIEF B2.3). */
+  comingSoon: boolean;
+  comingSoonLabel: string;
 }
 
 export interface ConfiguratorNodeModel extends UniverseNodeBase {
@@ -113,6 +119,7 @@ export function buildUniverseModel(manifest: SceneManifest): UniverseModel {
       key: sceneNodeId.category(category.id),
       categoryId: category.id,
       label: category.label,
+      ordinal: index + 1,
       core: category.dna.core,
       position: positions[index]!,
       color: category.dna.color,
@@ -131,7 +138,10 @@ export function buildUniverseModel(manifest: SceneManifest): UniverseModel {
     color: PALETTE.portfolio,
     glow: PALETTE.portfolioGlow,
     path: paths.portfolio(),
+    label: manifest.labels.portfolio,
     projectSlugs: manifest.projects.map((project) => project.slug),
+    comingSoon: manifest.projects.length === 0,
+    comingSoonLabel: manifest.labels.comingSoon,
   };
 
   const categoryColors = categories.map((category) => category.color);
@@ -143,6 +153,7 @@ export function buildUniverseModel(manifest: SceneManifest): UniverseModel {
     color: categoryColors[0] ?? PALETTE.beacon,
     glow: PALETTE.beacon,
     path: paths.configurator(),
+    label: manifest.labels.configurator,
     palette: categoryColors.length > 0 ? categoryColors : [PALETTE.beacon],
   };
 

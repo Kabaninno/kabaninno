@@ -7,6 +7,7 @@ import { buildUniverseModel } from './model';
 
 function manifestFromContent(): SceneManifest {
   return {
+    labels: { portfolio: 'Portfolio', configurator: 'Configurator', comingSoon: 'Coming soon' },
     categories: getCategories().map((category) => ({
       id: category.id,
       label: category.id,

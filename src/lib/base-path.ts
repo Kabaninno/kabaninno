@@ -23,3 +23,15 @@ export function withBasePath(path: string, basePath: string = BASE_PATH): string
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return `${basePath}${normalized}`;
 }
+
+/**
+ * Inverse of `withBasePath` for a URL pathname: "/kabaninno/pl/" → "/pl/".
+ * Returns null when the path lies outside the base path (another app on the
+ * same origin), so callers never mistake it for one of our routes.
+ */
+export function stripBasePath(pathname: string, basePath: string = BASE_PATH): string | null {
+  if (!basePath) return pathname || '/';
+  if (pathname === basePath) return '/';
+  if (pathname.startsWith(`${basePath}/`)) return pathname.slice(basePath.length);
+  return null;
+}

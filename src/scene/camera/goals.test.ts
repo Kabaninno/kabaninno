@@ -7,19 +7,23 @@ import {
   FULL_FRAME,
   MIN_FRAME_FRACTION,
   computeCameraGoal,
+  controlLimits,
   fitDistance,
   fovForAspect,
   frameAspect,
   frameCenter,
   frameTangents,
   overviewGoal,
+  minCoreDiameterPx,
   resolveSafeFrame,
+  usesPortraitOverview,
   viewOffsetForCenter,
   type CameraGoal,
   type SafeFrame,
 } from './goals';
 
 const manifest: SceneManifest = {
+  labels: { portfolio: 'Portfolio', configurator: 'Configurator', comingSoon: 'Coming soon' },
   categories: getCategories().map((category) => ({
     id: category.id,
     label: category.id,
@@ -420,3 +424,101 @@ describe('rect-aware framing', () => {
     }
   });
 });
+
+describe('controlLimits', () => {
+  it('keeps zoom relative to the fitted distance and the pivot in view', () => {
+    const overview = controlLimits({ mode: 'universe' }, 40, 1.1);
+    expect(overview.minDistance).toBeCloseTo(24);
+    expect(overview.maxDistance).toBeCloseTo(56);
+    expect(overview.minPolar).toBeGreaterThanOrEqual(0.35);
+    // Never below the ring plane by more than a few degrees.
+    expect(overview.maxPolar).toBeLessThanOrEqual(Math.PI / 2 + 0.18 + 1e-9);
+    expect(overview.minPolar).toBeLessThanOrEqual(1.1);
+    expect(overview.maxPolar).toBeGreaterThanOrEqual(1.1);
+
+    const system = controlLimits({ mode: 'system', category: 'web' }, 4, 1.2);
+    expect(system.minDistance).toBeCloseTo(2);
+    expect(system.maxDistance).toBeCloseTo(7.6);
+    for (const target of [
+      { mode: 'portfolio' as const },
+      { mode: 'configurator' as const },
+      { mode: 'planet' as const, category: 'web', service: 'x' },
+    ]) {
+      const limits = controlLimits(target, 10, 1.2);
+      expect(limits.minDistance).toBeLessThan(10);
+      expect(limits.maxDistance).toBeGreaterThan(10);
+      expect(limits.minPolar).toBeLessThanOrEqual(1.2);
+      expect(limits.maxPolar).toBeGreaterThanOrEqual(1.2);
+    }
+  });
+});
+
+describe('overview layout choice and sway (V2-01, V2-08)', () => {
+  const VIEW_1536: Viewport = { width: 1536, height: 864 };
+  /** Free column between hero and index at 1536×864 (visual review V2-01). */
+  const COLUMN_RECT: Rect = { x: 0, y: 68, width: 626, height: 796 };
+
+  it('fits the landscape layout into a portrait-ish free rect, portfolio included', () => {
+    const frame = resolveSafeFrame(COLUMN_RECT, VIEW_1536.width, VIEW_1536.height);
+    expect(usesPortraitOverview(VIEW_1536.width / VIEW_1536.height, frame)).toBe(false);
+    const goal = computeCameraGoal(
+      { mode: 'universe' },
+      model,
+      VIEW_1536.width / VIEW_1536.height,
+      frame,
+    );
+    for (const node of model.nodes) {
+      const radius = node.kind === 'category' ? node.systemRadius : 1;
+      expect(sphereInRect(goal, node.position, radius, VIEW_1536, frame, COLUMN_RECT)).toBe(true);
+    }
+  });
+
+  it('keeps the portrait layout for a free viewport (D26) and for very narrow rects', () => {
+    expect(usesPortraitOverview(390 / 844, FULL_FRAME)).toBe(true);
+    const narrow = resolveSafeFrame({ x: 0, y: 0, width: 300, height: 800 }, 1440, 900);
+    expect(usesPortraitOverview(1440 / 900, narrow)).toBe(true);
+    expect(usesPortraitOverview(1440 / 900, FULL_FRAME)).toBe(false);
+  });
+
+  it('fits the overview over the idle sway range', () => {
+    const { frame } = goalFor({ mode: 'universe' }, DESKTOP_VIEW, DESKTOP_HOME_RECT);
+    const aspect = DESKTOP_VIEW.width / DESKTOP_VIEW.height;
+    const sway = 0.2;
+    const still = computeCameraGoal({ mode: 'universe' }, model, aspect, frame);
+    const swaying = computeCameraGoal({ mode: 'universe' }, model, aspect, frame, { sway });
+    expect(dist(swaying.position, swaying.lookAt)).toBeGreaterThan(
+      dist(still.position, still.lookAt),
+    );
+    // At either end of the sway every node is still inside the rect.
+    for (const angle of [-sway, sway]) {
+      const position = rotateAround(swaying.position, swaying.lookAt, angle);
+      const goal = { ...swaying, position };
+      for (const node of model.categories) {
+        expect(
+          sphereInRect(
+            goal,
+            node.position,
+            node.systemRadius,
+            DESKTOP_VIEW,
+            frame,
+            DESKTOP_HOME_RECT,
+          ),
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('gives desktop cores an 18 px floor (V2-02)', () => {
+    expect(minCoreDiameterPx(750, 305)).toBeCloseTo(15.25);
+    expect(minCoreDiameterPx(750, 305, true)).toBe(18);
+    expect(minCoreDiameterPx(824, 564, true)).toBeCloseTo(28.2);
+  });
+});
+
+function rotateAround(point: Vec3, center: Vec3, angle: number): Vec3 {
+  const dx = point[0] - center[0];
+  const dz = point[2] - center[2];
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [center[0] + dx * c + dz * s, point[1], center[2] - dx * s + dz * c];
+}

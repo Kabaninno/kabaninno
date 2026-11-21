@@ -6,7 +6,7 @@ import { AdditiveBlending, Color, type ShaderMaterial } from 'three';
 import { qualityDefines, type QualityPreset } from '../quality';
 import { haloFragment, haloVertex } from '../shaders/halo';
 import { fogUniforms } from '../three-utils';
-import type { UniverseRuntimeRef } from './runtime';
+import { neighbourDim, type UniverseRuntimeRef } from './runtime';
 
 interface HaloProps {
   color: string;
@@ -21,9 +21,14 @@ interface HaloProps {
   preset: QualityPreset;
   /** Optional handle for parents that animate colors (e.g. the beacon). */
   materialRef?: RefObject<ShaderMaterial | null>;
+  /** Fade out when the camera dives into this node (its system corona takes over). */
+  fadeOnFocus?: boolean;
 }
 
-/** Soft additive glow around a node; brightens with the node's emphasis. */
+/**
+ * Soft additive glow around a node; brightens with the node's emphasis and
+ * dims while the camera focuses another node.
+ */
 export function Halo({
   color,
   glow,
@@ -34,6 +39,7 @@ export function Halo({
   index,
   preset,
   materialRef,
+  fadeOnFocus = false,
 }: HaloProps) {
   const localRef = useRef<ShaderMaterial>(null);
   const ref = materialRef ?? localRef;
@@ -54,7 +60,11 @@ export function Halo({
   useFrame(() => {
     const material = ref.current;
     const rt = runtime.current;
-    if (material && rt) material.uniforms.uEmphasis.value = rt.emphasis[index] ?? 0;
+    if (!material || !rt) return;
+    material.uniforms.uEmphasis.value = rt.emphasis[index] ?? 0;
+    const focusFade = fadeOnFocus ? 1 - 0.8 * (rt.focus[index] ?? 0) : 1;
+    material.uniforms.uIntensity.value =
+      intensity * neighbourDim(rt, index) * focusFade * (rt.presence[index] ?? 1);
   });
 
   return (

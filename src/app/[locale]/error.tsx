@@ -3,8 +3,9 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { PanelShell } from '@/components/panel/PanelShell';
 import { primaryButton, secondaryButton } from '@/components/ui/styles';
-import { Link } from '@/i18n/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { paths } from '@/lib/routes';
+import { withTrailingSlash } from '@/lib/style';
 import { bindShortWords } from '@/lib/typography';
 
 interface LocaleErrorProps {
@@ -23,10 +24,16 @@ interface LocaleErrorProps {
  * The panel is the bare `PanelShell` (no entrance animation, observers or
  * listeners): if the failure came from `ContentPanel`'s own effects, reusing
  * it here would make the fallback throw again and again (QA M1-2 N4).
+ *
+ * "Back to the universe" is a link elsewhere (a pathname change resets the
+ * boundary). On the home page itself a link to the same URL would do nothing,
+ * so there the action re-renders the universe instead (QA M1-3 C3-1).
  */
 export default function LocaleError({ retry }: LocaleErrorProps) {
   const t = useTranslations('error');
   const locale = useLocale();
+  const onHome = withTrailingSlash(usePathname()) === paths.home();
+  const homeClass = `${secondaryButton} min-h-12 px-6 text-sm whitespace-nowrap`;
 
   return (
     <PanelShell labelledBy="error-title">
@@ -48,13 +55,17 @@ export default function LocaleError({ retry }: LocaleErrorProps) {
         >
           {t('retry')}
         </button>
-        <Link
-          href={paths.home()}
-          className={`${secondaryButton} min-h-12 px-6 text-sm whitespace-nowrap`}
-        >
-          <span aria-hidden="true">←</span>
-          {t('home')}
-        </Link>
+        {onHome ? (
+          <button type="button" onClick={() => retry()} className={homeClass}>
+            <span aria-hidden="true">←</span>
+            {t('home')}
+          </button>
+        ) : (
+          <Link href={paths.home()} className={homeClass}>
+            <span aria-hidden="true">←</span>
+            {t('home')}
+          </Link>
+        )}
       </div>
     </PanelShell>
   );

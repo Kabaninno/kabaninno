@@ -7,14 +7,22 @@
  * - unknown paths get out/404.html with HTTP 404.
  *
  *   npm run serve                    # base path auto-detected, else /kabaninno
- *   npm run serve -- --base=/repo    # explicit base path
+ *   npm run serve -- --base=repo     # explicit base path (leading "/" optional)
  *   npm run serve -- --base=         # empty base path (custom-domain build)
  *   npm run serve -- --port=5000
+ *   npm run serve -- --gzip          # gzip text responses, like GitHub Pages
  *
- * Env alternatives: SERVE_BASE_PATH, PORT. Dependency-free, cross-platform.
+ * Git Bash rewrites arguments that start with "/" into Windows paths
+ * (`--base=/kabaninno` → `C:/Program Files/Git/kabaninno`). Write the base
+ * without the leading slash, or set MSYS_NO_PATHCONV=1. A rewritten value is
+ * rejected with that hint instead of mounting the site at a strange path.
+ *
+ * Env alternatives: SERVE_BASE_PATH, PORT, SERVE_GZIP=1. Dependency-free,
+ * cross-platform.
  */
 import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,8 +53,16 @@ function detectBase() {
 }
 
 const explicitBase = argValue('base') ?? process.env.SERVE_BASE_PATH;
+if (explicitBase !== undefined && /^[A-Za-z]:[\\/]|\\/.test(explicitBase)) {
+  console.error(
+    `[serve] --base="${explicitBase}" looks like a Windows path: Git Bash rewrote "/…".\n` +
+      '        Use --base=kabaninno (no leading slash) or set MSYS_NO_PATHCONV=1.',
+  );
+  process.exit(1);
+}
 const basePath = normalizeBase(explicitBase ?? detectBase() ?? '/kabaninno');
 const port = Number(argValue('port') ?? process.env.PORT ?? 4173);
+const gzip = process.argv.includes('--gzip') || process.env.SERVE_GZIP === '1';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -76,13 +92,50 @@ function contentType(file) {
   return MIME[extname(file).toLowerCase()] ?? 'application/octet-stream';
 }
 
+/** Types GitHub Pages compresses; fonts and images are compressed already. */
+const COMPRESSIBLE = new Set([
+  '.html',
+  '.js',
+  '.mjs',
+  '.css',
+  '.json',
+  '.map',
+  '.txt',
+  '.xml',
+  '.svg',
+  '.webmanifest',
+]);
+/** Compressed bodies, keyed by path and mtime (files do not change while serving). */
+const gzipCache = new Map();
+
+function gzipped(file) {
+  const { mtimeMs } = statSync(file);
+  const key = `${file}:${mtimeMs}`;
+  let body = gzipCache.get(key);
+  if (!body) {
+    body = gzipSync(readFileSync(file), { level: 6 });
+    gzipCache.set(key, body);
+  }
+  return body;
+}
+
 function sendFile(res, file, status = 200) {
   const head = res.req?.method === 'HEAD';
-  res.writeHead(status, {
-    'Content-Type': contentType(file),
-    'Content-Length': statSync(file).size,
-    'Cache-Control': 'no-cache',
-  });
+  const headers = { 'Content-Type': contentType(file), 'Cache-Control': 'no-cache' };
+  const acceptsGzip = /\bgzip\b/.test(res.req?.headers['accept-encoding'] ?? '');
+  if (gzip && COMPRESSIBLE.has(extname(file).toLowerCase())) {
+    headers.Vary = 'Accept-Encoding';
+    if (acceptsGzip) {
+      const body = gzipped(file);
+      res.writeHead(status, {
+        ...headers,
+        'Content-Encoding': 'gzip',
+        'Content-Length': body.length,
+      });
+      return res.end(head ? undefined : body);
+    }
+  }
+  res.writeHead(status, { ...headers, 'Content-Length': statSync(file).size });
   if (head) return res.end();
   createReadStream(file).pipe(res);
 }
@@ -145,6 +198,7 @@ const server = createServer((req, res) => {
 server.listen(port, () => {
   console.log(`[serve] out/ at http://localhost:${port}${basePath}/`);
   console.log(
-    `[serve] base path: ${basePath || '(none)'}${explicitBase === undefined ? ' (auto)' : ''}`,
+    `[serve] base path: ${basePath || '(none)'}${explicitBase === undefined ? ' (auto)' : ''}` +
+      `, gzip: ${gzip ? 'on' : 'off'}`,
   );
 });

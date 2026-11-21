@@ -4,14 +4,15 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { siteConfig } from '~/site.config';
 import { CategoryIndex } from '@/components/home/CategoryIndex';
 import { Reveal } from '@/components/motion/Reveal';
+import { HighlightLink } from '@/components/nav/HighlightLink';
 import { ctaArrow, primaryButton } from '@/components/ui/styles';
-import { Link } from '@/i18n/navigation';
 import { isLocale } from '@/i18n/routing';
 import { buildPageMetadata } from '@/lib/metadata';
 import { UI_MOTION } from '@/lib/motion';
 import { buildNavCategories } from '@/lib/nav-data';
 import { paths } from '@/lib/routes';
 import { bindShortWords } from '@/lib/typography';
+import { sceneNodeId } from '@/scene/node-ids';
 
 /**
  * Fixed frame of the home hero and the category index.
@@ -22,11 +23,15 @@ import { bindShortWords } from '@/lib/typography';
  *   so the scene keeps the area to the right (SafeAreaPublisher measures it).
  *   Below 19rem of height the lead is visually hidden (screen readers still
  *   get it); the chips under the hero name the same services.
+ * - Laptop heights (`compact:`, md+ up to 820 px tall): the headline gets a
+ *   wider column and a height-based size so it stays on two lines, and the
+ *   gaps tighten, so the universe keeps a usable band above (visual V2-02).
  * The frame never reaches under the HUD: it is capped at the viewport height
  * minus `--hud-offset` and scrolls inside only as a last resort (e.g. a very
  * large text zoom). On md+ the top fade padding shrinks on squat windows so
  * the hero still fits the cap. Side paddings respect the landscape notch
- * insets.
+ * insets. The HUD bar spans the same full width, so its glass edge stays
+ * 1.75rem outside the hero and index at every width (V2-09).
  */
 const HERO_FRAME = [
   'pointer-events-none fixed inset-x-0 bottom-0 z-10 flex flex-col gap-5',
@@ -63,46 +68,64 @@ export default async function HomePage({ params }: HomePageProps) {
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations('home');
+  const tHud = await getTranslations('hud');
 
   // On client-side navigations back to the universe the hero waits for the
-  // camera flight (never on the initial load, see useEnterAnimation).
+  // camera flight to reach ~60 % (never on the initial load, D29); it fades
+  // out when leaving (RouteExit).
   return (
     <Reveal
-      delayMs={UI_MOTION.homeRevealDelayMs}
+      gate="universe-flight"
       reducedDelayMs={UI_MOTION.homeRevealDelayReducedMs}
+      data-route-ui=""
       className={HERO_FRAME}
     >
       <section
         aria-labelledby="home-title"
         data-scene-overlay=""
-        className="relative isolate max-w-xl short:pointer-events-auto short:max-w-[min(26rem,56vw)]"
+        className="relative isolate max-w-xl compact:max-w-[48rem] short:pointer-events-auto short:max-w-[min(26rem,56vw)]"
       >
-        {/* Offsets stay inside the frame padding: the scroll frame must not overflow by itself. */}
+        {/*
+          Offsets stay inside the frame padding, so the scroll frame never
+          overflows by itself: on phones the copy spans the frame width, so the
+          scrim only reaches 1rem (the side padding) past it; from md up the
+          hero sits in a narrower column and the scrim can spread wider.
+        */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-16 -right-28 -bottom-12 -left-24 -z-10 hero-scrim md:-top-20 md:-bottom-10 short:-top-8 short:-right-12 shorter:-top-4"
+          className="pointer-events-none absolute -top-16 -right-4 -bottom-12 -left-4 -z-10 hero-scrim md:-top-20 md:-right-28 md:-bottom-10 md:-left-24 short:-top-8 short:-right-12 short:-left-4 shorter:-top-4"
         />
-        <p className="mb-3 eyebrow md:mb-4 short:mb-1.5 shorter:mb-1">{t('eyebrow')}</p>
+        <p className="mb-3 eyebrow md:mb-4 compact:mb-3 short:mb-1.5 shorter:mb-1">
+          {t('eyebrow')}
+        </p>
         <h1
           id="home-title"
-          className="font-display text-[1.625rem] leading-[1.15] font-medium tracking-[-0.01em] text-balance text-ink xs:text-[1.875rem] md:text-[2.75rem] lg:text-[3.25rem] short:text-[1.375rem] short:leading-[1.18] shorter:text-[1.1875rem]"
+          className="font-display text-[1.625rem] leading-[1.15] font-medium tracking-[-0.01em] text-balance text-ink xs:text-[1.875rem] md:text-[2.75rem] lg:text-[3.25rem] compact:text-[clamp(2.25rem,6.2vh,3.25rem)] short:text-[1.375rem] short:leading-[1.18] shorter:text-[1.1875rem]"
         >
           {bindShortWords(t('title'), locale)}
         </h1>
-        <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only">
+        <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only">
           {bindShortWords(t('lead'), locale)}
         </p>
-        <Link
+        {/* The CTA leads to the configurator beacon and lights it up on hover/focus. */}
+        <HighlightLink
           href={paths.configurator()}
-          className={`${primaryButton} pointer-events-auto mt-5 min-h-12 px-6 text-sm md:mt-7 short:mt-3 short:min-h-11 short:px-5 shorter:mt-2.5`}
+          highlightId={sceneNodeId.configurator}
+          className={`${primaryButton} pointer-events-auto mt-5 min-h-12 px-6 text-sm md:mt-7 compact:mt-5 short:mt-3 short:min-h-11 short:px-5 shorter:mt-2.5`}
         >
           {t('cta')}
           <span aria-hidden="true" className={ctaArrow}>
             →
           </span>
-        </Link>
+        </HighlightLink>
       </section>
-      <CategoryIndex label={t('servicesNav')} categories={buildNavCategories(locale)} />
+      <CategoryIndex
+        hint={t('explore')}
+        categoriesLabel={t('servicesNav')}
+        categories={buildNavCategories(locale)}
+        portfolioLabel={tHud('portfolio')}
+        configuratorLabel={tHud('configurator')}
+      />
     </Reveal>
   );
 }

@@ -4,8 +4,9 @@ import { MAX_UNIVERSE_NODES } from '../config';
 
 /**
  * Per-frame mutable state of the universe, written once per frame by
- * `Universe` (useFrame priority -1, before the node components) and read by
- * nodes and links. Arrays are sized MAX_UNIVERSE_NODES so they can be bound
+ * `Universe` (useFrame priority -0.5: after CameraControls has moved the
+ * camera, before the node components) and read by nodes, links, labels and
+ * hit zones. Arrays are sized MAX_UNIVERSE_NODES so they can be bound
  * directly as shader uniform arrays without copying.
  */
 export interface UniverseRuntime {
@@ -13,11 +14,31 @@ export interface UniverseRuntime {
   offsets: Vector3[];
   /** Eased hover/highlight per node, 0..1. */
   hover: number[];
-  /** Eased camera focus per node, 0..1. */
+  /** Camera focus per node, 0..1 (flight-driven while flying, eased otherwise). */
   focus: number[];
   /** Combined emphasis per node (what shaders display), 0..1. */
   emphasis: number[];
-  /** Eased visibility of the network (links), 0..1. */
+  /** Core world radius after the minimum on-screen size rule. */
+  coreRadius: number[];
+  /** On-screen core diameter, CSS px. */
+  corePx: number[];
+  /** CSS px per world unit at the node's depth. */
+  pxPerUnit: number[];
+  /** Emissive boost for cores near their minimum size, 0..1. */
+  small: number[];
+  /**
+   * 1 while the node is inside the free frame (or is the camera's focus),
+   * fading to 0 when its projected centre leaves it: overlays never cover a
+   * live node (visual V2-01, N2-02). Hit zones and labels follow it.
+   */
+  presence: number[];
+  /** Projected node centre, CSS px (canvas space), and whether it is in front of the camera. */
+  screenX: number[];
+  screenY: number[];
+  inFront: boolean[];
+  /** Current accent of nodes whose colour animates (the beacon), CSS colour or null. */
+  liveAccent: Array<string | null>;
+  /** Eased visibility of the network (links, minor nodes), 0..1. */
   network: number;
   /** Animation time (frozen under prefers-reduced-motion). */
   time: number;
@@ -28,20 +49,44 @@ export interface UniverseRuntime {
 /**
  * Children receive the ref (never `.current` during render) and read it inside
  * `useFrame`. `Universe` creates the runtime lazily in its own frame callback,
- * which runs before every child callback (priority -1).
+ * which runs before every child callback.
  */
 export type UniverseRuntimeRef = RefObject<UniverseRuntime | null>;
 
 export function createUniverseRuntime(): UniverseRuntime {
+  const filled = (value: number) => new Array<number>(MAX_UNIVERSE_NODES).fill(value);
   return {
     offsets: Array.from({ length: MAX_UNIVERSE_NODES }, () => new Vector3()),
-    hover: new Array<number>(MAX_UNIVERSE_NODES).fill(0),
-    focus: new Array<number>(MAX_UNIVERSE_NODES).fill(0),
-    emphasis: new Array<number>(MAX_UNIVERSE_NODES).fill(0),
+    hover: filled(0),
+    focus: filled(0),
+    emphasis: filled(0),
+    coreRadius: filled(0.3),
+    corePx: filled(20),
+    pxPerUnit: filled(20),
+    small: filled(0),
+    presence: filled(1),
+    screenX: filled(0),
+    screenY: filled(0),
+    inFront: new Array<boolean>(MAX_UNIVERSE_NODES).fill(false),
+    liveAccent: new Array<string | null>(MAX_UNIVERSE_NODES).fill(null),
     network: 1,
     time: 0,
     animated: true,
   };
+}
+
+/** Network visibility while the camera is focused on a node (art direction: "the network fades"). */
+export const FOCUSED_NETWORK = 0.18;
+
+/**
+ * Brightness factor for a main node while the camera focuses another one:
+ * neighbours dim with the network (down to `floor`), the focused node does not.
+ */
+export function neighbourDim(rt: UniverseRuntime, index: number, floor = 0.35): number {
+  const visible = Math.min(Math.max((rt.network - FOCUSED_NETWORK) / (1 - FOCUSED_NETWORK), 0), 1);
+  const dim = floor + (1 - floor) * visible;
+  const focus = rt.focus[index] ?? 0;
+  return dim + (1 - dim) * focus;
 }
 
 /** Ambient drift amplitude of nodes, world units. */

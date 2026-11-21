@@ -7,9 +7,9 @@ import type { CategoryNodeModel, UniverseModel, UniverseNode } from '../universe
 
 /**
  * Pure mapping from the URL-driven SceneTarget (plus the free part of the
- * viewport) to where the camera should be. The rig (placeholder now,
- * CameraControls + GSAP flights in M2) only animates toward this goal; it
- * never decides "where we are" itself.
+ * viewport) to where the camera should be. The camera director
+ * (CameraControls + GSAP flights) only animates toward this goal; it never
+ * decides "where we are" itself.
  */
 export interface CameraGoal {
   position: Vec3;
@@ -106,13 +106,18 @@ export const OVERVIEW = {
    */
   portrait: { elevation: degToRad(65), azimuth: degToRad(-100) },
   /**
-   * Frame aspect (width / height, in px) below which the portrait view is
-   * used. The aspect is the free frame's, not the viewport's: the free band
-   * above the hero on a phone (~390x330) is landscape-ish, and the landscape
-   * view fits all seven nodes there, the portfolio included, because that
-   * frame is width-bound (the cluster costs no node size).
+   * Viewport aspect below which the portrait view is used when the whole
+   * viewport is free (no safe rect, D26).
    */
   portraitBelowAspect: 0.8,
+  /**
+   * With a safe rect, the portrait view (which leaves the portfolio out) only
+   * for really narrow free areas. Above this, the landscape layout is fitted
+   * into the rect, so every node — portfolio included — lands inside it
+   * (visual V2-01: a 626×796 column at 1536×864 put the portfolio behind the
+   * hero copy).
+   */
+  portraitInRectBelowAspect: 0.65,
   minDistance: 18,
   maxDistance: 90,
 } as const;
@@ -175,19 +180,32 @@ export function isPortrait(aspect: number): boolean {
   return aspect > 0 && aspect < OVERVIEW.portraitBelowAspect;
 }
 
+/** Whether the overview uses the portrait layout for this frame (see OVERVIEW). */
+export function usesPortraitOverview(aspect: number, frame: SafeFrame = FULL_FRAME): boolean {
+  const shape = frameAspect(aspect, frame);
+  if (isFullFrame(frame)) return isPortrait(shape);
+  return shape > 0 && shape < OVERVIEW.portraitInRectBelowAspect;
+}
+
+function isFullFrame(frame: SafeFrame): boolean {
+  return frame.x === 0 && frame.y === 0 && frame.width === 1 && frame.height === 1;
+}
+
 /**
  * Fits the universe nodes into the frame from the overview direction.
- * Portrait frames leave the distant portfolio cluster out (D26).
+ * Portrait frames leave the distant portfolio cluster out (D26). `sway`
+ * (radians) widens the fit to cover the idle auto-rotate range, so the
+ * swaying network never drifts out of the free area (visual V2-08).
  */
 export function overviewGoal(
   model: UniverseModel,
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
+  sway = 0,
 ): CameraGoal {
   const fov = fovForAspect(aspect);
   const { tanV: frameTanV, tanH: frameTanH } = frameTangents(fov, aspect, frame);
-  const shape = frameAspect(aspect, frame);
-  const portrait = isPortrait(shape);
+  const portrait = usesPortraitOverview(aspect, frame);
   const { elevation, azimuth } = portrait ? OVERVIEW.portrait : OVERVIEW.landscape;
   const dir: Vec3 = [
     Math.sin(azimuth) * Math.cos(elevation),
@@ -197,19 +215,27 @@ export function overviewGoal(
   const forward = scale(dir, -1);
   const right = normalize(cross(forward, [0, 1, 0]));
   const up = cross(right, forward);
-  const points = model.nodes
-    .filter((node) => !(portrait && node.kind === 'portfolio'))
-    .map((node) => {
-      const { radius, margin } = nodeFraming(node);
-      return { p: node.position, r: radius, tanV: frameTanV * margin, tanH: frameTanH * margin };
-    });
-
-  let look: Vec3 = points.length
+  const framed = model.nodes.filter((node) => !(portrait && node.kind === 'portfolio'));
+  const centroid: Vec3 = framed.length
     ? scale(
-        points.reduce<Vec3>((sum, pt) => add(sum, pt.p), [0, 0, 0]),
-        1 / points.length,
+        framed.reduce<Vec3>((sum, node) => add(sum, node.position), [0, 0, 0]),
+        1 / framed.length,
       )
     : [0, 0, 0];
+  // Swaying the camera by ±sway around the vertical axis equals swaying the
+  // nodes by ∓sway around it: fit those positions too.
+  const angles = sway > 0 ? [0, -sway, sway, -sway / 2, sway / 2] : [0];
+  const points = framed.flatMap((node) => {
+    const { radius, margin } = nodeFraming(node);
+    return angles.map((angle) => ({
+      p: rotateY(node.position, centroid, angle),
+      r: radius,
+      tanV: frameTanV * margin,
+      tanH: frameTanH * margin,
+    }));
+  });
+
+  let look: Vec3 = centroid;
   let distance: number = OVERVIEW.minDistance;
 
   // A few fixed-point iterations: fit the distance, then recentre on the projected extents.
@@ -251,14 +277,16 @@ export function overviewGoal(
 /**
  * Camera goal for a URL target. `frame` is the free part of the viewport; the
  * focus is fitted into it (the rig shifts the principal point to its centre).
+ * `sway`: idle auto-rotate amplitude the overview fit must cover.
  */
 export function computeCameraGoal(
   target: SceneTarget,
   model: UniverseModel,
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
+  options: { sway?: number } = {},
 ): CameraGoal {
-  const overview = overviewGoal(model, aspect, frame);
+  const overview = overviewGoal(model, aspect, frame, options.sway ?? 0);
   const fov = overview.fov;
 
   switch (target.mode) {
@@ -317,6 +345,74 @@ function planetGoal(
   return approach(lookAt, overview.position, distance, overview.fov, 0.3);
 }
 
+/**
+ * User input limits around a goal (CameraControls): the dolly range is
+ * relative to the fitted distance and the polar range to the goal elevation,
+ * so whatever the visitor does, the focus stays in view at a sane size (the
+ * orbit pivot is always the goal's look target; panning is disabled).
+ */
+export interface ControlLimits {
+  minDistance: number;
+  maxDistance: number;
+  minPolar: number;
+  maxPolar: number;
+}
+
+export function controlLimits(
+  target: SceneTarget,
+  goalRadius: number,
+  goalPolar: number,
+): ControlLimits {
+  const radius = Math.max(goalRadius, 0.1);
+  const polarRange = (below: number, above: number, floor: number, ceiling: number) => ({
+    minPolar: clamp(goalPolar - above, floor, goalPolar),
+    maxPolar: clamp(goalPolar + below, goalPolar, ceiling),
+  });
+  switch (target.mode) {
+    case 'system':
+    case 'planet':
+      return {
+        minDistance: radius * 0.5,
+        maxDistance: radius * 1.9,
+        ...polarRange(0.75, 0.9, 0.22, Math.PI - 0.5),
+      };
+    case 'portfolio':
+    case 'project':
+    case 'configurator':
+      return {
+        minDistance: radius * 0.55,
+        maxDistance: radius * 1.6,
+        ...polarRange(0.55, 0.7, 0.3, Math.PI * 0.62),
+      };
+    default:
+      // Overview: never dive under the ring plane or look straight down on it.
+      return {
+        minDistance: radius * 0.6,
+        maxDistance: radius * 1.4,
+        ...polarRange(0.42, 0.55, 0.35, Math.PI / 2 + 0.18),
+      };
+  }
+}
+
+/**
+ * Minimum on-screen diameter of a universe core (CSS px) for a free frame of
+ * `frameWidthPx` × `frameHeightPx`: ~5% of the frame's short side, so the
+ * desktop home frame (824×564) gets 28 px and landscape phones still get a
+ * readable 12–14 px signal point instead of a grey pearl (N-07, M3-04).
+ * Desktop (fine pointer) never goes below 18 px (visual V2-02: 16 px cores
+ * in the short frames of 1366×768 laptops).
+ */
+export function minCoreDiameterPx(
+  frameWidthPx: number,
+  frameHeightPx: number,
+  desktop = false,
+): number {
+  const short = Math.min(frameWidthPx, frameHeightPx);
+  const floor = desktop ? 18 : 12;
+  if (!(short > 0)) return Math.max(20, floor);
+  return clamp(short * 0.05, floor, 30);
+}
+
 /** Camera placed `distance` away from `center`, on the side of `from`, lifted by `lift`. */
 function approach(center: Vec3, from: Vec3, distance: number, fov: number, lift: number) {
   const toward = normalize(sub(from, center));
@@ -334,6 +430,16 @@ function yawAround(goal: CameraGoal, center: Vec3, angle: number): CameraGoal {
     ...goal,
     position: [center[0] + dx * c + dz * s, goal.position[1], center[2] - dx * s + dz * c],
   };
+}
+
+/** Rotates `point` around the vertical axis through `center`. */
+function rotateY(point: Vec3, center: Vec3, angle: number): Vec3 {
+  if (angle === 0) return point;
+  const dx = point[0] - center[0];
+  const dz = point[2] - center[2];
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  return [center[0] + dx * c + dz * s, point[1], center[2] - dx * s + dz * c];
 }
 
 function findCategory(model: UniverseModel, categoryId: string): CategoryNodeModel | undefined {

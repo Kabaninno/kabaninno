@@ -21,7 +21,8 @@ export interface PanelShellProps {
  *   content and scrolls inside once it reaches the bottom of the viewport.
  * - Mobile: docked to the bottom, full width, max 60dvh, rounded top (the
  *   draggable bottom sheet arrives in M6).
- * - Marked as a scene overlay, so the camera frames the scene beside it.
+ * - Marked as a scene overlay, so the camera frames the scene beside it, and
+ *   as route UI, so it fades out when the route changes (`RouteExit`).
  * - Scroll-edge fades follow `data-scrolled` / `data-more` on the frame; they
  *   stay hidden while nobody sets them.
  *
@@ -41,6 +42,7 @@ export function PanelShell({
     <div
       ref={frameRef}
       data-scene-overlay=""
+      data-route-ui=""
       style={style}
       className="group/panel pointer-events-auto fixed inset-x-0 bottom-0 z-10 flex max-h-[60dvh] flex-col overflow-hidden rounded-t-3xl border-b-0 glass-panel shadow-[0_-12px_48px_rgb(0_0_0/0.4)] md:top-[var(--hud-offset)] md:right-3 md:bottom-auto md:left-auto md:max-h-[calc(100dvh-var(--hud-offset)-0.75rem)] md:w-[440px] md:rounded-3xl md:border-b md:shadow-[0_24px_60px_rgb(0_0_0/0.45)]"
     >

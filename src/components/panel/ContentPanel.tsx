@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { routeFlightGate } from '@/components/motion/flight-gate';
 import { useEnterAnimation } from '@/components/motion/use-enter-animation';
+import { usePathname } from '@/i18n/navigation';
 import { PanelShell } from './PanelShell';
 
 interface ContentPanelProps {
@@ -16,7 +18,11 @@ const EDGE_TOLERANCE = 4;
 
 /**
  * Glass content panel over the scene (layout and styles: `PanelShell`).
- * - Enters with the art-direction motion on client-side navigations.
+ * - Enters with the art-direction motion on client-side navigations, once
+ *   the camera flight to its route has covered 35 % (visual V2-06: at the
+ *   start of the flight the target node is still where the panel will be).
+ *   Same fallbacks as the home hero (D44); none of it on the first load or
+ *   under reduced motion.
  * - Soft fades at the top and bottom edges signal content scrolled away above
  *   and more content below. The state lives in `data-scrolled` / `data-more`
  *   attributes on the frame: no React re-renders while scrolling.
@@ -25,7 +31,10 @@ export function ContentPanel({ labelledBy, children, style }: ContentPanelProps)
   const frameRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  useEnterAnimation(frameRef);
+  const pathname = usePathname();
+  // One gate per mounted panel (a stable reference, see EnterGate).
+  const [gate] = useState(() => routeFlightGate(pathname));
+  useEnterAnimation(frameRef, { gate });
 
   useEffect(() => {
     const frame = frameRef.current;

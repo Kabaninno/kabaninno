@@ -65,7 +65,9 @@ function LocaleLinks({
                 locale={locale}
                 hrefLang={locale}
                 lang={locale}
-                aria-label={`${t(`languageNames.${locale}`)} (${locale.toUpperCase()})`}
+                // The visible code stays a word of the name (WCAG 2.5.3 Label in
+                // Name; axe ignores parenthesised text, so not "Polski (PL)").
+                aria-label={`${t(`languageNames.${locale}`)}, ${locale.toUpperCase()}`}
                 aria-current={active ? 'true' : undefined}
                 onClick={(event) => {
                   if (!active) analytics.track('locale_switch', { from: current, to: locale });

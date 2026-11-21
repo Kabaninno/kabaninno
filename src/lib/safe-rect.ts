@@ -39,6 +39,39 @@ function sortedEdges(values: number[]): number[] {
 }
 
 /**
+ * A free column between two overlays that reaches the bottom of the viewport
+ * (desktop home: between the hero and the system index) is preferred over the
+ * best band when its box scores at least this share of the band's: a centred
+ * network between the two reads better than a slightly larger one pushed
+ * into a corner (visual V2-02; the 1600×900 composition).
+ */
+export const COLUMN_PREFERENCE = 0.85;
+
+/**
+ * Such a column is trimmed from the bottom to at most `width / COLUMN_MIN_ASPECT`
+ * tall. The preferred-aspect box inside it is width-limited anyway, so the
+ * trim costs no size; it keeps the composition above the hero baseline and
+ * the rect clearly landscape-framed (the camera switches to its portrait
+ * overview only for much narrower rects).
+ */
+export const COLUMN_MIN_ASPECT = 0.75;
+
+interface Candidate {
+  rect: Rect;
+  score: number;
+  area: number;
+}
+
+/** Higher score wins; within half a pixel of score, the larger area wins. */
+function better(candidate: Candidate, best: Candidate | null): boolean {
+  if (best === null) return true;
+  return (
+    candidate.score > best.score + 0.5 ||
+    (Math.abs(candidate.score - best.score) <= 0.5 && candidate.area > best.area)
+  );
+}
+
+/**
  * Largest useful free rectangle of the viewport that no obstacle (HTML
  * overlay) intersects.
  *
@@ -49,6 +82,11 @@ function sortedEdges(values: number[]): number[] {
  * with the preferred aspect that fits inside it — `min(width / aspect,
  * height)` — so a very wide but short strip does not beat a well-proportioned
  * area. Ties go to the larger area.
+ *
+ * Column rule: a candidate between two overlays (free on neither side up to
+ * the viewport edge) that reaches the viewport bottom wins when it scores at
+ * least `COLUMN_PREFERENCE` × the best; it is then trimmed to
+ * `COLUMN_MIN_ASPECT` (see both constants).
  *
  * Returns the full viewport when nothing overlaps it, and `null` for an empty
  * viewport or when overlays cover everything.
@@ -69,9 +107,8 @@ export function largestFreeRect(
   const ys = sortedEdges([0, viewport.height, ...blocks.flatMap((b) => [b.y, b.y + b.height])]);
   const safeAspect = aspect > 0 ? aspect : 1;
 
-  let best: Rect | null = null;
-  let bestScore = 0;
-  let bestArea = 0;
+  let best: Candidate | null = null;
+  let bestColumn: Candidate | null = null;
   for (let i = 0; i < xs.length - 1; i += 1) {
     for (let j = i + 1; j < xs.length; j += 1) {
       const left = xs[i]!;
@@ -87,18 +124,24 @@ export function largestFreeRect(
           if (blocked) break;
           const width = right - left;
           const height = bottom - top;
-          const score = Math.min(width / safeAspect, height);
-          const area = width * height;
-          if (score > bestScore + 0.5 || (Math.abs(score - bestScore) <= 0.5 && area > bestArea)) {
-            best = { x: left, y: top, width, height };
-            bestScore = score;
-            bestArea = area;
-          }
+          const candidate: Candidate = {
+            rect: { x: left, y: top, width, height },
+            score: Math.min(width / safeAspect, height),
+            area: width * height,
+          };
+          if (better(candidate, best)) best = candidate;
+          const column = left > 0 && right < viewport.width && bottom === viewport.height;
+          if (column && better(candidate, bestColumn)) bestColumn = candidate;
         }
       }
     }
   }
-  return best;
+  if (best === null) return null;
+  if (bestColumn !== null && bestColumn.score >= COLUMN_PREFERENCE * best.score) {
+    const { x, y, width, height } = bestColumn.rect;
+    return { x, y, width, height: Math.min(height, Math.floor(width / COLUMN_MIN_ASPECT)) };
+  }
+  return best.rect;
 }
 
 /** True when both rects are null or every side differs by less than `tolerance` px. */

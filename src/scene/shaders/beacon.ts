@@ -68,6 +68,7 @@ uniform vec3 uColor;
 uniform float uTime;
 uniform float uEmphasis;
 uniform float uPing;
+uniform float uIntensity;
 
 varying vec2 vUv;
 varying float vDepth;
@@ -86,7 +87,7 @@ void main() {
   a *= uPing;
   // Static inner disc glow so the base reads even when pings are frozen.
   a += exp(-d * 9.0) * 0.25;
-  a *= (0.6 + 0.6 * uEmphasis) * fogFactor(vDepth);
+  a *= (0.6 + 0.6 * uEmphasis) * uIntensity * fogFactor(vDepth);
   gl_FragColor = vec4(uColor, clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>
 }

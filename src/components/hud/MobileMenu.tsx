@@ -10,6 +10,7 @@ import { paths } from '@/lib/routes';
 import { accentStyle, formatIndex } from '@/lib/style';
 import { primaryButton } from '@/components/ui/styles';
 import { sceneNodeId } from '@/scene/node-ids';
+import { useSceneStore } from '@/store/scene';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { NodeMark } from './NodeMark';
 import type { NavCategory } from '@/lib/nav';
@@ -93,6 +94,9 @@ export function MobileMenu({ categories, studioName, className }: MobileMenuProp
         aria-label={t('primaryNav')}
         onClose={() => {
           setOpenOn(null);
+          // A focused link inside the closed dialog must not leave its node
+          // highlighted (and its scene label on screen).
+          useSceneStore.getState().setHighlighted(null);
           buttonRef.current?.focus();
         }}
         onClick={onDialogClick}

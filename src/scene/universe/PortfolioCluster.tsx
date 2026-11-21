@@ -3,6 +3,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { AdditiveBlending, Color, type Group, type ShaderMaterial } from 'three';
+import type { SceneBusRef } from '../bus';
 import { PALETTE } from '../config';
 import { qualityDefines, type QualityPreset } from '../quality';
 import { createRandom } from '../random';
@@ -11,26 +12,33 @@ import { fogUniforms, pointScale } from '../three-utils';
 import { Halo } from './Halo';
 import { HitZone } from './HitZone';
 import type { PortfolioNodeModel } from './model';
-import type { UniverseRuntimeRef } from './runtime';
+import { neighbourDim, type UniverseRuntimeRef } from './runtime';
 
 /** Plummer scale radius and cut-off of the cluster, world units. */
 const CORE_RADIUS = 0.85;
 const MAX_RADIUS = 3.1;
-const STAR_COLORS = ['#DDE6FF', '#C8D5FF', '#F4F7FF', '#FFF0DC'] as const;
+const STAR_COLORS = [PALETTE.portfolio, '#C8D5FF', PALETTE.portfolioGlow, '#FFF0DC'] as const;
 
 interface PortfolioClusterProps {
   node: PortfolioNodeModel;
   runtime: UniverseRuntimeRef;
   preset: QualityPreset;
   onNavigate: (path: string) => void;
+  busRef: SceneBusRef;
 }
 
 /**
  * Distant silver globular cluster — the portfolio "archive". One brighter star
  * per visible project; with no published projects the cluster stays dimmer
- * ("coming soon" state, BRIEF B2.3).
+ * and its label adds "coming soon" (BRIEF B2.3, see NodeLabels).
  */
-export function PortfolioCluster({ node, runtime, preset, onNavigate }: PortfolioClusterProps) {
+export function PortfolioCluster({
+  node,
+  runtime,
+  preset,
+  onNavigate,
+  busRef,
+}: PortfolioClusterProps) {
   const groupRef = useRef<Group>(null);
   const spinRef = useRef<Group>(null);
   const materialRef = useRef<ShaderMaterial>(null);
@@ -48,9 +56,9 @@ export function PortfolioCluster({ node, runtime, preset, onNavigate }: Portfoli
       uScale: { value: 1 },
       uPixelRatio: { value: 1 },
       uEmphasis: { value: 0 },
-      uBrightness: { value: projectCount > 0 ? 1 : 0.7 },
+      uBrightness: { value: node.comingSoon ? 0.68 : 1 },
     }),
-    [projectCount],
+    [node.comingSoon],
   );
 
   useFrame((state) => {
@@ -69,6 +77,10 @@ export function PortfolioCluster({ node, runtime, preset, onNavigate }: Portfoli
       material.uniforms.uEmphasis.value = rt.emphasis[node.index] ?? 0;
       material.uniforms.uScale.value = pointScale(state);
       material.uniforms.uPixelRatio.value = state.viewport.dpr;
+      material.uniforms.uBrightness.value =
+        (node.comingSoon ? 0.68 : 1) *
+        neighbourDim(rt, node.index, 0.45) *
+        (rt.presence[node.index] ?? 1);
     }
   });
 
@@ -101,12 +113,20 @@ export function PortfolioCluster({ node, runtime, preset, onNavigate }: Portfoli
         glow={PALETTE.portfolioGlow}
         size={4.6}
         lift={0}
-        intensity={projectCount > 0 ? 0.42 : 0.3}
+        intensity={node.comingSoon ? 0.28 : 0.42}
         runtime={runtime}
         index={node.index}
         preset={preset}
       />
-      <HitZone radius={3.6} nodeKey={node.key} path={node.path} onNavigate={onNavigate} />
+      <HitZone
+        radius={3.6}
+        nodeKey={node.key}
+        path={node.path}
+        onNavigate={onNavigate}
+        busRef={busRef}
+        runtime={runtime}
+        index={node.index}
+      />
     </group>
   );
 }

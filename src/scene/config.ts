@@ -13,11 +13,17 @@ export const PALETTE = {
   portfolioGlow: '#F4F7FF',
   /** Neutral beacon tint used when no category colors are available. */
   beacon: '#F1EEFF',
+  /**
+   * Fallbacks only: the in-canvas backdrop reads `--color-brand` and
+   * `--color-nebula` from globals.css at runtime (single source of truth).
+   */
+  backdropBrand: '#4FF0D2',
+  backdropNebula: '#B57BFF',
 } as const;
 
 /**
  * Camera clip planes. The near plane is adapted at runtime to the distance to
- * the look target (see CameraRig), so depth precision stays high both in the
+ * the look target (see camera/CameraDirector.tsx), so depth precision stays high both in the
  * universe overview (~30 units away) and when diving into a system nested at a
  * node (~1-4 units away). Far must contain the outermost star layer.
  */

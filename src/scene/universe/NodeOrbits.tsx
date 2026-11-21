@@ -17,6 +17,7 @@ import type { UniverseRuntimeRef } from './runtime';
 
 /** Sparks are drawn larger than the real planet so they read from afar. */
 const SPARK_EXAGGERATION = 2.6;
+const LINE_OPACITY = 0.85;
 
 interface NodeOrbitsProps {
   orbits: readonly OrbitPreview[];
@@ -44,7 +45,7 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
       uColor: { value: new Color(color) },
       uTime: { value: 0 },
       uEmphasis: { value: 0 },
-      uOpacity: { value: 0.85 },
+      uOpacity: { value: LINE_OPACITY },
     }),
     [color],
   );
@@ -55,6 +56,7 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
       uScale: { value: 1 },
       uPixelRatio: { value: 1 },
       uEmphasis: { value: 0 },
+      uOpacity: { value: 1 },
     }),
     [],
   );
@@ -63,10 +65,12 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
     const rt = runtime.current;
     if (!rt) return;
     const emphasis = rt.emphasis[index] ?? 0;
+    const presence = rt.presence[index] ?? 1;
     const line = lineRef.current;
     if (line) {
       line.uniforms.uTime.value = rt.time;
       line.uniforms.uEmphasis.value = emphasis;
+      line.uniforms.uOpacity.value = LINE_OPACITY * presence;
     }
     const spark = sparkRef.current;
     if (spark) {
@@ -74,6 +78,7 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
       spark.uniforms.uEmphasis.value = emphasis;
       spark.uniforms.uScale.value = pointScale(state);
       spark.uniforms.uPixelRatio.value = state.viewport.dpr;
+      spark.uniforms.uOpacity.value = presence;
     }
   });
 
