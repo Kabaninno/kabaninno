@@ -26,7 +26,8 @@
       "pl": "Polski",
       "en": "English",
       "uk": "Українська"
-    }
+    },
+    "requestCount": "{count, plural, one {# usługa} few {# usługi} many {# usług} other {# usługi}} w zapytaniu"
   },
   "home": {
     "eyebrow": "Studio cyfrowe dla małych firm",
@@ -50,7 +51,14 @@
     "relatedProjects": "Powiązane realizacje",
     "previous": "Poprzednia usługa",
     "next": "Następna usługa",
-    "siblings": "Usługi w tym systemie"
+    "siblings": "Usługi w tym systemie",
+    "addedToRequest": "Dodano do zapytania",
+    "requestAddedStatus": "Dodano do zapytania: {service}",
+    "requestRemovedStatus": "Usunięto z zapytania: {service}",
+    "goToRequest": "Przejdź do zapytania"
+  },
+  "panel": {
+    "sheetToggle": "Panel treści"
   },
   "portfolio": {
     "eyebrow": "Obserwatorium",

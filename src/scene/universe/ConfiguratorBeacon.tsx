@@ -32,7 +32,7 @@ interface ConfiguratorBeaconProps {
   /** Read and written (the beacon publishes its live accent for the label). */
   runtimeRef: UniverseRuntimeRef;
   preset: QualityPreset;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, replace?: boolean) => void;
   busRef: SceneBusRef;
 }
 

@@ -2,7 +2,8 @@
 
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { AdditiveBlending, Color, Vector3, type ShaderMaterial } from 'three';
+import { AdditiveBlending, Color, Vector3, Vector4, type ShaderMaterial } from 'three';
+import type { SceneBusRef } from '../bus';
 import { MAX_UNIVERSE_NODES } from '../config';
 import { qualityDefines, type QualityPreset } from '../quality';
 import {
@@ -30,6 +31,7 @@ interface NetworkProps {
   model: UniverseModel;
   runtime: UniverseRuntimeRef;
   preset: QualityPreset;
+  busRef: SceneBusRef;
 }
 
 /**
@@ -41,7 +43,7 @@ interface NetworkProps {
  * fire impulses more often. The whole fabric fades while the camera focuses
  * a node (dive), the stars stay.
  */
-export function Network({ model, runtime, preset }: NetworkProps) {
+export function Network({ model, runtime, preset, busRef }: NetworkProps) {
   const pointsRef = useRef<ShaderMaterial>(null);
   const linksRef = useRef<ShaderMaterial>(null);
   const network = useMemo(() => buildNetwork(model, preset.minorNodes), [model, preset.minorNodes]);
@@ -73,6 +75,7 @@ export function Network({ model, runtime, preset }: NetworkProps) {
       uDrift: { value: 1 },
       uNetwork: { value: 1 },
       uPulses: { value: 1 },
+      uLabelRect: { value: new Vector4(1, 0, 0, 0) },
     }),
     [],
   );
@@ -95,6 +98,10 @@ export function Network({ model, runtime, preset }: NetworkProps) {
       lines.uniforms.uTime.value = rt.time;
       lines.uniforms.uNetwork.value = rt.network;
       lines.uniforms.uPulses.value = rt.animated ? 1 : 0;
+      const rect = busRef.current.labelRect;
+      const labelRect = lines.uniforms.uLabelRect.value as Vector4;
+      if (rect) labelRect.set(rect[0], rect[1], rect[2], rect[3]);
+      else labelRect.set(1, 0, 0, 0);
     }
   });
 

@@ -36,7 +36,9 @@ interface CategoryNodeProps {
   preset: QualityPreset;
   /** The URL focuses this category (system / planet). */
   focused: boolean;
-  onNavigate: (path: string) => void;
+  /** Slug of the planet the URL focuses in this category (planet route), else null. */
+  focusedService: string | null;
+  onNavigate: (path: string, replace?: boolean) => void;
   busRef: SceneBusRef;
   prewarm: PrewarmApiRef;
   compile: CompileApiRef;
@@ -59,6 +61,7 @@ export function CategoryNode({
   runtime,
   preset,
   focused,
+  focusedService,
   onNavigate,
   busRef,
   prewarm,
@@ -171,6 +174,9 @@ export function CategoryNode({
           mode="live"
           runtime={runtime}
           compile={compile}
+          busRef={busRef}
+          focusedService={focusedService}
+          onNavigate={onNavigate}
           readyRef={systemReadyRef}
         />
       ) : null}
@@ -194,6 +200,8 @@ export function CategoryNode({
             runtime={runtime}
             index={node.index}
             preset={preset}
+            categoryId={node.categoryId}
+            focusedService={focusedService}
           />
         </group>
       </group>

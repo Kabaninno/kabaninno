@@ -181,7 +181,7 @@ src/components/     HUD, content panels, portfolio views, shared UI
 src/i18n/           next-intl routing, navigation and server-side dictionaries
 src/lib/            Pure helpers: routes, URL → scene state, base path, site URL, metadata, …
 src/scene/          React Three Fiber scene (client-only, lazy-loaded)
-src/store/          Zustand stores (transient scene UI state)
+src/store/          Zustand stores: scene UI state, interface state, request draft (persisted)
 scripts/            Node scripts: postbuild, build-preview, serve-out, vitest, font-report,
                     screenshots and audit-a11y (Playwright runners)
 tests/unit/         Cross-cutting unit tests (content integrity, scene layout, dictionaries)

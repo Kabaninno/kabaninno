@@ -26,7 +26,8 @@
       "pl": "Polski",
       "en": "English",
       "uk": "Українська"
-    }
+    },
+    "requestCount": "{count, plural, one {# service} other {# services}} in your request"
   },
   "home": {
     "eyebrow": "Digital studio for small companies",
@@ -50,7 +51,14 @@
     "relatedProjects": "Related projects",
     "previous": "Previous service",
     "next": "Next service",
-    "siblings": "Services in this system"
+    "siblings": "Services in this system",
+    "addedToRequest": "Added to request",
+    "requestAddedStatus": "Added to your request: {service}",
+    "requestRemovedStatus": "Removed from your request: {service}",
+    "goToRequest": "Go to your request"
+  },
+  "panel": {
+    "sheetToggle": "Content panel"
   },
   "portfolio": {
     "eyebrow": "Observatory",

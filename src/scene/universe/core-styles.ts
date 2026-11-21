@@ -1,26 +1,33 @@
 import type { CategoryDna } from '~/content/schema';
+import {
+  cometStyle,
+  forgeStyle,
+  neuralStyle,
+  prismStyle,
+  strataStyle,
+} from '../shaders/core-styles';
 
 export type CoreStyle = CategoryDna['core'];
 
+/** Extra geometry some core styles add around the core in the system view. */
+export type CoreExtra = 'forge-rim' | 'comet-tail';
+
 /**
- * Registry: DNA `core` value → surface parameters of the detailed system-view
- * core (node-core.ts, DETAIL variant). One program serves every style, so the
- * prewarm compiles it once. M3 may replace entries with dedicated shaders;
- * a new `core` enum value only needs an entry here (TypeScript enforces it).
+ * Registry: DNA `core` value → system-view core. Each style is its own
+ * program (`chunk`, see shaders/core-styles.ts); `deform` swells the sphere
+ * in the vertex shader; `extra` adds a component (system/CoreExtras.tsx).
+ * A new `core` enum value only needs an entry here (TypeScript enforces it).
  */
-export interface CoreStyleParams {
-  /** flow scale, flow speed, ridge scale, ridge sharpness */
-  a: readonly [number, number, number, number];
-  /** strata bands, forge crust, iridescence, comet stream (0..1 each) */
-  b: readonly [number, number, number, number];
-  /** Prism facets, 0..1. */
-  facet: number;
+export interface CoreStyleEntry {
+  chunk: string;
+  deform: boolean;
+  extra: CoreExtra | null;
 }
 
-export const CORE_STYLES: Record<CoreStyle, CoreStyleParams> = {
-  prism: { a: [2.6, 0.12, 4.2, 9], b: [0, 0, 0.15, 0], facet: 0.85 },
-  strata: { a: [2.0, 0.16, 3.0, 6], b: [1, 0, 0, 0], facet: 0 },
-  forge: { a: [1.6, 0.1, 2.6, 5], b: [0, 0.85, 0, 0], facet: 0 },
-  neural: { a: [2.8, 0.22, 3.6, 7], b: [0, 0, 1, 0], facet: 0 },
-  comet: { a: [2.4, 0.3, 3.8, 8], b: [0, 0, 0, 1], facet: 0 },
+export const CORE_STYLES: Record<CoreStyle, CoreStyleEntry> = {
+  prism: { chunk: prismStyle, deform: false, extra: null },
+  strata: { chunk: strataStyle, deform: false, extra: null },
+  forge: { chunk: forgeStyle, deform: false, extra: 'forge-rim' },
+  neural: { chunk: neuralStyle, deform: true, extra: null },
+  comet: { chunk: cometStyle, deform: false, extra: 'comet-tail' },
 };

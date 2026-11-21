@@ -5,11 +5,12 @@ import { getCategories, getCategory, getProjectsForService, getService } from '~
 import { HighlightLink } from '@/components/nav/HighlightLink';
 import { Breadcrumbs } from '@/components/panel/Breadcrumbs';
 import { ContentPanel } from '@/components/panel/ContentPanel';
-import { primaryButton } from '@/components/ui/styles';
+import { RequestToggle } from '@/components/request/RequestToggle';
 import { Link } from '@/i18n/navigation';
 import { isLocale } from '@/i18n/routing';
 import { getCategoryText, getProjectText, getServiceText } from '@/lib/content-text';
 import { buildPageMetadata } from '@/lib/metadata';
+import { serviceRef } from '@/lib/request-draft';
 import { paths } from '@/lib/routes';
 import { sceneNodeId } from '@/scene/node-ids';
 import { accentStyle, formatIndex } from '@/lib/style';
@@ -59,10 +60,17 @@ export default async function ServicePage({ params }: ServicePageProps) {
   const previous = siblings[(position - 1 + siblings.length) % siblings.length]!;
   const next = siblings[(position + 1) % siblings.length]!;
   const related = getProjectsForService(category.id, service.slug);
-  const serviceRef = `${category.id}/${service.slug}`;
+  const ref = serviceRef(category.id, service.slug);
 
   return (
-    <ContentPanel labelledBy="service-title" style={accentStyle(category.dna.color)}>
+    <ContentPanel
+      labelledBy="service-title"
+      style={accentStyle(category.dna.color)}
+      siblings={{
+        previous: paths.service(category.id, previous.slug),
+        next: paths.service(category.id, next.slug),
+      }}
+    >
       <Breadcrumbs
         label={tCommon('breadcrumbs')}
         items={[
@@ -86,13 +94,17 @@ export default async function ServicePage({ params }: ServicePageProps) {
       </h1>
       <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink/90">{text.summary}</p>
 
-      <Link
-        href={{ pathname: paths.configurator(), query: { add: serviceRef } }}
-        className={`${primaryButton} mt-5 min-h-12 w-full px-6 text-sm sm:w-auto`}
-      >
-        <span aria-hidden="true">+</span>
-        {t('addToRequest')}
-      </Link>
+      <RequestToggle
+        serviceRef={ref}
+        fallbackHref={{ pathname: paths.configurator(), query: { add: ref } }}
+        labels={{
+          add: t('addToRequest'),
+          added: t('addedToRequest'),
+          addedStatus: t('requestAddedStatus', { service: text.title }),
+          removedStatus: t('requestRemovedStatus', { service: text.title }),
+          goTo: t('goToRequest'),
+        }}
+      />
 
       <div className="mt-8 flex flex-col gap-6">
         <section>

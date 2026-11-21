@@ -26,7 +26,8 @@
       "pl": "Polski",
       "en": "English",
       "uk": "Українська"
-    }
+    },
+    "requestCount": "{count, plural, one {# послуга в запиті} few {# послуги в запиті} many {# послуг у запиті} other {# послуги в запиті}}"
   },
   "home": {
     "eyebrow": "Цифрова студія для невеликих компаній",
@@ -50,7 +51,14 @@
     "relatedProjects": "Пов’язані кейси",
     "previous": "Попередня послуга",
     "next": "Наступна послуга",
-    "siblings": "Послуги цієї системи"
+    "siblings": "Послуги цієї системи",
+    "addedToRequest": "Додано до запиту",
+    "requestAddedStatus": "Додано до запиту: {service}",
+    "requestRemovedStatus": "Вилучено із запиту: {service}",
+    "goToRequest": "Перейти до запиту"
+  },
+  "panel": {
+    "sheetToggle": "Панель вмісту"
   },
   "portfolio": {
     "eyebrow": "Обсерваторія",

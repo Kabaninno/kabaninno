@@ -9,13 +9,16 @@ export const orbitLineVertex = /* glsl */ `
 attribute float aAngle;
 attribute float aSpeed;
 attribute float aPhase;
+attribute float aOrbit;
 
 varying float vAngle;
 varying float vSpeed;
 varying float vPhase;
 varying float vDepth;
+varying float vOrbit;
 
 void main() {
+  vOrbit = aOrbit;
   vAngle = aAngle;
   vSpeed = aSpeed;
   vPhase = aPhase;
@@ -30,11 +33,17 @@ uniform vec3 uColor;
 uniform float uTime;
 uniform float uEmphasis;
 uniform float uOpacity;
+/** 1 in the universe preview; 0 in the system view, where real planets move. */
+uniform float uTail;
+/** Highlighted orbit (hovered / focused planet) and how much. */
+uniform float uHot;
+uniform float uHotAmount;
 
 varying float vAngle;
 varying float vSpeed;
 varying float vPhase;
 varying float vDepth;
+varying float vOrbit;
 
 ${fogChunk}
 
@@ -45,9 +54,10 @@ void main() {
   float direction = vSpeed < 0.0 ? -1.0 : 1.0;
   float behind = mod((head - vAngle) * direction, TAU);
   float tail = exp(-behind * 1.8);
-  float a = (0.11 + 0.2 * uEmphasis) + tail * (0.5 + 0.4 * uEmphasis);
+  float hot = abs(vOrbit - uHot) < 0.5 ? uHotAmount : 0.0;
+  float a = (0.11 + 0.2 * uEmphasis + 0.6 * hot) + tail * (0.5 + 0.4 * uEmphasis) * uTail;
   a *= uOpacity * fogFactor(vDepth);
-  gl_FragColor = vec4(uColor, clamp(a, 0.0, 1.0));
+  gl_FragColor = vec4(mix(uColor, vec3(1.0), hot * 0.35), clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>
 }
 `;

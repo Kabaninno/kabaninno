@@ -8,6 +8,12 @@ export interface PanelShellProps {
   frameRef?: Ref<HTMLDivElement>;
   scrollRef?: Ref<HTMLElement>;
   contentRef?: Ref<HTMLDivElement>;
+  /** id of the scrolling region (for the sheet handle's `aria-controls`). */
+  scrollId?: string;
+  /** Interactive mobile sheet handle; a decorative bar when omitted. */
+  handle?: ReactNode;
+  /** Mobile sheet collapsed to its peek height (ignored from md up). */
+  collapsed?: boolean;
 }
 
 /**
@@ -19,8 +25,12 @@ export interface PanelShellProps {
  *
  * - Desktop (md+): right-side column, 440px wide, below the HUD. It hugs its
  *   content and scrolls inside once it reaches the bottom of the viewport.
- * - Mobile: docked to the bottom, full width, max 60dvh, rounded top (the
- *   draggable bottom sheet arrives in M6).
+ * - Mobile: a bottom sheet docked to the bottom, full width, max 60dvh,
+ *   rounded top; `collapsed` shrinks it to a peek (handle, back button, title)
+ *   so the planet stays visible. The height change animates (instant under
+ *   reduced motion) and reaches the camera via SafeAreaPublisher.
+ * - `touch-action: pan-y pinch-zoom`: vertical scrolling and zoom stay
+ *   native, horizontal swipes reach the planet-switching handlers.
  * - Marked as a scene overlay, so the camera frames the scene beside it, and
  *   as route UI, so it fades out when the route changes (`RouteExit`).
  * - Scroll-edge fades follow `data-scrolled` / `data-more` on the frame; they
@@ -37,19 +47,26 @@ export function PanelShell({
   frameRef,
   scrollRef,
   contentRef,
+  scrollId,
+  handle,
+  collapsed = false,
 }: PanelShellProps) {
   return (
     <div
       ref={frameRef}
       data-scene-overlay=""
       data-route-ui=""
+      data-sheet={collapsed ? 'collapsed' : 'expanded'}
       style={style}
-      className="group/panel pointer-events-auto fixed inset-x-0 bottom-0 z-10 flex max-h-[60dvh] flex-col overflow-hidden rounded-t-3xl border-b-0 glass-panel shadow-[0_-12px_48px_rgb(0_0_0/0.4)] md:top-[var(--hud-offset)] md:right-3 md:bottom-auto md:left-auto md:max-h-[calc(100dvh-var(--hud-offset)-0.75rem)] md:w-[440px] md:rounded-3xl md:border-b md:shadow-[0_24px_60px_rgb(0_0_0/0.45)]"
+      className={`group/panel pointer-events-auto fixed inset-x-0 bottom-0 z-10 flex touch-pan-y touch-pinch-zoom flex-col overflow-hidden rounded-t-3xl border-b-0 glass-panel shadow-[0_-12px_48px_rgb(0_0_0/0.4)] transition-[max-height] duration-300 ease-calm md:top-[var(--hud-offset)] md:right-3 md:bottom-auto md:left-auto md:max-h-[calc(100dvh-var(--hud-offset)-0.75rem)] md:w-[440px] md:rounded-3xl md:border-b md:shadow-[0_24px_60px_rgb(0_0_0/0.45)] ${collapsed ? 'max-h-[min(12.5rem,45dvh)]' : 'max-h-[60dvh]'}`}
     >
-      <div aria-hidden="true" className="flex shrink-0 justify-center pt-2 pb-1 md:hidden">
-        <span className="h-1 w-10 rounded-full bg-white/15" />
-      </div>
+      {handle ?? (
+        <div aria-hidden="true" className="flex shrink-0 justify-center pt-2 pb-1 md:hidden">
+          <span className="h-1 w-10 rounded-full bg-white/15" />
+        </div>
+      )}
       <section
+        id={scrollId}
         ref={scrollRef}
         aria-labelledby={labelledBy}
         tabIndex={0}
@@ -62,10 +79,10 @@ export function PanelShell({
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-4 h-12 bg-gradient-to-b from-[rgb(8_11_22/0.96)] via-[rgb(8_11_22/0.6)] to-transparent opacity-0 transition-opacity duration-200 ease-calm group-data-[scrolled=true]/panel:opacity-100 md:top-0"
       />
-      {/* Bottom fade (more content below). */}
+      {/* Bottom fade (more content below); not over the title of a collapsed sheet. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[rgb(8_11_22/0.96)] via-[rgb(8_11_22/0.6)] to-transparent opacity-0 transition-opacity duration-200 ease-calm group-data-[more=true]/panel:opacity-100"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-[rgb(8_11_22/0.96)] via-[rgb(8_11_22/0.6)] to-transparent opacity-0 transition-opacity duration-200 ease-calm group-data-[more=true]/panel:opacity-100 max-md:group-data-[sheet=collapsed]/panel:hidden"
       />
     </div>
   );

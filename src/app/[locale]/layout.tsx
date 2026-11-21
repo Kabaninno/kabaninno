@@ -11,9 +11,10 @@ import { RouteFocus } from '@/components/layout/RouteFocus';
 import { SafeAreaPublisher } from '@/components/layout/SafeAreaPublisher';
 import { SkipLink } from '@/components/layout/SkipLink';
 import { RouteExit } from '@/components/motion/RouteExit';
+import { RequestSync } from '@/components/request/RequestSync';
 import { getMessagesFor, pickMessages } from '@/i18n/messages';
 import { isLocale, locales } from '@/i18n/routing';
-import { buildNavCategories } from '@/lib/nav-data';
+import { allServiceRefs, buildNavCategories } from '@/lib/nav-data';
 import { buildSceneManifest } from '@/lib/scene-manifest';
 import { SITE_URL } from '@/lib/site-url';
 import { SceneRoot } from '@/scene/SceneRoot';
@@ -57,9 +58,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   const t = await getTranslations('common');
   const tHud = await getTranslations('hud');
-  // Client components only get the namespaces they use (D05): the HUD and the
-  // localized error boundary (`error.tsx`).
-  const clientMessages = pickMessages(getMessagesFor(locale), ['hud', 'error']);
+  // Client components only get the namespaces they use (D05): the HUD, the
+  // localized error boundary (`error.tsx`) and the panel's sheet handle.
+  const clientMessages = pickMessages(getMessagesFor(locale), ['hud', 'error', 'panel']);
 
   return (
     <html lang={locale} className={fontVariables}>
@@ -73,6 +74,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           <EscapeToParent />
           <RouteFocus />
           <RouteExit />
+          <RequestSync serviceRefs={allServiceRefs()} />
           <Hud
             categories={buildNavCategories(locale)}
             studioName={siteConfig.studioName}

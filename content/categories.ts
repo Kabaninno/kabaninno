@@ -20,9 +20,9 @@ export const categoriesData = [
         planet: {
           shape: 'icosahedron',
           material: 'glass',
-          size: 0.55,
+          size: 0.63,
           shell: 'wireframe',
-          orbit: { radius: 2.7, tilt: 6, speed: 0.16, phase: 0 },
+          orbit: { radius: 2.7, tilt: 6, speed: 0.16, phase: 0.1 },
         },
       },
       {
@@ -31,9 +31,9 @@ export const categoriesData = [
         planet: {
           shape: 'torus-knot',
           material: 'glass',
-          size: 0.45,
+          size: 0.52,
           moons: { count: 3, kind: 'cube' },
-          orbit: { radius: 3.8, tilt: -10, speed: 0.11, phase: 0.3 },
+          orbit: { radius: 3.8, tilt: -10, speed: 0.11, phase: 0.73 },
         },
       },
       {
@@ -42,9 +42,9 @@ export const categoriesData = [
         planet: {
           shape: 'octahedron',
           material: 'hologram',
-          size: 0.42,
+          size: 0.48,
           rings: [{ inner: 1.5, outer: 1.9, tilt: 20 }],
-          orbit: { radius: 4.9, tilt: 14, speed: 0.085, phase: 0.62 },
+          orbit: { radius: 4.9, tilt: 14, speed: 0.085, phase: 0.36 },
         },
       },
       {
@@ -53,10 +53,10 @@ export const categoriesData = [
         planet: {
           shape: 'sphere',
           material: 'glass',
-          size: 0.6,
+          size: 0.69,
           shell: 'wireframe',
           moons: { count: 2, kind: 'shard' },
-          orbit: { radius: 6.1, tilt: -6, speed: 0.06, phase: 0.85 },
+          orbit: { radius: 6.1, tilt: -6, speed: 0.06, phase: 0.99 },
         },
       },
     ],
@@ -72,7 +72,7 @@ export const categoriesData = [
         planet: {
           shape: 'sphere',
           material: 'hologram',
-          size: 0.55,
+          size: 0.63,
           rings: [{ inner: 1.4, outer: 2.2, bands: 6 }],
           orbit: { radius: 2.8, tilt: -8, speed: 0.14, phase: 0.1 },
         },
@@ -83,12 +83,12 @@ export const categoriesData = [
         planet: {
           shape: 'sphere',
           material: 'liquid-metal',
-          size: 0.5,
+          size: 0.57,
           rings: [
             { inner: 1.3, outer: 1.7, tilt: 30, bands: 4 },
             { inner: 1.9, outer: 2.5, tilt: -20, bands: 8 },
           ],
-          orbit: { radius: 3.9, tilt: 12, speed: 0.1, phase: 0.45 },
+          orbit: { radius: 3.9, tilt: 12, speed: 0.1, phase: 0.73 },
         },
       },
       {
@@ -97,9 +97,9 @@ export const categoriesData = [
         planet: {
           shape: 'funnel',
           material: 'glass',
-          size: 0.55,
+          size: 0.63,
           moons: { count: 5, kind: 'orb', radius: 1.6, speed: 0.9 },
-          orbit: { radius: 5, tilt: -14, speed: 0.075, phase: 0.7 },
+          orbit: { radius: 5, tilt: -14, speed: 0.075, phase: 0.36 },
         },
       },
       {
@@ -108,9 +108,9 @@ export const categoriesData = [
         planet: {
           shape: 'cube-cluster',
           material: 'hologram',
-          size: 0.5,
+          size: 0.57,
           rings: [{ inner: 1.6, outer: 2, tilt: 10, bands: 12 }],
-          orbit: { radius: 6.2, tilt: 5, speed: 0.055, phase: 0.25 },
+          orbit: { radius: 6.2, tilt: 5, speed: 0.055, phase: 0.99 },
         },
       },
     ],
@@ -126,9 +126,9 @@ export const categoriesData = [
         planet: {
           shape: 'gear',
           material: 'liquid-metal',
-          size: 0.55,
+          size: 0.63,
           moons: { count: 6, kind: 'conveyor', radius: 2, speed: 0.8 },
-          orbit: { radius: 2.9, tilt: 4, speed: 0.15, phase: 0.2 },
+          orbit: { radius: 2.9, tilt: 4, speed: 0.15, phase: 0.22 },
         },
       },
       {
@@ -137,9 +137,9 @@ export const categoriesData = [
         planet: {
           shape: 'cube-cluster',
           material: 'liquid-metal',
-          size: 0.5,
+          size: 0.57,
           moons: { count: 4, kind: 'cube' },
-          orbit: { radius: 4, tilt: -12, speed: 0.1, phase: 0.55 },
+          orbit: { radius: 4, tilt: -12, speed: 0.1, phase: 0.85 },
         },
       },
       {
@@ -148,9 +148,9 @@ export const categoriesData = [
         planet: {
           shape: 'torus',
           material: 'emissive',
-          size: 0.45,
+          size: 0.52,
           moons: { count: 3, kind: 'orb', speed: 1.2 },
-          orbit: { radius: 5.1, tilt: 16, speed: 0.08, phase: 0.8 },
+          orbit: { radius: 5.1, tilt: 16, speed: 0.08, phase: 0.49 },
         },
       },
       {
@@ -159,10 +159,10 @@ export const categoriesData = [
         planet: {
           shape: 'sphere',
           material: 'liquid-metal',
-          size: 0.6,
+          size: 0.69,
           shell: 'wireframe',
           moons: { count: 8, kind: 'conveyor', radius: 1.7 },
-          orbit: { radius: 6.3, tilt: -4, speed: 0.058, phase: 0.35 },
+          orbit: { radius: 6.3, tilt: -4, speed: 0.058, phase: 0.12 },
         },
       },
     ],
@@ -178,8 +178,8 @@ export const categoriesData = [
         planet: {
           shape: 'blob',
           material: 'iridescent',
-          size: 0.6,
-          orbit: { radius: 2.8, tilt: 10, speed: 0.13, phase: 0.05 },
+          size: 0.69,
+          orbit: { radius: 2.8, tilt: 10, speed: 0.13, phase: 0.37 },
         },
       },
       {
@@ -188,9 +188,9 @@ export const categoriesData = [
         planet: {
           shape: 'crystal',
           material: 'iridescent',
-          size: 0.5,
+          size: 0.57,
           shell: 'hologram',
-          orbit: { radius: 3.9, tilt: -14, speed: 0.095, phase: 0.4 },
+          orbit: { radius: 3.9, tilt: -14, speed: 0.095, phase: 1.0 },
         },
       },
       {
@@ -199,10 +199,10 @@ export const categoriesData = [
         planet: {
           shape: 'blob',
           material: 'iridescent',
-          size: 0.48,
+          size: 0.55,
           rings: [{ inner: 1.5, outer: 2.1, tilt: 25, bands: 3 }],
           moons: { count: 3, kind: 'shard' },
-          orbit: { radius: 5, tilt: 8, speed: 0.075, phase: 0.7 },
+          orbit: { radius: 5, tilt: 8, speed: 0.075, phase: 0.63 },
         },
       },
       {
@@ -211,8 +211,8 @@ export const categoriesData = [
         planet: {
           shape: 'torus-knot',
           material: 'hologram',
-          size: 0.45,
-          orbit: { radius: 6.1, tilt: -8, speed: 0.055, phase: 0.2 },
+          size: 0.52,
+          orbit: { radius: 6.1, tilt: -8, speed: 0.055, phase: 0.26 },
         },
       },
     ],
@@ -228,9 +228,9 @@ export const categoriesData = [
         planet: {
           shape: 'dart',
           material: 'glass',
-          size: 0.45,
+          size: 0.52,
           trail: true,
-          orbit: { radius: 2.9, tilt: 12, speed: 0.2, phase: 0.15 },
+          orbit: { radius: 2.9, tilt: 12, speed: 0.2, phase: 0.03 },
         },
       },
       {
@@ -239,9 +239,9 @@ export const categoriesData = [
         planet: {
           shape: 'sphere',
           material: 'hologram',
-          size: 0.5,
+          size: 0.57,
           rings: [{ inner: 1.4, outer: 1.8, tilt: -15, bands: 7 }],
-          orbit: { radius: 3.9, tilt: -6, speed: 0.12, phase: 0.5 },
+          orbit: { radius: 3.9, tilt: -6, speed: 0.12, phase: 0.66 },
         },
       },
       {
@@ -250,10 +250,10 @@ export const categoriesData = [
         planet: {
           shape: 'dart',
           material: 'emissive',
-          size: 0.4,
+          size: 0.46,
           trail: true,
           moons: { count: 2, kind: 'orb' },
-          orbit: { radius: 5, tilt: 18, speed: 0.09, phase: 0.8 },
+          orbit: { radius: 5, tilt: 18, speed: 0.09, phase: 0.3 },
         },
       },
       {
@@ -262,9 +262,9 @@ export const categoriesData = [
         planet: {
           shape: 'cube-cluster',
           material: 'glass',
-          size: 0.5,
+          size: 0.57,
           shell: 'wireframe',
-          orbit: { radius: 6.1, tilt: -10, speed: 0.065, phase: 0.3 },
+          orbit: { radius: 6.1, tilt: -10, speed: 0.065, phase: 0.93 },
         },
       },
     ],

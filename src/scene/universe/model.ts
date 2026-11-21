@@ -1,4 +1,4 @@
-import type { CategoryDna } from '~/content/schema';
+import type { CategoryDna, Planet } from '~/content/schema';
 import { paths } from '@/lib/routes';
 import { MAX_CATEGORY_NODES, MAX_UNIVERSE_NODES, PALETTE, SYSTEM_SCALE } from '../config';
 import { CONFIGURATOR_POSITION, PORTFOLIO_POSITION, layoutCategoryNodes } from '../layout';
@@ -32,8 +32,16 @@ export interface OrbitPreview extends OrbitShape {
   phase: number;
   /** Planet radius in world units. */
   size: number;
+  /** Planet accent (per-planet DNA tint, else the category colour) and highlight. */
   color: string;
+  glow: string;
   serviceSlug: string;
+  /** Localized service name (canvas label). */
+  label: string;
+  /** 1-based position among the category's services (label index "02 / 04"). */
+  ordinal: number;
+  /** Full planet DNA (shape, material, shell, rings, moons, trail). */
+  planet: Planet;
 }
 
 export interface CategoryNodeModel extends UniverseNodeBase {
@@ -103,7 +111,11 @@ export function buildUniverseModel(manifest: SceneManifest): UniverseModel {
         speed: orbit.speed,
         phase: orbit.phase * Math.PI * 2,
         size: service.planet.size * SYSTEM_SCALE,
-        color: service.planet.color ?? category.dna.glow,
+        color: service.planet.color ?? category.dna.color,
+        glow: category.dna.glow,
+        label: service.label,
+        ordinal: serviceIndex + 1,
+        planet: service.planet,
       };
     });
     const systemUnits = category.services.reduce((max, service) => {

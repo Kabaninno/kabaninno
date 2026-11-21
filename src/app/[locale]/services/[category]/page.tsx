@@ -46,9 +46,21 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const categories = getCategories();
   const position = categories.findIndex((item) => item.id === category.id) + 1;
   const text = getCategoryText(locale, category.id);
+  const services = category.services;
+  // ←/→ and swipe from the system: → to the first planet, ← to the last. This
+  // enters a planet like a click on it, so it pushes (Back returns here).
+  const siblings = {
+    previous: paths.service(category.id, services[services.length - 1]!.slug),
+    next: paths.service(category.id, services[0]!.slug),
+    history: 'push' as const,
+  };
 
   return (
-    <ContentPanel labelledBy="category-title" style={accentStyle(category.dna.color)}>
+    <ContentPanel
+      labelledBy="category-title"
+      style={accentStyle(category.dna.color)}
+      siblings={siblings}
+    >
       <Breadcrumbs
         label={tCommon('breadcrumbs')}
         items={[{ label: tCommon('backToUniverse'), href: paths.home() }, { label: text.name }]}

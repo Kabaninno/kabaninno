@@ -33,6 +33,34 @@ export interface SceneBus {
   lastInputAt: number;
   /** frameloop="demand": keep rendering until this `performance.now()` time. */
   busyUntil: number;
+  /**
+   * Category whose system view accepts planet input (system/planet route,
+   * camera settled, universe revealed), else null.
+   */
+  systemInteractive: string | null;
+  /** Live orbit angle per planet ("category/slug"): the camera frames the focused one. */
+  planetAngles: Map<string, number>;
+  /** Projected planets of the mounted system ("category/slug"), for labels and hit zones. */
+  planetTargets: Map<string, PlanetTarget>;
+  /** Text box of the visible canvas label, device px, GL origin (bottom-left), or null. */
+  labelRect: [number, number, number, number] | null;
+}
+
+/** A planet as the labels see it (CSS px, canvas space). */
+export interface PlanetTarget {
+  x: number;
+  y: number;
+  /** On-screen radius of the planet body. */
+  radiusPx: number;
+  /** CSS px per world unit at the planet's depth. */
+  pxPerUnit: number;
+  inFront: boolean;
+  /** Materialized (system detail) — hidden while the dive is still far. */
+  visible: boolean;
+  label: string;
+  color: string;
+  ordinal: number;
+  total: number;
 }
 
 export type SceneBusRef = RefObject<SceneBus>;
@@ -51,6 +79,10 @@ export function createSceneBus(): SceneBus {
     hovering: false,
     lastInputAt: 0,
     busyUntil: 0,
+    systemInteractive: null,
+    planetAngles: new Map(),
+    planetTargets: new Map(),
+    labelRect: null,
   };
 }
 

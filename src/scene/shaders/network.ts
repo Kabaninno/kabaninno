@@ -130,6 +130,8 @@ export const networkLinksFragment = /* glsl */ `
 uniform float uTime;
 uniform float uNetwork;
 uniform float uPulses;
+/** Visible label text box (GL px, bottom-left origin); x > z means none. */
+uniform vec4 uLabelRect;
 
 varying float vT;
 varying float vSeed;
@@ -166,6 +168,11 @@ void main() {
 
   float ends = smoothstep(0.0, 0.07, vT) * (1.0 - smoothstep(0.93, 1.0, vT));
   float a = (base + pulse * (0.75 + 0.4 * vEmphasis)) * ends * uNetwork * vPresence * fogFactor(vDepth);
+  // Links crossing the visible label dim under its text (visual L-03).
+  vec2 fc = gl_FragCoord.xy;
+  if (fc.x > uLabelRect.x && fc.x < uLabelRect.z && fc.y > uLabelRect.y && fc.y < uLabelRect.w) {
+    a *= 0.3;
+  }
   vec3 color = mix(vColor, vec3(1.0), clamp(pulse * 0.45, 0.0, 0.6));
   gl_FragColor = vec4(color, clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>

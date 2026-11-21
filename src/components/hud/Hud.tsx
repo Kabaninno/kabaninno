@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { analytics } from '@/lib/analytics';
 import { ariaCurrentFor } from '@/lib/nav';
 import { paths } from '@/lib/routes';
+import { RequestCountBadge, useConfiguratorName } from '@/components/request/RequestCount';
 import { hudLink, primaryButton } from '@/components/ui/styles';
 import { sceneNodeId } from '@/scene/node-ids';
 import { LocaleSwitcher } from './LocaleSwitcher';
@@ -39,6 +40,8 @@ interface HudProps {
 export function Hud({ categories, studioName, homeLabel }: HudProps) {
   const t = useTranslations('hud');
   const { pathname } = useHudLocation();
+  // Request draft size (M3): a badge on the configurator link while non-empty.
+  const configurator = useConfiguratorName();
 
   return (
     <header
@@ -76,9 +79,11 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
             href={paths.configurator()}
             highlightId={sceneNodeId.configurator}
             aria-current={ariaCurrentFor(pathname, paths.configurator())}
+            aria-label={configurator.name}
             className={hudLink}
           >
             {t('configurator')}
+            <RequestCountBadge count={configurator.count} />
           </HighlightLink>
         </nav>
 

@@ -135,6 +135,8 @@ interface DirectorState {
   goalPose: OrbitPose;
   goalModel: UniverseModel | null;
   goalAspect: number;
+  /** Planet angle the cached goal was computed for (planet routes). */
+  goalPlanetAngle: number | undefined;
   /** Visitor's azimuth deviation carried into focused views (approach from their side). */
   azimuthOffset: number;
   /** Goal distance the current limits and zoom ratio refer to. */
@@ -335,21 +337,32 @@ export function CameraDirector({
       d.targetPath = path;
     }
 
-    // 3. Goal for the current target and frame (pure; cached).
+    // 3. Goal for the current target and frame (pure; cached). On a planet
+    // route the goal follows the planet's live angle while it parks.
+    const planetAngle =
+      target.mode === 'planet'
+        ? shared.planetAngles.get(`${target.category}/${target.service}`)
+        : undefined;
+    const angleChanged =
+      planetAngle !== undefined &&
+      (d.goalPlanetAngle === undefined || Math.abs(planetAngle - d.goalPlanetAngle) > 1e-5);
     let goalChanged = false;
     if (
       d.goal === null ||
       targetChanged ||
       model !== d.goalModel ||
       aspect !== d.goalAspect ||
-      frameChanged
+      frameChanged ||
+      angleChanged
     ) {
       d.goal = computeCameraGoal(target, model, aspect, d.frame, {
         sway: reducedMotion ? 0 : IDLE.overview.amplitude,
+        planetAngle,
       });
       d.goalPose = poseFromLookAt(d.goal.position, d.goal.lookAt);
       d.goalModel = model;
       d.goalAspect = aspect;
+      d.goalPlanetAngle = planetAngle;
       goalChanged = true;
     }
     const goal = d.goal;
@@ -379,6 +392,7 @@ export function CameraDirector({
       d.revealed = true;
       if (!d.cut && (!d.flight || d.flight.kind === 'intro')) {
         shared.interactive = isOverview(target);
+        shared.systemInteractive = systemCategory(target);
         d.refreshHover = true;
       }
     }
@@ -557,6 +571,7 @@ function startFlight(
   d.parallaxY = 0;
   shared.flying = true;
   shared.interactive = false;
+  shared.systemInteractive = null;
   shared.focusDriven = true;
   shared.focusFrom = d.flight.focusFrom;
   shared.focusTo = d.flight.focusTo;
@@ -691,6 +706,7 @@ function finishMotion(d: DirectorState, shared: SceneBus, target: SceneTarget) {
   shared.flying = false;
   shared.focusDriven = false;
   shared.interactive = isOverview(target) && d.revealed;
+  shared.systemInteractive = d.revealed ? systemCategory(target) : null;
   // The camera settled on the URL's state (D56).
   useSceneStore.getState().setFocus(d.targetPath);
   d.idleClock = 0;
@@ -722,6 +738,7 @@ function startCut(
   };
   shared.flying = true;
   shared.interactive = false;
+  shared.systemInteractive = null;
   shared.focusDriven = true;
   shared.focusFrom = d.cut.focusFrom;
   shared.focusTo = d.cut.focusTo;
@@ -921,6 +938,7 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     goalPose: { target: [0, 0, 0], radius: 1, azimuth: 0, polar: Math.PI / 2 },
     goalModel: null,
     goalAspect: 0,
+    goalPlanetAngle: undefined,
     azimuthOffset: 0,
     settledRadius: 1,
     safeRect: undefined,
@@ -966,4 +984,9 @@ function sameFrame(a: SafeFrame, b: SafeFrame): boolean {
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+/** Category whose planets take input on this route (system / planet), else null. */
+function systemCategory(target: SceneTarget): string | null {
+  return target.mode === 'system' || target.mode === 'planet' ? target.category : null;
 }

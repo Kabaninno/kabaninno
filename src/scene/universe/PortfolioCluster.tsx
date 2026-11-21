@@ -23,7 +23,7 @@ interface PortfolioClusterProps {
   node: PortfolioNodeModel;
   runtime: UniverseRuntimeRef;
   preset: QualityPreset;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, replace?: boolean) => void;
   busRef: SceneBusRef;
 }
 

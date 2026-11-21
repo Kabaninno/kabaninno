@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getCategories } from '~/content';
 import { CAMERA } from '../config';
 import type { SceneManifest, Vec3 } from '../types';
+import { planetReach, planetWorldPosition } from '../system/planet-math';
 import { buildUniverseModel } from '../universe/model';
 import {
   FULL_FRAME,
@@ -522,3 +523,46 @@ function rotateAround(point: Vec3, center: Vec3, angle: number): Vec3 {
   const s = Math.sin(angle);
   return [center[0] + dx * c + dz * s, point[1], center[2] - dx * s + dz * c];
 }
+
+describe('planet focus framing', () => {
+  const node = model.categories[2]!;
+  const orbit = node.orbits[1]!;
+  const target = { mode: 'planet' as const, category: node.categoryId, service: orbit.serviceSlug };
+
+  it('looks at the live planet and fits it with rings and moons inside the free rect', () => {
+    for (const [view, rect] of [
+      [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+      [PHONE_VIEW, PHONE_SHEET_RECT],
+    ] as const) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      for (const angle of [0, 1.3, 4.1]) {
+        const goal = computeCameraGoal(target, model, view.width / view.height, frame, {
+          planetAngle: angle,
+        });
+        const planet = planetWorldPosition(node.position, orbit, angle);
+        goal.lookAt.forEach((value, axis) => expect(value).toBeCloseTo(planet[axis]!, 9));
+        const p = projectPx(goal, planet, view, frame);
+        expect(p.x).toBeCloseTo(rect.x + rect.width / 2, 6);
+        expect(p.y).toBeCloseTo(rect.y + rect.height / 2, 6);
+        expect(sphereInRect(goal, planet, planetReach(orbit), view, frame, rect)).toBe(true);
+        // The camera stays outside the planet's reach and closer than the system view.
+        expect(dist(goal.position, planet)).toBeGreaterThan(planetReach(orbit) * 2);
+        const system = computeCameraGoal(
+          { mode: 'system', category: node.categoryId },
+          model,
+          view.width / view.height,
+          frame,
+        );
+        expect(dist(goal.position, goal.lookAt)).toBeLessThan(dist(system.position, system.lookAt));
+      }
+    }
+  });
+
+  it('starts deep links at the orbit phase', () => {
+    const frame = resolveSafeFrame(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
+    const aspect = DESKTOP_VIEW.width / DESKTOP_VIEW.height;
+    expect(computeCameraGoal(target, model, aspect, frame)).toEqual(
+      computeCameraGoal(target, model, aspect, frame, { planetAngle: orbit.phase }),
+    );
+  });
+});

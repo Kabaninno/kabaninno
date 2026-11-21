@@ -1,4 +1,5 @@
 import { fogChunk, fresnelChunk, simplexNoise3d } from './chunks';
+import { hashChunk, voronoiChunk } from './planet-common';
 
 /**
  * Energy core of a universe node: flowing plasma (noise body + ridged-noise
@@ -12,26 +13,54 @@ import { fogChunk, fresnelChunk, simplexNoise3d } from './chunks';
  *
  * Variants:
  * - LOW_QUALITY replaces the 3D noise with a cheap analytic pattern;
- * - DETAIL (system view, prewarmed) adds a style-driven surface faded in by
- *   `uDetail`. At uDetail = 0 it renders exactly like the base variant, so
- *   swapping the universe core for the detailed one never pops. The style
- *   parameters come from the DNA `core` value (universe/core-styles.ts).
+ * - DETAIL (system view, prewarmed): `buildCoreFragment(styleChunk)` inserts
+ *   one of the five core styles (shaders/core-styles.ts, one program each),
+ *   faded in by `uDetail`. At uDetail = 0 every variant renders exactly like
+ *   the universe core, so the swap during the dive never pops. A style may
+ *   also deform the sphere (CORE_DEFORM, scaled by uDetail as well).
  */
-export const nodeCoreVertex = /* glsl */ `
+
+export function buildCoreVertex(deform: boolean): string {
+  return /* glsl */ `
+uniform float uTime;
+uniform float uSeed;
+#ifdef DETAIL
+uniform float uDetail;
+#endif
+
 varying vec3 vNormalV;
 varying vec3 vViewPos;
 varying vec3 vObjPos;
 
+${deform ? simplexNoise3d : ''}
+
 void main() {
+  vec3 pos = position;
+${
+  deform
+    ? `#ifdef DETAIL
+  // Fluid core: a slow noise swell along the normal (system view only).
+  float swell = snoise(normalize(position) * 1.6 + vec3(uSeed, uTime * 0.28, -uTime * 0.21));
+  pos += normal * swell * 0.11 * length(position) * uDetail;
+#endif`
+    : ''
+}
   vObjPos = position;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   vViewPos = mv.xyz;
   vNormalV = normalize(normalMatrix * normal);
   gl_Position = projectionMatrix * mv;
 }
 `;
+}
 
-export const nodeCoreFragment = /* glsl */ `
+/**
+ * Core fragment shader. `styleChunk` defines
+ * `vec3 coreStyle(vec3 p, vec3 n, vec3 v, float t)` (system-view surface of
+ * one DNA core style) and is only called in the DETAIL variant.
+ */
+export function buildCoreFragment(styleChunk: string): string {
+  return /* glsl */ `
 uniform vec3 uColor;
 uniform vec3 uGlow;
 uniform vec3 uFogColor;
@@ -43,11 +72,6 @@ uniform float uSmall;
 uniform float uPresence;
 #ifdef DETAIL
 uniform float uDetail;
-// x: flow scale, y: flow speed, z: ridge scale, w: ridge sharpness
-uniform vec4 uStyleA;
-// x: strata bands, y: forge crust, z: iridescence, w: comet stream
-uniform vec4 uStyleB;
-uniform float uFacet;
 #endif
 
 varying vec3 vNormalV;
@@ -59,14 +83,14 @@ ${fresnelChunk}
 #ifndef LOW_QUALITY
 ${simplexNoise3d}
 #endif
+#ifdef DETAIL
+${hashChunk}
+${voronoiChunk}
+${styleChunk}
+#endif
 
 void main() {
   vec3 n = normalize(vNormalV);
-#ifdef DETAIL
-  // Prism: faceted glass normals blended in.
-  vec3 faceN = normalize(cross(dFdx(vViewPos), dFdy(vViewPos)));
-  n = normalize(mix(n, faceN, uFacet * uDetail));
-#endif
   vec3 v = normalize(-vViewPos);
   float facing = clamp(dot(n, v), 0.0, 1.0);
   vec3 p = normalize(vObjPos);
@@ -85,37 +109,19 @@ void main() {
   float detail = 1.0 - smoothstep(5.0, 14.0, -vViewPos.z);
   vec3 body = mix(uColor * mix(0.8, 0.34, detail), uColor, smoothstep(0.15, 0.95, flow));
   body += uGlow * ridge * 0.85 * detail;
-
+  float styleMix = 0.0;
 #ifdef DETAIL
-  {
-    // Comet: the pattern streams along -X like a tail.
-    vec3 q = vec3(p.x * (1.0 - 0.6 * uStyleB.w) + uTime * 0.35 * uStyleB.w, p.y, p.z);
-#ifdef LOW_QUALITY
-    float f2 = 0.5 + 0.5 * sin(q.x * uStyleA.x * 3.0 + q.y * 5.0 + uTime * uStyleA.y * 4.0 + uSeed);
-    float r2 = pow(1.0 - abs(sin(q.y * uStyleA.z * 2.0 + q.z * 3.0 + uSeed)), uStyleA.w);
-#else
-    float f2 = snoise(q * uStyleA.x + vec3(uSeed, uTime * uStyleA.y, 0.0)) * 0.5 + 0.5;
-    float r2 = pow(1.0 - abs(snoise(q * uStyleA.z + vec3(0.0, uSeed, uTime * uStyleA.y * 0.8))), uStyleA.w);
-#endif
-    vec3 styled = mix(uColor * 0.26, uColor * 0.9, f2) + mix(uColor, uGlow, 0.5) * r2 * 0.7;
-    // Strata: scrolling horizontal data bands.
-    float bands = 0.5 + 0.5 * sin(p.y * 22.0 + f2 * 3.0 - uTime * 0.6);
-    styled = mix(styled, mix(uColor * 0.32, uGlow, bands), uStyleB.x * 0.65);
-    // Forge: dark cooled crust over molten metal.
-    styled *= mix(1.0, mix(1.0, 0.22, smoothstep(0.45, 0.62, f2)), uStyleB.y);
-    // Neural: iridescent hue drift.
-    vec3 iri = 0.5 + 0.5 * cos(6.2831 * (vec3(0.0, 0.33, 0.67) + f2 * 0.8 + facing * 0.6));
-    styled = mix(styled, styled * (0.55 + iri), uStyleB.z * 0.6);
-    body = mix(body, styled, uDetail);
-  }
+  styleMix = uDetail;
+  body = mix(body, coreStyle(p, n, v, uTime), styleMix);
 #endif
 
   // Limb darkening: the sphere reads as a glowing volume, not a flat disc.
   body *= mix(0.5, 1.0, pow(facing, 0.6));
 
-  // V-07: DNA-coloured HDR hot centre (bloom keeps the hue).
+  // V-07: DNA-coloured HDR hot centre (bloom keeps the hue). The system
+  // view keeps it small, so the style's surface reads.
   vec3 hot = mix(uColor, uGlow, 0.3) * (mix(1.25, 1.05, detail) + 0.55 * uEmphasis + 0.6 * uSmall);
-  float hotWeight = mix(0.72, 0.42, detail) + 0.22 * uEmphasis + 0.2 * uSmall;
+  float hotWeight = (mix(0.72, 0.42, detail) + 0.22 * uEmphasis + 0.2 * uSmall) * (1.0 - 0.7 * styleMix);
   vec3 color = mix(body, hot, clamp(pow(facing, mix(2.2, 4.5, detail)) * hotWeight, 0.0, 1.0));
   // White only as a pinpoint at the very centre.
   color += vec3(0.2) * pow(facing, 28.0) * (1.0 - 0.6 * detail);
@@ -127,3 +133,8 @@ void main() {
   #include <colorspace_fragment>
 }
 `;
+}
+
+/** The universe core (no style; also the beacon core). */
+export const nodeCoreVertex = buildCoreVertex(false);
+export const nodeCoreFragment = buildCoreFragment('');

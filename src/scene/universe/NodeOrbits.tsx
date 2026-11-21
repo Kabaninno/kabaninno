@@ -1,9 +1,14 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { AdditiveBlending, Color, type ShaderMaterial } from 'three';
+import { useSceneStore } from '@/store/scene';
+import { dampFactor } from '../camera/damp';
+import { MOTION } from '../config';
+import { sceneNodeId } from '../node-ids';
 import { orbitPosition } from '../orbit-math';
+import { systemDetail } from '../system/constants';
 import { qualityDefines, type QualityPreset } from '../quality';
 import {
   orbitLineFragment,
@@ -25,6 +30,9 @@ interface NodeOrbitsProps {
   runtime: UniverseRuntimeRef;
   index: number;
   preset: QualityPreset;
+  categoryId: string;
+  /** Slug of the planet the URL focuses (its orbit stays lit). */
+  focusedService: string | null;
 }
 
 /**
@@ -32,9 +40,26 @@ interface NodeOrbitsProps {
  * moving spark per service, using the real orbit parameters at system scale.
  * Two draw calls per node regardless of the number of services.
  */
-export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbitsProps) {
+export function NodeOrbits({
+  orbits,
+  color,
+  runtime,
+  index,
+  preset,
+  categoryId,
+  focusedService,
+}: NodeOrbitsProps) {
   const lineRef = useRef<ShaderMaterial>(null);
   const sparkRef = useRef<ShaderMaterial>(null);
+  const highlightRef = useRef<string | null>(null);
+  const hotRef = useRef({ orbit: -1, amount: 0 });
+
+  useEffect(() => {
+    highlightRef.current = useSceneStore.getState().highlighted;
+    return useSceneStore.subscribe((state) => {
+      highlightRef.current = state.highlighted;
+    });
+  }, []);
 
   const lines = useMemo(() => buildOrbitLines(orbits, preset.orbitSegments), [orbits, preset]);
   const sparks = useMemo(() => buildSparks(orbits), [orbits]);
@@ -46,6 +71,9 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
       uTime: { value: 0 },
       uEmphasis: { value: 0 },
       uOpacity: { value: LINE_OPACITY },
+      uTail: { value: 1 },
+      uHot: { value: -1 },
+      uHotAmount: { value: 0 },
     }),
     [color],
   );
@@ -61,16 +89,36 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
     [],
   );
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     const rt = runtime.current;
     if (!rt) return;
     const emphasis = rt.emphasis[index] ?? 0;
     const presence = rt.presence[index] ?? 1;
+    // In the system view the real planets replace the sparks and their tails.
+    const detail = systemDetail(rt.focus[index] ?? 0, rt.corePx[index] ?? 0);
+    // Hovered planet (3D or HTML highlight) lights its orbit; the focused one stays lit.
+    const highlight = highlightRef.current;
+    let hotOrbit = orbits.findIndex(
+      (orbit) => highlight === sceneNodeId.service(categoryId, orbit.serviceSlug),
+    );
+    if (hotOrbit < 0 && focusedService) {
+      hotOrbit = orbits.findIndex((orbit) => orbit.serviceSlug === focusedService);
+    }
+    const hot = hotRef.current;
+    const k = dampFactor(MOTION.hoverRate, Math.min(delta, 0.1));
+    if (hotOrbit >= 0 && hotOrbit !== hot.orbit) {
+      hot.orbit = hotOrbit;
+      hot.amount = 0;
+    }
+    hot.amount += ((hotOrbit >= 0 ? 1 : 0) * detail - hot.amount) * k;
     const line = lineRef.current;
     if (line) {
       line.uniforms.uTime.value = rt.time;
       line.uniforms.uEmphasis.value = emphasis;
       line.uniforms.uOpacity.value = LINE_OPACITY * presence;
+      line.uniforms.uTail.value = 1 - detail;
+      line.uniforms.uHot.value = hot.orbit;
+      line.uniforms.uHotAmount.value = hot.amount;
     }
     const spark = sparkRef.current;
     if (spark) {
@@ -78,7 +126,7 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
       spark.uniforms.uEmphasis.value = emphasis;
       spark.uniforms.uScale.value = pointScale(state);
       spark.uniforms.uPixelRatio.value = state.viewport.dpr;
-      spark.uniforms.uOpacity.value = presence;
+      spark.uniforms.uOpacity.value = presence * (1 - detail);
     }
   });
 
@@ -93,6 +141,7 @@ export function NodeOrbits({ orbits, color, runtime, index, preset }: NodeOrbits
           <bufferAttribute attach="attributes-aAngle" args={[lines.angles, 1]} />
           <bufferAttribute attach="attributes-aSpeed" args={[lines.speeds, 1]} />
           <bufferAttribute attach="attributes-aPhase" args={[lines.phases, 1]} />
+          <bufferAttribute attach="attributes-aOrbit" args={[lines.orbitIds, 1]} />
         </bufferGeometry>
         <shaderMaterial
           key={variant}
@@ -139,9 +188,10 @@ function buildOrbitLines(orbits: readonly OrbitPreview[], segments: number) {
   const angles = new Float32Array(vertexCount);
   const speeds = new Float32Array(vertexCount);
   const phases = new Float32Array(vertexCount);
+  const orbitIds = new Float32Array(vertexCount);
   const point = { x: 0, y: 0, z: 0 };
   let v = 0;
-  for (const orbit of orbits) {
+  for (const [orbitIndex, orbit] of orbits.entries()) {
     for (let s = 0; s < segments; s++) {
       for (const step of [s, s + 1]) {
         // Unwrapped angle (last vertex = 2π) keeps the varying continuous.
@@ -153,11 +203,12 @@ function buildOrbitLines(orbits: readonly OrbitPreview[], segments: number) {
         angles[v] = angle;
         speeds[v] = orbit.speed;
         phases[v] = orbit.phase;
+        orbitIds[v] = orbitIndex;
         v++;
       }
     }
   }
-  return { positions, angles, speeds, phases, count: vertexCount };
+  return { positions, angles, speeds, phases, orbitIds, count: vertexCount };
 }
 
 function buildSparks(orbits: readonly OrbitPreview[]) {

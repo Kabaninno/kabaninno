@@ -7,8 +7,9 @@ export interface BreadcrumbItem {
 }
 
 /**
- * Breadcrumb trail; the first item gets a "←" affordance (back to the
- * universe). The trail stays on one line: ancestors keep their width and the
+ * Breadcrumb trail. The first item is the explicit «← Universe» button of
+ * system and planet panels (BRIEF scene 2: an outlined pill, not just a
+ * crumb). The trail stays on one line: ancestors keep their width and the
  * current page (repeated by the h1 right below) truncates with an ellipsis,
  * so a wrapped line never starts with a bare "/".
  */
@@ -26,12 +27,19 @@ export function Breadcrumbs({ label, items }: { label: string; items: readonly B
                 /
               </span>
             ) : null}
-            {item.href ? (
+            {item.href && index === 0 ? (
+              <Link
+                href={item.href}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-white/15 px-3.5 whitespace-nowrap text-ink transition-colors duration-150 hover:border-white/35 hover:bg-white/[0.06] active:bg-white/10 md:min-h-9"
+              >
+                <span aria-hidden="true">←</span>
+                {item.label}
+              </Link>
+            ) : item.href ? (
               <Link
                 href={item.href}
                 className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-1 whitespace-nowrap transition-colors duration-150 hover:text-ink active:text-white md:min-h-8"
               >
-                {index === 0 ? <span aria-hidden="true">←</span> : null}
                 {item.label}
               </Link>
             ) : (

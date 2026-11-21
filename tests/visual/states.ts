@@ -146,18 +146,50 @@ export const STATES: CaptureState[] = [
     },
   },
 
-  // Systems (every category) and one planet per system (planet focus: M3).
+  // Systems (every category) and the first planet of every system (planet focus).
   ...categories.map((category): CaptureState => ({
     name: `system-${category.id}-pl`,
     path: pl(category.path),
     tags: ['system'],
   })),
   { name: `system-${first.id}-uk`, path: localized('uk', first.path), tags: ['system'] },
+  {
+    // Hovering (focus on touch) a planet in the system panel lights it up in the scene.
+    name: `hover-planet-${first.id}-${first.services[0]!.slug}-pl`,
+    path: pl(first.path),
+    tags: ['system', 'hover', 'planet'],
+    prepare: async (page, { viewport }) => {
+      const link = page.locator(
+        `main [data-route-ui] a[href="${sitePath(pl(first.services[0]!.path))}"]`,
+      );
+      if (viewport === 'mobile') await link.focus();
+      else await link.hover();
+    },
+  },
   ...categories.map((category): CaptureState => ({
     name: `planet-${category.id}-${category.services[0]!.slug}-pl`,
     path: pl(category.services[0]!.path),
     tags: ['planet'],
   })),
+
+  // Mobile bottom sheet on a planet: expanded (default) and collapsed by its handle.
+  {
+    name: `sheet-expanded-${first.id}-${first.services[0]!.slug}-pl`,
+    path: pl(first.services[0]!.path),
+    viewports: ['mobile'],
+    tags: ['planet', 'sheet'],
+  },
+  {
+    name: `sheet-collapsed-${first.id}-${first.services[0]!.slug}-pl`,
+    path: pl(first.services[0]!.path),
+    viewports: ['mobile'],
+    tags: ['planet', 'sheet'],
+    prepare: async (page) => {
+      await page.locator('[data-sheet-handle]').click();
+      await page.locator('[data-sheet="collapsed"]').waitFor();
+      await page.waitForTimeout(400);
+    },
+  },
 
   // Other nodes
   { name: 'portfolio-pl', path: pl(paths.portfolio()), tags: ['portfolio'] },

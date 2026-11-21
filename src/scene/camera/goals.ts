@@ -1,7 +1,8 @@
 import type { SceneTarget } from '@/lib/route-state';
 import type { SafeRect } from '@/store/scene';
 import { CAMERA } from '../config';
-import { degToRad, orbitPosition, type MutableVec3 } from '../orbit-math';
+import { degToRad } from '../orbit-math';
+import { planetReach, planetWorldPosition } from '../system/planet-math';
 import type { Vec3 } from '../types';
 import type { CategoryNodeModel, UniverseModel, UniverseNode } from '../universe/model';
 
@@ -278,13 +279,14 @@ export function overviewGoal(
  * Camera goal for a URL target. `frame` is the free part of the viewport; the
  * focus is fitted into it (the rig shifts the principal point to its centre).
  * `sway`: idle auto-rotate amplitude the overview fit must cover.
+ * `planetAngle`: live orbit angle of the focused planet (planet mode).
  */
 export function computeCameraGoal(
   target: SceneTarget,
   model: UniverseModel,
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
-  options: { sway?: number } = {},
+  options: { sway?: number; planetAngle?: number } = {},
 ): CameraGoal {
   const overview = overviewGoal(model, aspect, frame, options.sway ?? 0);
   const fov = overview.fov;
@@ -294,13 +296,17 @@ export function computeCameraGoal(
     case 'planet': {
       const node = findCategory(model, target.category);
       if (!node) return overview;
-      if (target.mode === 'planet') {
-        const orbit = node.orbits.find((o) => o.serviceSlug === target.service);
-        if (orbit) return planetGoal(node, orbit, overview, aspect, frame);
-      }
       const radius = Math.max(node.systemRadius * 1.2, 0.8);
       const distance = Math.max(fitDistance(radius, radius, fov, aspect, frame), 3.2);
-      return approach(node.position, overview.position, distance, fov, 0.35);
+      const system = approach(node.position, overview.position, distance, fov, 0.35);
+      if (target.mode === 'planet') {
+        const orbit = node.orbits.find((o) => o.serviceSlug === target.service);
+        // The live angle comes from the system view; deep links start at the orbit phase.
+        if (orbit) {
+          return planetGoal(node, orbit, options.planetAngle ?? orbit.phase, system, aspect, frame);
+        }
+      }
+      return system;
     }
     case 'portfolio':
     case 'project': {
@@ -324,26 +330,35 @@ export function computeCameraGoal(
 }
 
 /**
- * Planet focus (placeholder until M3 tracks the live planet): closer to the
- * node, looking toward where the planet's orbit starts.
+ * Planet focus: the camera looks at the planet's live position (the planet
+ * parks on its orbit while focused) from outside its orbit, roughly from the
+ * side the system was approached from, so the core stays in the background
+ * and lights the planet from the side. The planet with its rings and moons
+ * is fitted into the free frame (the panel or sheet covers the rest).
  */
-function planetGoal(
+export function planetGoal(
   node: CategoryNodeModel,
   orbit: CategoryNodeModel['orbits'][number],
-  overview: CameraGoal,
+  angle: number,
+  system: CameraGoal,
   aspect: number,
   frame: SafeFrame,
 ): CameraGoal {
-  const radius = Math.max(node.systemRadius * 0.75, 0.6);
-  const distance = Math.max(fitDistance(radius, radius, overview.fov, aspect, frame), 2.2);
-  const start = orbitPosition(orbit, orbit.phase, { x: 0, y: 0, z: 0 } as MutableVec3);
-  const lookAt: Vec3 = [
-    node.position[0] + start.x * 0.45,
-    node.position[1] + start.y * 0.45,
-    node.position[2] + start.z * 0.45,
-  ];
-  return approach(lookAt, overview.position, distance, overview.fov, 0.3);
+  const planet = planetWorldPosition(node.position, orbit, angle);
+  const reach = planetReach(orbit);
+  const fov = system.fov;
+  const distance = Math.max(
+    fitDistance(reach * PLANET_FRAMING, reach * PLANET_FRAMING, fov, aspect, frame),
+    reach * 3.2,
+  );
+  const toSystemCamera = normalize(sub(system.position, node.position));
+  const outward = normalize(sub(planet, node.position));
+  const dir = normalize(add(add(toSystemCamera, scale(outward, 0.6)), [0, 0.22, 0]));
+  return { position: add(planet, scale(dir, distance)), lookAt: planet, fov };
 }
+
+/** Planet focus: half extent of the fitted box relative to the planet's reach. */
+export const PLANET_FRAMING = 1.35;
 
 /**
  * User input limits around a goal (CameraControls): the dolly range is

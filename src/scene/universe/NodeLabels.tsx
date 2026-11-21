@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useSceneStore } from '@/store/scene';
-import type { SceneBusRef } from '../bus';
+import type { SceneBus, SceneBusRef } from '../bus';
 import { universeKeyForHighlight } from '../node-ids';
 import {
   LABEL_INSET,
@@ -14,8 +14,8 @@ import {
   type LabelLayout,
   type LabelObstacle,
 } from './label-layout';
-import type { UniverseModel, UniverseNode } from './model';
-import type { UniverseRuntimeRef } from './runtime';
+import type { UniverseModel } from './model';
+import type { UniverseRuntime, UniverseRuntimeRef } from './runtime';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Hover reactions: 150–200 ms (art direction). */
@@ -65,8 +65,9 @@ interface LabelState {
  * highlighted node changes; per frame only transforms and, when the layout
  * shifts, two SVG paths are written. Shown in the overview while the camera
  * is settled (`bus.interactive`) and the node is not faded out under an
- * overlay (presence). The text box stays inside the free area, clear of the
- * other cores (label-layout.ts).
+ * overlay (presence), and in a settled system view for the planet of a
+ * `service:<cat>/<slug>` highlight. The text box stays inside the free area,
+ * clear of the other cores and planets (label-layout.ts).
  */
 export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabelsProps) {
   const gl = useThree((state) => state.gl);
@@ -84,11 +85,12 @@ export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabels
   });
   const highlightRef = useRef<string | null>(null);
   const obstaclesRef = useRef<LabelObstacle[]>([]);
+  const targetRef = useRef<LabelTarget>(createTarget());
 
   useEffect(() => {
-    highlightRef.current = universeKeyForHighlight(useSceneStore.getState().highlighted);
+    highlightRef.current = useSceneStore.getState().highlighted;
     return useSceneStore.subscribe((state) => {
-      highlightRef.current = universeKeyForHighlight(state.highlighted);
+      highlightRef.current = state.highlighted;
     });
   }, []);
 
@@ -99,67 +101,69 @@ export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabels
     host.appendChild(dom.root);
     domRef.current = dom;
     const label = labelRef.current;
+    const bus = busRef.current;
     label.key = null;
     label.visible = false;
     label.layout = null;
+    // Re-measure once the web fonts have loaded: the fallback face is wider and
+    // left the leader running past the text (visual L-02).
+    const remeasure = () => {
+      label.key = null;
+    };
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+    fonts?.addEventListener('loadingdone', remeasure);
+    void fonts?.ready.then(remeasure);
     return () => {
+      fonts?.removeEventListener('loadingdone', remeasure);
       dom.root.remove();
       domRef.current = null;
+      bus.labelRect = null;
     };
-  }, [gl, connected, reducedMotion]);
+  }, [gl, connected, reducedMotion, busRef]);
 
   useFrame((state) => {
     const dom = domRef.current;
     const rt = runtime.current;
     if (!dom || !rt) return;
+    const bus = busRef.current;
     const label = labelRef.current;
-    const wanted = busRef.current.interactive ? highlightRef.current : null;
-    let node = wanted ? model.byKey.get(wanted) : undefined;
-    if (node && ((rt.presence[node.index] ?? 1) < 0.5 || !rt.inFront[node.index])) {
-      node = undefined;
-    }
+    const target = targetRef.current;
+    const obstacles = obstaclesRef.current;
+    obstacles.length = 0;
+    const found = resolveTarget(model, rt, bus, highlightRef.current, target, obstacles);
     const now = performance.now();
 
-    if (node && node.key !== label.key) {
-      setContent(dom, node, model.categories.length);
-      label.key = node.key;
+    if (found && target.key !== label.key) {
+      setContent(dom, target);
+      label.key = target.key;
       measure(dom, label);
       label.layout = null;
       label.accent = '';
     }
-    const show = node !== undefined;
+    const show = found;
     if (show !== label.visible) {
       label.visible = show;
       if (!show) label.hiddenAt = now;
       dom.root.dataset.visible = show ? 'true' : 'false';
     }
-    if (!label.visible && now - label.hiddenAt > FADE_MS + 50) return;
-
-    const current = label.key ? model.byKey.get(label.key) : undefined;
-    if (!current) return;
-    const i = current.index;
-    const x = rt.screenX[i] ?? 0;
-    const y = rt.screenY[i] ?? 0;
-    dom.anchor.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-
-    // The beacon's colour cycles: its leader follows it (visual N2-04).
-    const accent = rt.liveAccent[i] ?? current.color;
-    if (accent !== label.accent) {
-      label.accent = accent;
-      dom.root.style.setProperty('--label-accent', accent);
+    if (!label.visible) {
+      bus.labelRect = null;
+      if (now - label.hiddenAt > FADE_MS + 50) return;
+      // Fading out: keep the last position.
+      return;
     }
 
-    const obstacles = obstaclesRef.current;
-    obstacles.length = 0;
-    for (const other of model.nodes) {
-      const j = other.index;
-      if (j === i || !rt.inFront[j] || (rt.presence[j] ?? 1) < 0.3) continue;
-      obstacles.push({ x: rt.screenX[j] ?? 0, y: rt.screenY[j] ?? 0, r: (rt.corePx[j] ?? 0) / 2 });
+    const { x, y } = target;
+    dom.anchor.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    // The beacon's colour cycles: its leader follows it (visual N2-04).
+    if (target.color !== label.accent) {
+      label.accent = target.color;
+      dom.root.style.setProperty('--label-accent', target.color);
     }
     const layout = layoutLabel({
       x,
       y,
-      coreRadiusPx: (rt.corePx[i] ?? 16) / 2,
+      coreRadiusPx: target.radiusPx,
       textWidth: label.width,
       compactWidth: label.compactWidth,
       textHeight: label.height,
@@ -170,9 +174,99 @@ export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabels
       label.layout = layout;
       drawLayout(dom, layout, label);
     }
+    // Links crossing the text dim under it (visual L-03): GL px, bottom-left origin.
+    const dpr = state.viewport.dpr;
+    const width = layout.compact ? label.compactWidth : label.width;
+    const left = x + layout.textX;
+    const top = y + layout.textY;
+    bus.labelRect = [
+      left * dpr,
+      (state.size.height - top - label.height) * dpr,
+      (left + width) * dpr,
+      (state.size.height - top) * dpr,
+    ];
   });
 
   return null;
+}
+
+/** What a label points at: a universe node (overview) or a planet (settled system view). */
+interface LabelTarget {
+  key: string;
+  x: number;
+  y: number;
+  radiusPx: number;
+  color: string;
+  label: string;
+  index: string | null;
+  sub: string | null;
+}
+
+function createTarget(): LabelTarget {
+  return { key: '', x: 0, y: 0, radiusPx: 0, color: '#e8ecf5', label: '', index: null, sub: null };
+}
+
+/**
+ * Fills `target` and `obstacles` for the current highlight; false when no
+ * label should show. Overview: the highlighted universe node (also from a
+ * service id). Settled system view: the planet of a `service:<cat>/<slug>`
+ * highlight of that system, clear of the core and the other planets.
+ */
+function resolveTarget(
+  model: UniverseModel,
+  rt: UniverseRuntime,
+  bus: SceneBus,
+  highlight: string | null,
+  target: LabelTarget,
+  obstacles: LabelObstacle[],
+): boolean {
+  if (!highlight) return false;
+  if (bus.interactive) {
+    const key = universeKeyForHighlight(highlight);
+    const node = key ? model.byKey.get(key) : undefined;
+    if (!node) return false;
+    const i = node.index;
+    if ((rt.presence[i] ?? 1) < 0.5 || !rt.inFront[i]) return false;
+    target.key = node.key;
+    target.x = rt.screenX[i] ?? 0;
+    target.y = rt.screenY[i] ?? 0;
+    target.radiusPx = (rt.corePx[i] ?? 16) / 2;
+    target.color = rt.liveAccent[i] ?? node.color;
+    target.label = node.label;
+    target.index =
+      node.kind === 'category' ? formatOrdinal(node.ordinal, model.categories.length) : null;
+    target.sub = node.kind === 'portfolio' && node.comingSoon ? node.comingSoonLabel : null;
+    for (const other of model.nodes) {
+      const j = other.index;
+      if (j === i || !rt.inFront[j] || (rt.presence[j] ?? 1) < 0.3) continue;
+      obstacles.push({ x: rt.screenX[j] ?? 0, y: rt.screenY[j] ?? 0, r: (rt.corePx[j] ?? 0) / 2 });
+    }
+    return true;
+  }
+  const category = bus.systemInteractive;
+  const prefix = category ? `service:${category}/` : null;
+  if (!prefix || !highlight.startsWith(prefix)) return false;
+  const key = `${category}/${highlight.slice(prefix.length)}`;
+  const planet = bus.planetTargets.get(key);
+  if (!planet || !planet.visible || !planet.inFront) return false;
+  target.key = highlight;
+  target.x = planet.x;
+  target.y = planet.y;
+  target.radiusPx = Math.max(planet.radiusPx, 6);
+  target.color = planet.color;
+  target.label = planet.label;
+  target.index = formatOrdinal(planet.ordinal, planet.total);
+  target.sub = null;
+  for (const [otherKey, other] of bus.planetTargets) {
+    if (otherKey === key || !otherKey.startsWith(`${category}/`) || !other.visible) continue;
+    if (other.inFront) obstacles.push({ x: other.x, y: other.y, r: other.radiusPx });
+  }
+  const node = model.categories.find((candidate) => candidate.categoryId === category);
+  if (node && rt.inFront[node.index]) {
+    const i = node.index;
+    obstacles.push({ x: rt.screenX[i] ?? 0, y: rt.screenY[i] ?? 0, r: (rt.corePx[i] ?? 0) / 2 });
+  }
+  return true;
 }
 
 let finePointerQuery: MediaQueryList | null = null;
@@ -203,18 +297,12 @@ function layoutChanged(a: LabelLayout, b: LabelLayout): boolean {
   );
 }
 
-function setContent(dom: LabelDom, node: UniverseNode, categoryCount: number) {
-  dom.name.textContent = node.label;
-  if (node.kind === 'category') {
-    dom.index.textContent = formatOrdinal(node.ordinal, categoryCount);
-    dom.index.style.display = '';
-  } else {
-    dom.index.textContent = '';
-    dom.index.style.display = 'none';
-  }
-  const sub = node.kind === 'portfolio' && node.comingSoon ? node.comingSoonLabel : '';
-  dom.sub.textContent = sub;
-  dom.sub.style.display = sub ? '' : 'none';
+function setContent(dom: LabelDom, target: LabelTarget) {
+  dom.name.textContent = target.label;
+  dom.index.textContent = target.index ?? '';
+  dom.index.style.display = target.index ? '' : 'none';
+  dom.sub.textContent = target.sub ?? '';
+  dom.sub.style.display = target.sub ? '' : 'none';
 }
 
 /** Text block size at normal and compact spacing (only when the content changes). */

@@ -50,9 +50,11 @@ interface UniverseProps {
   model: UniverseModel;
   /** Universe node the URL focuses (null = overview). */
   focusKey: string | null;
+  /** Planet the URL focuses ("<category>/<slug>" route), else null. */
+  focusedPlanet: { category: string; service: string } | null;
   preset: QualityPreset;
   reducedMotion: boolean;
-  onNavigate: (path: string) => void;
+  onNavigate: (path: string, replace?: boolean) => void;
   busRef: SceneBusRef;
   prewarm: PrewarmApiRef;
   compile: CompileApiRef;
@@ -69,6 +71,7 @@ interface UniverseProps {
 export function Universe({
   model,
   focusKey,
+  focusedPlanet,
   preset,
   reducedMotion,
   onNavigate,
@@ -198,7 +201,7 @@ export function Universe({
 
   return (
     <group>
-      <Network model={model} runtime={runtime} preset={preset} />
+      <Network model={model} runtime={runtime} preset={preset} busRef={busRef} />
       {model.categories.map((node) => (
         <CategoryNode
           key={node.key}
@@ -206,6 +209,9 @@ export function Universe({
           runtime={runtime}
           preset={preset}
           focused={node.key === focusKey}
+          focusedService={
+            focusedPlanet?.category === node.categoryId ? focusedPlanet.service : null
+          }
           onNavigate={onNavigate}
           busRef={busRef}
           prewarm={prewarm}

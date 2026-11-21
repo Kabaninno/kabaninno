@@ -158,6 +158,11 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   const preset = QUALITY_PRESETS[tier];
   const bloom = preset.bloom !== null;
   const focusKey = focusKeyForTarget(target);
+  const focusedPlanet = useMemo(
+    () =>
+      target.mode === 'planet' ? { category: target.category, service: target.service } : null,
+    [target],
+  );
   // The tier's DPR is the Canvas prop itself: R3F re-applies this prop on
   // every render, so anything else (AdaptiveDpr) was reset (P-02).
   const dpr = sceneDpr(deviceDpr, preset);
@@ -207,7 +212,10 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   // On screen: compiled through the queue, or forced by the deadline.
   const shown = revealed || deadlinePassed;
 
-  const navigate = useCallback((to: string) => router.push(to), [router]);
+  const navigate = useCallback(
+    (to: string, replace = false) => (replace ? router.replace(to) : router.push(to)),
+    [router],
+  );
   // Hidden tab: stop. Reduced motion: the scene is static between interactions.
   const frameloop = !visible ? 'never' : reducedMotion ? 'demand' : 'always';
 
@@ -248,6 +256,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
           <Universe
             model={model}
             focusKey={focusKey}
+            focusedPlanet={focusedPlanet}
             preset={preset}
             reducedMotion={reducedMotion}
             onNavigate={navigate}

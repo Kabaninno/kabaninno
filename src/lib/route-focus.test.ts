@@ -18,6 +18,15 @@ describe('routeFocusPlan', () => {
     expect(routeFocusPlan('/services/web/', '/services/crm/', true)).toEqual({ type: 'heading' });
   });
 
+  it('planet ↔ planet switching (arrows / swipe, router.replace) focuses the new heading', () => {
+    expect(routeFocusPlan('/services/crm/a/', '/services/crm/d/', true)).toEqual({
+      type: 'heading',
+    });
+    expect(routeFocusPlan('/services/crm/d/', '/services/crm/a/', false)).toEqual({
+      type: 'heading',
+    });
+  });
+
   it('back up to the universe with the keyboard returns to the node link', () => {
     expect(routeFocusPlan('/services/web/', '/', true)).toEqual({
       type: 'link',

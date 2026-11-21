@@ -27,7 +27,14 @@ interface HitZoneProps {
   nodeKey: string;
   /** Locale-less route opened on click; null disables navigation. */
   path: string | null;
-  onNavigate: (path: string) => void;
+  /** `replace`: swap the history entry (sibling planets, D16). */
+  onNavigate: (path: string, replace?: boolean) => void;
+  replace?: boolean;
+  /**
+   * Custom input gate (planets: their system view is settled and the planet
+   * is not the focused one). Default: universe overview, node present.
+   */
+  gate?: () => boolean;
   busRef: SceneBusRef;
   /** With `index`: the zone also needs the node's presence (not faded out under an overlay). */
   runtime?: UniverseRuntimeRef;
@@ -54,6 +61,8 @@ export function HitZone({
   nodeKey,
   path,
   onNavigate,
+  replace = false,
+  gate,
   busRef,
   runtime,
   index,
@@ -92,8 +101,13 @@ export function HitZone({
   useFrame(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
-    const presence = index === undefined ? 1 : (runtime?.current?.presence[index] ?? 1);
-    const interactive = busRef.current.interactive && presence > 0.5;
+    let interactive: boolean;
+    if (gate) {
+      interactive = gate();
+    } else {
+      const presence = index === undefined ? 1 : (runtime?.current?.presence[index] ?? 1);
+      interactive = busRef.current.interactive && presence > 0.5;
+    }
     if (interactive !== enabled.current) {
       enabled.current = interactive;
       if (interactive) mesh.layers.enableAll();
@@ -125,7 +139,7 @@ export function HitZone({
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
     if (!path || !enabled.current || event.delta > CLICK_TOLERANCE_PX) return;
-    onNavigate(path);
+    onNavigate(path, replace);
   };
 
   return (
