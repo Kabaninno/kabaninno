@@ -1,0 +1,10 @@
+# Normalize line endings to LF in the repository and working tree
+# (Prettier and the CI runner expect LF; Windows checkouts must not get CRLF).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.woff2 binary
+*.ico binary

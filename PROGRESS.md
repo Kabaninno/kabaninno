@@ -12,7 +12,19 @@
 
 ## Поточний блок
 
-**M1. Каркас** (в роботі). Наступний крок: ui-engineer дописує app, HUD, скрипти, workflow і тести, scene-engineer робить SceneRoot і заглушку Experience. Далі ворота і рецензії.
+**M1. Каркас** (в роботі).
+
+Агентів створено й закомічено, але поточна сесія їх не бачить: агенти завантажуються лише під час старту Claude Code. Замовника попрошено перезапустити сесію (`claude --continue`).
+
+Після «продовжуй» робимо таке:
+1. Перевірити, що агенти доступні: `subagent_type: ui-engineer` тощо.
+2. Паралельно:
+   - **ui-engineer:** globals.css, fonts, кореневі app-файли (layout, redirect, not-found), `[locale]`-layout і сторінки, HUD, sitemap і robots, scripts (postbuild, build-preview, serve-out), workflow, README (деплой), тести.
+   - **scene-engineer:** SceneRoot і заглушка Experience (вимоги в пункті M1 нижче).
+   - **content-writer:** розділ UI-рядків у CONTENT_REVIEW.md, вичитка ui.json.
+3. Ворота, потім qa-reviewer і visual-reviewer, виправлення, коміт M1.
+
+Незакомічений код M1 лежить у робочій копії. Його закомічу, коли ворота стануть зеленими.
 
 ## Чекліст
 
@@ -108,7 +120,7 @@
 
 | Дата | Блок | lint | typecheck | test | build | Примітки |
 |---|---|---|---|---|---|---|
-| — | — | — | — | — | — | ще не запускались: каркас неповний |
+| 2026-11-21 | M1 (базова перевірка наявного коду) | ✅ (попередження «Pages directory cannot be found» зникне, коли з'явиться src/app) | ✅ | — (тестів ще немає) | — (немає src/app) | лише конфіги, content, i18n і lib |
 
 ## Беклог (minor і ідеї)
 - (порожньо)
