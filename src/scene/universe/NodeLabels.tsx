@@ -343,6 +343,7 @@ function layoutChanged(a: LabelLayout, b: LabelLayout): boolean {
     a.side !== b.side ||
     a.rise !== b.rise ||
     a.compact !== b.compact ||
+    Math.abs(a.leaderY - b.leaderY) > 0.5 ||
     Math.abs(a.reticle - b.reticle) > 0.5 ||
     Math.abs(a.textX - b.textX) > 0.5 ||
     Math.abs(a.textY - b.textY) > 0.5
@@ -388,7 +389,7 @@ function drawLayout(dom: LabelDom, layout: LabelLayout, label: LabelState) {
   const x0 = side * r;
   const y0 = -rise * r;
   const x1 = side * (r + diagonal);
-  const y1 = -rise * (r + diagonal);
+  const y1 = layout.leaderY;
   const x2 = side > 0 ? Math.max(x1, textX + width) : Math.min(x1, textX);
   dom.leader.setAttribute('d', `M${x0} ${y0}L${x1} ${y1}H${x2}`);
   dom.tick.setAttribute('cx', String(x2));

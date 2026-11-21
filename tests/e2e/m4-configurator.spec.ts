@@ -84,7 +84,8 @@ test.describe('[M4, not yet run] wizard navigation and validation', () => {
   test('the name is validated on Next, not while typing', async ({ page }) => {
     await seed(page, 'contact', { ...DRAFT, contact: { name: '', comment: '' } });
     await open(page);
-    const name = panel(page).getByLabel(ui.pl.configurator.fields.name);
+    // exact: the step form is labelled by its title ("Imię i komentarz"), which contains the field name.
+    const name = panel(page).getByLabel(ui.pl.configurator.fields.name, { exact: true });
     await name.fill('A');
     await expect(panel(page)).not.toContainText('Wpisz co najmniej');
     await panel(page).getByRole('button', { name: ui.pl.configurator.nav.toSummary }).click();
@@ -195,7 +196,9 @@ test.describe('[M4, not yet run] summary and hand-off', () => {
     const text = await panel(page).getByLabel(ui.pl.configurator.summary.message).inputValue();
     await panel(page).getByRole('button', { name: ui.pl.configurator.summary.copy }).click();
     await expect(panel(page)).toContainText(ui.pl.configurator.summary.copied);
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+    // The OS clipboard may store CRLF line breaks (Windows); compare the text, not the line endings.
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied.replace(/\r\n/g, '\n')).toBe(text);
   });
 
   test('Telegram link: encoded, within the budget, "@" rule', async ({ page }) => {

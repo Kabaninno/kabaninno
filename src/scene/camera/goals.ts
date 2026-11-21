@@ -8,7 +8,8 @@ import {
   archiveCenterOffset,
   archiveExtents,
 } from '../portfolio/archive-layout';
-import { NODE_CORE_RADIUS } from '../system/constants';
+import { COMET_TAIL_CAPSULE, CORE_CORONA_RADIUS, CORE_KEEP_OUT } from '../system/constants';
+import { CORE_STYLES } from '../universe/core-styles';
 import { planetReach, planetWorldPosition } from '../system/planet-math';
 import type { Vec3 } from '../types';
 import type { CategoryNodeModel, UniverseModel, UniverseNode } from '../universe/model';
@@ -178,7 +179,9 @@ function nodeFraming(node: UniverseNode): { radius: number; margin: number } {
     case 'category':
       return { radius: Math.max(node.systemRadius, 1) + 0.4, margin: 0.86 };
     case 'portfolio':
-      return { radius: 1.2, margin: 0.97 };
+      // The cluster's visible star cloud (and its label reticle), not just its core
+      // (S4: the reticle ran under the HUD).
+      return { radius: 2.3, margin: 0.94 };
     case 'configurator':
       return { radius: 1.8, margin: 0.9 };
   }
@@ -632,15 +635,91 @@ export function systemGoal(
 }
 
 /**
- * Planet focus: the camera looks at the planet's live position (the planet
- * parks on its orbit while focused) from outside its orbit, roughly from the
- * side the system was approached from, so the core lights the planet from
- * the side. The planet with its rings and moons is fitted into the free
- * frame (the panel or sheet covers the rest). The viewing side turns around
- * the planet (nearest yaw first) until the core with its corona is out of
- * the frame, or at least 1.5 planet radii clear of the planet's reach
- * (visual MJ1: a big, close core overlapped the rings and flooded the frame).
+ * Planet focus framing (visual MJ1, S1, S2). Hard limits first, then taste:
+ * - distance: the planet body fills ~42 % of the free frame's short side
+ *   (never under 25 % or over 60 %), its reach (rings, moons) fits inside,
+ *   and the camera stays ≥ minReach reaches away (well past the near plane);
+ * - the camera never stands inside the core's corona or inside any orbit's
+ *   tube — the path a planet (with its rings, moons and trail) sweeps along,
+ *   the focused planet's own orbit included (S1: a side view along the orbit
+ *   put the camera on the planet's trail, in a wash of glow);
+ * - among the sides that pass, the first (smallest change from the approach
+ *   side) where the core is out of frame or 1.5 planet radii clear wins,
+ *   else the one with the least overlap; if no side passes, the camera backs
+ *   off step by step.
  */
+export const PLANET_VIEW = {
+  targetFraction: 0.42,
+  minFraction: 0.25,
+  maxFraction: 0.6,
+  reachFit: 0.85,
+  minReach: 2.6,
+  minDistance: 0.5,
+  /** Camera distance from every orbit path, in that orbit planet's reaches. */
+  orbitClearance: 1.6,
+  /** Camera distance from the core centre, world units (outside the corona). */
+  coreClearance: CORE_CORONA_RADIUS * 1.15,
+  /** The focused planet's own orbit is ignored this close to it (radians). */
+  ownOrbitSkip: 0.45,
+  growth: 1.15,
+  orbitSamples: 32,
+} as const;
+
+/** Distance range of a planet focus: [start, longest] (see PLANET_VIEW). */
+export function planetDistanceRange(
+  orbit: CategoryNodeModel['orbits'][number],
+  tanShort: number,
+): { start: number; longest: number } {
+  const reach = planetReach(orbit);
+  const start = Math.max(
+    orbit.size / (PLANET_VIEW.targetFraction * tanShort),
+    reach / (PLANET_VIEW.reachFit * tanShort),
+    reach * PLANET_VIEW.minReach,
+    PLANET_VIEW.minDistance,
+  );
+  const longest = Math.max(start, orbit.size / (PLANET_VIEW.minFraction * tanShort));
+  return { start, longest };
+}
+
+/**
+ * How far a camera position is from the forbidden zones of a system (world
+ * units; ≥ 0 = allowed): the core's corona and every orbit's tube (orbit
+ * path inflated by `orbitClearance` reaches), skipping the stretch of the
+ * focused planet's own orbit right around it.
+ */
+export function planetCameraMargin(
+  camera: Vec3,
+  node: CategoryNodeModel,
+  focused: CategoryNodeModel['orbits'][number],
+  angle: number,
+): number {
+  let margin = Math.hypot(...sub(camera, node.position)) - PLANET_VIEW.coreClearance;
+  if (CORE_STYLES[node.core].extra === 'comet-tail') {
+    // The comet core's particle tail (S1: a camera inside it sees a wash of particles).
+    const end = add(node.position, [...COMET_TAIL_CAPSULE.end]);
+    margin = Math.min(
+      margin,
+      segmentDistance(camera, node.position, end) - COMET_TAIL_CAPSULE.radius,
+    );
+  }
+  const samples = PLANET_VIEW.orbitSamples;
+  for (const orbit of node.orbits) {
+    const tube = planetReach(orbit) * PLANET_VIEW.orbitClearance;
+    const own = orbit === focused;
+    for (let k = 0; k < samples; k++) {
+      const a = (k / samples) * Math.PI * 2;
+      if (own) {
+        const delta = Math.abs(Math.atan2(Math.sin(a - angle), Math.cos(a - angle)));
+        if (delta < PLANET_VIEW.ownOrbitSkip) continue;
+      }
+      const p = planetWorldPosition(node.position, orbit, a);
+      margin = Math.min(margin, Math.hypot(...sub(camera, p)) - tube);
+      if (margin < -10) return margin;
+    }
+  }
+  return margin;
+}
+
 export function planetGoal(
   node: CategoryNodeModel,
   orbit: CategoryNodeModel['orbits'][number],
@@ -653,14 +732,11 @@ export function planetGoal(
   const planet = planetWorldPosition(node.position, orbit, angle);
   const reach = planetReach(orbit);
   const fov = system.fov;
-  const distance = Math.max(
-    fitDistance(reach * PLANET_FRAMING, reach * PLANET_FRAMING, fov, aspect, frame),
-    reach * 3.2,
-  );
+  const { tanV, tanH } = frameTangents(fov, aspect, frame);
+  const { start, longest } = planetDistanceRange(orbit, Math.min(tanV, tanH));
   const toSystemCamera = normalize(sub(system.position, node.position));
   const outward = normalize(sub(planet, node.position));
   const base = normalize(add(add(toSystemCamera, scale(outward, 0.6)), [0, 0.22, 0]));
-  const { tanV, tanH } = frameTangents(fov, aspect, frame);
   const azimuth = Math.atan2(base[0], base[2]);
   const elevation = Math.asin(clamp(base[1], -1, 1));
   const viewDir = ([yaw, pitch]: readonly [number, number]): Vec3 => {
@@ -668,7 +744,9 @@ export function planetGoal(
     const a = azimuth + yaw;
     return [Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e)];
   };
-  const clearance = (offset: readonly [number, number]) =>
+  const cameraAt = (offset: readonly [number, number], distance: number) =>
+    add(planet, scale(viewDir(offset), distance));
+  const clearance = (offset: readonly [number, number], distance: number) =>
     planetCoreClearance(
       node.position,
       planet,
@@ -679,27 +757,57 @@ export function planetGoal(
       tanV,
       tanH,
     );
+  const allowed = (offset: readonly [number, number], distance: number) =>
+    planetCameraMargin(cameraAt(offset, distance), node, orbit, angle) >= 0;
+  const key = `${node.categoryId}/${orbit.serviceSlug}`;
+  const remember = (offset: readonly [number, number], distance: number): CameraGoal => {
+    if (memo) {
+      memo.key = key;
+      memo.offset = offset;
+    }
+    return { position: cameraAt(offset, distance), lookAt: planet, fov };
+  };
+
+  // Hysteresis: the previous side stays while it is allowed and clear (cheap while
+  // parking). The distance always follows the current frame (S3: a collapsing sheet).
+  if (memo?.key === key && memo.offset) {
+    if (allowed(memo.offset, start) && clearance(memo.offset, start) >= 1) {
+      return remember(memo.offset, start);
+    }
+  }
+
+  for (let distance = start; ; distance = Math.min(distance * PLANET_VIEW.growth, longest)) {
+    let best: readonly [number, number] | null = null;
+    let bestScore = -Infinity;
+    for (const offset of PLANET_VIEW_OFFSETS) {
+      if (!allowed(offset, distance)) continue;
+      const score = clearance(offset, distance);
+      if (score > bestScore) {
+        bestScore = score;
+        best = offset;
+      }
+      if (score >= 1) break;
+    }
+    if (best) {
+      if (memo?.key === key && memo.offset && allowed(memo.offset, distance)) {
+        // Keep the previous side while it is nearly as good.
+        if (clearance(memo.offset, distance) >= Math.min(bestScore, 1) - 0.1) best = memo.offset;
+      }
+      return remember(best, distance);
+    }
+    if (distance >= longest) break;
+  }
+  // Nothing allowed even at the longest distance: the side with the most room.
   let best: readonly [number, number] = [0, 0];
-  let bestScore = -Infinity;
+  let bestMargin = -Infinity;
   for (const offset of PLANET_VIEW_OFFSETS) {
-    const score = clearance(offset);
-    if (score > bestScore) {
-      bestScore = score;
+    const margin = planetCameraMargin(cameraAt(offset, longest), node, orbit, angle);
+    if (margin > bestMargin) {
+      bestMargin = margin;
       best = offset;
     }
-    if (score >= 1) break;
   }
-  // Hysteresis: keep the previous side while it is still (nearly) as good.
-  const key = `${node.categoryId}/${orbit.serviceSlug}`;
-  if (memo?.key === key && memo.offset) {
-    const kept = clearance(memo.offset);
-    if (kept >= Math.min(bestScore, 1) - 0.1) best = memo.offset;
-  }
-  if (memo) {
-    memo.key = key;
-    memo.offset = best;
-  }
-  return { position: add(planet, scale(viewDir(best), distance)), lookAt: planet, fov };
+  return remember(best, longest);
 }
 
 /** Planet focus: the viewing side chosen last time (see planetGoal). */
@@ -714,28 +822,23 @@ export interface PlanetViewMemo {
  */
 const PLANET_VIEW_OFFSETS: ReadonlyArray<readonly [number, number]> = (() => {
   const offsets: Array<[number, number]> = [];
-  for (let step = -10; step <= 10; step++) {
+  for (let step = -12; step <= 12; step++) {
     for (const pitch of [0, 0.3, -0.25, 0.6, 0.9]) offsets.push([step * 0.25, pitch]);
   }
   return offsets.sort(
     (a, b) => Math.abs(a[0]) + Math.abs(a[1]) * 1.2 - (Math.abs(b[0]) + Math.abs(b[1]) * 1.2),
   );
 })();
-/**
- * Radius the system core occupies in planet focus, world units: the core
- * body (slightly enlarged in the system view) plus the inner glow — the
- * corona shrinks and dims while a planet is focused (SystemContent).
- */
-export const CORE_KEEP_OUT = NODE_CORE_RADIUS * 1.1 * 1.6;
+
+export { CORE_KEEP_OUT };
 
 /**
  * How clear the system core is of a planet viewed from `dir` (camera at
  * `planet + dir · distance`, looking at the planet, up = +Y): 1 when the core
  * is outside the frame or at least 1.5 planet radii (`size`) clear of the
  * planet's reach on screen; less when it crowds the planet (0 = touching,
- * negative = overlapping);
- * 0.9 when the core is behind the camera (clear, but the planet is lit from
- * the front, so a side view is preferred).
+ * negative = overlapping); 0.9 when the core is behind the camera (clear,
+ * but the planet is lit from the front, so a side view is preferred).
  */
 export function planetCoreClearance(
   core: Vec3,
@@ -912,6 +1015,13 @@ function rotateY(point: Vec3, center: Vec3, angle: number): Vec3 {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   return [center[0] + dx * c + dz * s, point[1], center[2] - dx * s + dz * c];
+}
+
+/** Distance from `p` to the segment [a, b]. */
+function segmentDistance(p: Vec3, a: Vec3, b: Vec3): number {
+  const ab = sub(b, a);
+  const t = clamp(dot(sub(p, a), ab) / Math.max(dot(ab, ab), 1e-9), 0, 1);
+  return Math.hypot(...sub(p, add(a, scale(ab, t))));
 }
 
 function findCategory(model: UniverseModel, categoryId: string): CategoryNodeModel | undefined {

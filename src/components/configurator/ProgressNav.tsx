@@ -61,7 +61,7 @@ export function ProgressNav({
       </div>
       <ol
         ref={rowRef}
-        className="relative -mx-1 mt-2 flex scroll-thin gap-1 overflow-x-auto px-1 pt-0.5 pb-1.5"
+        className="relative -mx-1 mt-2 flex scroll-thin gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,transparent,#000_0.75rem,#000_calc(100%-0.75rem),transparent)] px-1 pt-0.5 pb-1.5"
       >
         {CONFIGURATOR_STEPS.map((step, position) => {
           const isCurrent = step === current;

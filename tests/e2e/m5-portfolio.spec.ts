@@ -49,7 +49,7 @@ test.describe('[M5, not yet run] portfolio index', () => {
     ).toHaveAttribute('aria-current', 'true');
     const length = await page.evaluate(() => history.length);
 
-    const chip = filter.getByRole('link', { name: categoryName(locale, category) });
+    const chip = filter.getByRole('link', { name: categoryName(locale, category), exact: true });
     // Plain links: they also work without JavaScript.
     await expect(chip).toHaveAttribute(
       'href',
@@ -75,7 +75,7 @@ test.describe('[M5, not yet run] portfolio index', () => {
     await page.goBack();
     await expect(page).toHaveURL(new RegExp(`\\?category=${escapeRegExp(category)}$`));
     await expect(
-      panel(page).getByRole('link', { name: categoryName(locale, category) }),
+      panel(page).getByRole('link', { name: categoryName(locale, category), exact: true }),
     ).toHaveAttribute('aria-current', 'true');
   });
 });

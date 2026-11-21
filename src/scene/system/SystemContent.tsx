@@ -17,7 +17,13 @@ import { CORE_STYLES } from '../universe/core-styles';
 import type { CategoryNodeModel } from '../universe/model';
 import type { UniverseRuntimeRef } from '../universe/runtime';
 import { pixelsPerUnit } from '../universe/screen-size';
-import { CORONA_SCALE, NODE_CORE_RADIUS, SYSTEM_DETAIL_EPSILON, systemDetail } from './constants';
+import {
+  CORONA_SCALE,
+  NODE_CORE_RADIUS,
+  SYSTEM_DETAIL_EPSILON,
+  systemDetail,
+  COMET_TAIL_LENGTH,
+} from './constants';
 import { CoreExtraMesh } from './CoreExtras';
 import { Planet, type SystemRuntime } from './Planet';
 import {
@@ -25,6 +31,7 @@ import {
   planetLocalPosition,
   planetSpeedTarget,
   planetScreenBoost,
+  focusCoreLook,
 } from './planet-math';
 
 export { NODE_CORE_RADIUS, SYSTEM_DETAIL_EPSILON, systemDetail };
@@ -33,10 +40,7 @@ export { NODE_CORE_RADIUS, SYSTEM_DETAIL_EPSILON, systemDetail };
 const SPEED_RATE = 2.2;
 /** Brightness of a focused planet's siblings. */
 const SIBLING_DIM = 0.32;
-/** Brightness of the core (and its corona) while a planet is focused (visual MJ1). */
-const FOCUS_CORE_DIM = 0.5;
 /** Comet tail length, world units. */
-const COMET_TAIL_LENGTH = 1.5;
 
 interface SystemContentProps {
   node: CategoryNodeModel;
@@ -101,7 +105,7 @@ export function SystemContent({
   });
   const invalidate = useThree((state) => state.invalidate);
   const [compiled, setCompiled] = useState(false);
-  const coreDimRef = useRef(1);
+  const coreLookRef = useRef({ dim: 1, corona: 1 });
   // Read once when the compile starts (a later change must not restart it).
   const priorityRef = useRef(priority);
   const style = CORE_STYLES[node.core];
@@ -187,10 +191,17 @@ export function SystemContent({
     shared.uCorePos.value.copy(s.center);
 
     // A focused planet takes the stage: the core steps back.
-    const coreDimTarget = focusedService ? FOCUS_CORE_DIM : 1;
-    coreDimRef.current +=
-      (coreDimTarget - coreDimRef.current) * (rt.animated ? dampFactor(2.5, dt) : 1);
-    const coreDim = coreDimRef.current;
+    // Inner orbits, where no side clears the core, dim it harder (visual MJ1, S2).
+    const look = focusCoreLook(
+      focusedService
+        ? node.orbits.find((orbit) => orbit.serviceSlug === focusedService)
+        : undefined,
+    );
+    const lookK = rt.animated ? dampFactor(2.5, dt) : 1;
+    const coreLook = coreLookRef.current;
+    coreLook.dim += (look.dim - coreLook.dim) * lookK;
+    coreLook.corona += (look.corona - coreLook.corona) * lookK;
+    const coreDim = coreLook.dim;
     const core = coreRef.current;
     if (core) {
       core.scale.setScalar(scale * 1.002);
@@ -204,9 +215,7 @@ export function SystemContent({
     const corona = coronaRef.current;
     if (corona) {
       // The corona also shrinks around a focused planet (MJ1: CORE_KEEP_OUT in goals.ts).
-      corona.scale.setScalar(
-        scale * CORONA_SCALE * (0.55 + 0.45 * ((coreDim - FOCUS_CORE_DIM) / (1 - FOCUS_CORE_DIM))),
-      );
+      corona.scale.setScalar(scale * CORONA_SCALE * coreLook.corona);
       const uniforms = (corona.material as ShaderMaterial).uniforms;
       uniforms.uIntensity.value = detail * 0.8 * coreDim;
       uniforms.uCoreRadius.value = NODE_CORE_RADIUS * scale;

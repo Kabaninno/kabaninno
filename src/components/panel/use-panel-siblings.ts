@@ -44,7 +44,12 @@ export function usePanelSiblings(
 
   useEffect(() => {
     if (previous === undefined || next === undefined) return;
+    // One move per panel: until the next route's panel mounts (it brings its
+    // own neighbours), a second key press here would repeat the same move.
+    let moved = false;
     const go = (step: PlanetStep) => {
+      if (moved) return;
+      moved = true;
       const path = step === 'next' ? next : previous;
       if (history === 'push') router.push(path);
       else router.replace(path);

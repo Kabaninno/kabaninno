@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { minCoreDiameterPx } from '../camera/goals';
-import { coreWorldRadius, orbitClearanceScale, pixelsPerUnit, smallCoreBoost } from './screen-size';
+import {
+  coreWorldRadius,
+  orbitClearanceScale,
+  pixelsPerUnit,
+  smallCoreBoost,
+  nodeVisualRadiusPx,
+  presenceInFrame,
+} from './screen-size';
 
 describe('screen-size rules', () => {
   it('converts world units to CSS px at a depth', () => {
@@ -43,5 +50,30 @@ describe('screen-size rules', () => {
     expect(smallCoreBoost(40)).toBe(0);
     expect(smallCoreBoost(20)).toBeGreaterThan(0);
     expect(smallCoreBoost(20)).toBeLessThan(1);
+  });
+});
+
+describe('node presence by visual extent (MN-2, S5, S6)', () => {
+  const frame = { left: 0, top: 64, right: 390, bottom: 364 };
+
+  it('measures what a node visibly occupies, not just its core', () => {
+    // A category's orbit preview reaches far beyond its core.
+    expect(nodeVisualRadiusPx('category', 20, 40, 1.6)).toBeCloseTo(1.6 * 0.8 * 40, 9);
+    expect(nodeVisualRadiusPx('category', 20, 1, 1.6)).toBeCloseTo(16, 9);
+    // The beacon's crystal is stretched 1.6× and glows.
+    expect(nodeVisualRadiusPx('configurator', 20, 40)).toBeGreaterThan(20);
+    expect(nodeVisualRadiusPx('portfolio', 20, 40)).toBeGreaterThanOrEqual(80);
+  });
+
+  it('fades a node whose visible extent crosses the frame edge (HUD, panel, sheet)', () => {
+    expect(presenceInFrame(200, 200, 30, frame)).toBe(1);
+    // Centre inside, but the crystal reaches under the HUD (S5).
+    const beacon = nodeVisualRadiusPx('configurator', 30, 40);
+    expect(presenceInFrame(60, 64 + 2, beacon, frame)).toBeLessThan(0.05);
+    // Orbits cut by the panel edge on the right (S6).
+    const automation = nodeVisualRadiusPx('category', 18, 60, 1.6);
+    expect(presenceInFrame(370, 250, automation, frame)).toBeLessThan(0.05);
+    // Just touching the edge (within the tolerance) stays.
+    expect(presenceInFrame(200, 64 + 30 - 5, 30, frame)).toBe(1);
   });
 });

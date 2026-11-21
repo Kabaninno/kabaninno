@@ -36,7 +36,13 @@ import {
   type UniverseRuntime,
 } from './runtime';
 import { SelectionLinks } from './SelectionLinks';
-import { coreWorldRadius, pixelsPerUnit, smallCoreBoost } from './screen-size';
+import {
+  coreWorldRadius,
+  nodeVisualRadiusPx,
+  pixelsPerUnit,
+  presenceInFrame,
+  smallCoreBoost,
+} from './screen-size';
 
 /** True world radius of each node kind's core (portfolio: the cluster's bright core). */
 const BASE_RADIUS: Record<UniverseNode['kind'], number> = {
@@ -44,12 +50,7 @@ const BASE_RADIUS: Record<UniverseNode['kind'], number> = {
   configurator: BEACON_CORE_RADIUS,
   portfolio: 1.1,
 };
-/** Presence fade: tolerance and fade distance outside the free frame, CSS px. */
-const PRESENCE_TOLERANCE_PX = 6;
-const PRESENCE_FADE_PX = 28;
 const PRESENCE_RATE = 6;
-/** Visible disc of a node relative to its core radius (core plus inner halo). */
-const PRESENCE_DISC = 1.6;
 
 /** Share of the minimum on-screen core size each kind gets. */
 const MIN_SIZE_SHARE: Record<UniverseNode['kind'], number> = {
@@ -221,21 +222,23 @@ export function Universe({
       rt.inFront[i] = inFront;
       const focusTarget =
         node.key === focusKey || (shared.focusDriven && node.key === shared.focusTo);
-      // The node's glowing disc, not just its centre: a node never shows clipped by
-      // the frame edge (visual MN-2, mn4) — it fades as soon as its disc crosses it.
-      const disc = ((rt.corePx[i] ?? 0) / 2) * PRESENCE_DISC;
-      const outside = Math.max(
-        frameLeft - (sx - disc),
-        sx + disc - frameRight,
-        frameTop - (sy - disc),
-        sy + disc - frameBottom,
-        0,
+      // What the node visibly occupies, not just its centre: it never shows clipped
+      // by the free frame's edge (HUD, panel, sheet) — it fades once that crosses it.
+      const visual = nodeVisualRadiusPx(
+        node.kind,
+        rt.corePx[i] ?? 0,
+        ppu,
+        node.kind === 'category' ? node.systemRadius : 0,
       );
       const presenceTarget =
         focusTarget || !inFront
           ? 1
-          : 1 -
-            smoothstep(PRESENCE_TOLERANCE_PX, PRESENCE_TOLERANCE_PX + PRESENCE_FADE_PX, outside);
+          : presenceInFrame(sx, sy, visual, {
+              left: frameLeft,
+              top: frameTop,
+              right: frameRight,
+              bottom: frameBottom,
+            });
       const presence = rt.presence[i]! + (presenceTarget - rt.presence[i]!) * presenceK;
       rt.presence[i] = presence;
       if (Math.abs(presenceTarget - presence) > 0.002) settling = true;
@@ -295,9 +298,4 @@ export function Universe({
       <NodeLabels model={model} runtime={runtime} busRef={busRef} reducedMotion={reducedMotion} />
     </group>
   );
-}
-
-function smoothstep(edge0: number, edge1: number, x: number): number {
-  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
-  return t * t * (3 - 2 * t);
 }

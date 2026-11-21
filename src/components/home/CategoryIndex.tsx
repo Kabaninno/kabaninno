@@ -20,7 +20,7 @@ const HINT_ID = 'home-explore';
 /** Glass chip on phones, quiet right-aligned link from md up. */
 const ITEM_LINK =
   'group flex min-h-11 items-center gap-2.5 rounded-full glass px-3.5 text-sm text-ink transition-[background-color,border-color,color] duration-200 ease-calm ' +
-  'hover:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] hover:bg-[rgb(10_14_28/0.8)] focus-visible:border-[var(--accent)] active:bg-[rgb(10_14_28/0.9)] ' +
+  'hover:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] hover:bg-[rgb(10_14_28/0.8)] focus-visible:outline-offset-[-1px] active:bg-[rgb(10_14_28/0.9)] ' +
   'md:border-transparent md:bg-transparent md:px-3 md:text-muted md:text-halo md:[backdrop-filter:none] md:hover:bg-[rgb(10_14_28/0.55)] md:hover:text-ink md:pointer-fine:min-h-9 ' +
   'short:gap-2 short:px-2.5 short:text-[0.8125rem]';
 

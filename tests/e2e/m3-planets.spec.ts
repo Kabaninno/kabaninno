@@ -56,6 +56,9 @@ test.describe('[M3, not yet run] planet switching with ←/→', () => {
     await expect(page).toHaveURL(at(second.path));
     await expect(page.locator('main h1')).toHaveText(serviceTitle(locale, crm.id, second.slug));
     await page.keyboard.press('ArrowLeft');
+    // Each panel handles one move (its neighbours); wait for the next planet.
+    await expect(page).toHaveURL(at(first.path));
+    await expect(page.locator('main h1')).toHaveText(serviceTitle(locale, crm.id, first.slug));
     await page.keyboard.press('ArrowLeft');
     await expect(page).toHaveURL(at(last.path));
     expect(await historyLength(page), 'router.replace').toBe(length);
@@ -217,7 +220,9 @@ async function swipe(
   { fromX, toX, y, toY = y }: { fromX: number; toX: number; y: number; toY?: number },
 ) {
   const cdp = await page.context().newCDPSession(page);
-  const steps = 6;
+  // Few moves: under software GL each dispatched move waits for a busy main
+  // thread, and six of them stretched a quick flick past the 700 ms swipe limit.
+  const steps = 2;
   await cdp.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
     touchPoints: [{ x: fromX, y }],

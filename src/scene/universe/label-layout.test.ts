@@ -114,3 +114,30 @@ describe('layoutLabel', () => {
     expect(formatOrdinal(12, 30)).toBe('12 / 30');
   });
 });
+
+describe('leader never crosses the text (S4)', () => {
+  it('keeps the run above or below the text box, also when clamped', () => {
+    // A huge reticle near the right edge of a phone frame (the dormant portfolio
+    // cluster): nothing fits, the text is clamped into the bounds.
+    const cases: LabelInput[] = [
+      input({
+        x: 300,
+        y: 240,
+        coreRadiusPx: 120,
+        textWidth: 150,
+        compactWidth: 140,
+        bounds: PHONE,
+      }),
+      input({ x: 40, y: 90, coreRadiusPx: 90, textWidth: 150, compactWidth: 140, bounds: PHONE }),
+      input({}),
+      input({ x: 1400, y: 600, coreRadiusPx: 40 }),
+    ];
+    for (const i of cases) {
+      const layout = layoutLabel(i);
+      const top = layout.textY;
+      const bottom = layout.textY + i.textHeight;
+      const leader = layout.leaderY;
+      expect(leader <= top || leader >= bottom, JSON.stringify(layout)).toBe(true);
+    }
+  });
+});

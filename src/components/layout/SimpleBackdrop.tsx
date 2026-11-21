@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { getCategories } from '~/content';
 import { withBasePath } from '@/lib/base-path';
 import { SIMPLE_SKY_TILES, buildConstellation } from '@/lib/simple-sky';
@@ -32,12 +33,16 @@ export function SimpleBackdrop() {
     <div
       className="simple-sky"
       aria-hidden="true"
-      style={{
-        backgroundImage: SIMPLE_SKY_TILES.map((tile) => `url("${withBasePath(tile.file)}")`).join(
-          ', ',
-        ),
-        backgroundSize: SIMPLE_SKY_TILES.map((tile) => `${tile.size}px ${tile.size}px`).join(', '),
-      }}
+      // Painted by `.simple-sky::before` (globals.css), which fades the stars
+      // behind the hero and the index.
+      style={
+        {
+          '--sky-image': SIMPLE_SKY_TILES.map((tile) => `url("${withBasePath(tile.file)}")`).join(
+            ', ',
+          ),
+          '--sky-size': SIMPLE_SKY_TILES.map((tile) => `${tile.size}px ${tile.size}px`).join(', '),
+        } as CSSProperties
+      }
     >
       <svg
         className="simple-constellation"

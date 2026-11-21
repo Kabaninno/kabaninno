@@ -210,6 +210,7 @@
   color: var(--color-muted);
   /* Dark halo: a star or bloom right behind a micro-label must not read as a diacritic (L-01). */
   text-shadow:
+    0 0 3px rgb(5 7 13),
     0 0 6px rgb(5 7 13 / 0.9),
     0 0 14px rgb(5 7 13 / 0.5);
 }
@@ -217,6 +218,7 @@
 /* The same halo for text that sits directly over the scene (home index on md+). */
 @utility text-halo {
   text-shadow:
+    0 0 3px rgb(5 7 13),
     0 0 6px rgb(5 7 13 / 0.9),
     0 0 14px rgb(5 7 13 / 0.5);
 }
@@ -373,7 +375,21 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
+  }
+
+  /*
+   * The star tiles (URLs from SimpleBackdrop). Faded towards the bottom,
+   * where the hero and the index sit, so no star reads as a diacritic over
+   * their text (F2: a star above "aplikacje").
+   */
+  .simple-sky::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--sky-image);
+    background-size: var(--sky-size);
     background-repeat: repeat;
+    mask-image: linear-gradient(to bottom, #000 45%, rgb(0 0 0 / 0.2) 75%);
   }
 
   [data-simple] .simple-sky {
@@ -398,6 +414,20 @@
       height: calc(100% - var(--hud-offset) - 1rem);
       left: 45%;
       width: 52%;
+    }
+  }
+
+  /*
+   * With a content panel open, keep the constellation in the free area: above
+   * the bottom sheet on phones, left of the side column (440 px + gutter).
+   */
+  [data-simple]:has([data-sheet]) .simple-constellation {
+    height: calc(36% - var(--hud-offset));
+
+    @variant side {
+      left: 1.5rem;
+      width: calc(100% - min(440px, 58vw) - 3.5rem);
+      height: calc(100% - var(--hud-offset) - 2rem);
     }
   }
 

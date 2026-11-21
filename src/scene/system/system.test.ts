@@ -200,3 +200,22 @@ describe('system materials', () => {
     cache.dispose();
   });
 });
+
+describe('focus core look (S2)', () => {
+  it('dims the core harder where no side can clear it', async () => {
+    const { coreClearable, focusCoreLook } = await import('./planet-math');
+    const { CORE_KEEP_OUT } = await import('./constants');
+    const orbits = model.categories.flatMap((node) => node.orbits);
+    expect(focusCoreLook(undefined)).toEqual({ dim: 1, corona: 1 });
+    for (const orbit of orbits) {
+      const clearable = orbit.radius >= CORE_KEEP_OUT + planetReach(orbit) + 1.5 * orbit.size;
+      expect(coreClearable(orbit)).toBe(clearable);
+      const look = focusCoreLook(orbit);
+      expect(look.dim).toBeLessThanOrEqual(0.5);
+      if (!clearable) expect(look.dim).toBeLessThanOrEqual(0.3);
+      expect(look.corona).toBeLessThan(0.6);
+    }
+    // The content has both kinds (inner orbits exist).
+    expect(orbits.some((orbit) => !coreClearable(orbit))).toBe(true);
+  });
+});

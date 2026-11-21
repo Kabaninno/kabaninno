@@ -35,10 +35,14 @@ export interface PanelShellProps {
  *   SafeAreaPublisher. The handle sits on an opaque strip above the top
  *   scroll fade, so it keeps its contrast over scrolled content (V5-05).
  * - The scrolling section exposes its paddings as `--panel-px` /
- *   `--panel-pb`, so full-bleed children (the wizard's sticky footer) can
- *   cancel them exactly.
- * - `touch-action: pan-y pinch-zoom`: vertical scrolling and zoom stay
- *   native, horizontal swipes reach the planet-switching handlers.
+ *   `--panel-pb` (the bottom one applied by the content wrapper), so
+ *   full-bleed children (the wizard's sticky footer) can cancel them.
+ * - `touch-action: pan-y pinch-zoom` on the frame AND on the scrolling
+ *   section: vertical scrolling and zoom stay native, horizontal swipes reach
+ *   the planet-switching handlers. The section needs its own value: it is a
+ *   scroll container, and the browser only looks at elements up to the
+ *   nearest one, so the frame's value alone let Chrome take horizontal
+ *   gestures over (pointercancel, no swipe; found by the M3 e2e in F2).
  * - Marked as a scene overlay, so the camera frames the scene beside it, and
  *   as route UI, so it fades out when the route changes (`RouteExit`).
  * - Scroll-edge fades follow `data-scrolled` / `data-more` on the frame; they
@@ -87,9 +91,17 @@ export function PanelShell({
         ref={scrollRef}
         aria-labelledby={labelledBy}
         tabIndex={0}
-        className="min-h-0 flex-1 scroll-thin overflow-y-auto rounded-[inherit] px-[var(--panel-px)] pt-3 pb-[var(--panel-pb)] [--panel-pb:max(1.5rem,env(safe-area-inset-bottom))] [--panel-px:1.25rem] focus-visible:outline-offset-[-3px] side:pt-7 side:[--panel-pb:2rem] side:[--panel-px:1.75rem] short:side:pt-4 short:side:[--panel-pb:1.25rem] short:side:[--panel-px:1.25rem]"
+        className="min-h-0 flex-1 touch-pan-y touch-pinch-zoom scroll-thin overflow-y-auto rounded-[inherit] px-[var(--panel-px)] pt-3 [--panel-pb:max(1.5rem,env(safe-area-inset-bottom))] [--panel-px:1.25rem] focus-visible:outline-offset-[-3px] side:pt-7 side:[--panel-pb:2rem] side:[--panel-px:1.75rem] short:side:pt-4 short:side:[--panel-pb:1.25rem] short:side:[--panel-px:1.25rem]"
       >
-        <div ref={contentRef}>{children}</div>
+        {/*
+          The bottom padding lives on the content, not on the scroller: sticky
+          children (the wizard footer) then stick flush to the visible bottom
+          edge (Chrome insets sticky by the scroller's padding: F2 saw a 24 px
+          gap under the footer).
+        */}
+        <div ref={contentRef} className="pb-[var(--panel-pb)]">
+          {children}
+        </div>
       </section>
       {/* Top fade (content scrolled away above), starting under the mobile handle strip. */}
       <div

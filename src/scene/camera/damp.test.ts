@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { dampFactor, smoothDamp, smoothDampVec3 } from './damp';
+import { MOTION } from '../config';
+import { FAST_REFRAME, dampFactor, reframeSmoothTime, smoothDamp, smoothDampVec3 } from './damp';
 
 describe('smoothDamp', () => {
   it('converges to the target without overshooting', () => {
@@ -44,5 +45,30 @@ describe('dampFactor', () => {
   it('is 0 for no time and approaches 1 for long steps', () => {
     expect(dampFactor(10, 0)).toBe(0);
     expect(dampFactor(10, 10)).toBeCloseTo(1, 6);
+  });
+});
+
+describe('fast reframe after a frame change (S3)', () => {
+  /** Seconds until a damped value is within 5 % of a unit step (60 fps). */
+  function settleTime(smoothTime: number): number {
+    const state = { value: 0, velocity: 0 };
+    const dt = 1 / 60;
+    for (let t = 0; t < 5; t += dt) {
+      smoothDamp(state, 1, smoothTime, dt);
+      if (Math.abs(1 - state.value) < 0.05 && Math.abs(state.velocity) < 0.5) return t + dt;
+    }
+    return Infinity;
+  }
+
+  it('settles within ~0.6 s, where the normal smoothing takes much longer', () => {
+    expect(settleTime(FAST_REFRAME.smoothTime)).toBeLessThanOrEqual(0.6);
+    expect(settleTime(MOTION.cameraSmoothTime)).toBeGreaterThan(1);
+    // The fast window outlasts the settle time.
+    expect(FAST_REFRAME.ms / 1000).toBeGreaterThan(settleTime(FAST_REFRAME.smoothTime));
+  });
+
+  it('uses the fast smoothing only inside the window', () => {
+    expect(reframeSmoothTime(100, 500, 0.62)).toBe(FAST_REFRAME.smoothTime);
+    expect(reframeSmoothTime(600, 500, 0.62)).toBe(0.62);
   });
 });

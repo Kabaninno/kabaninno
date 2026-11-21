@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getCategories } from '~/content';
 import { CAMERA } from '../config';
 import type { SceneManifest, Vec3 } from '../types';
+import { COMET_TAIL_CAPSULE, CORE_CORONA_RADIUS } from '../system/constants';
 import { planetReach, planetWorldPosition } from '../system/planet-math';
 import { buildUniverseModel } from '../universe/model';
 import {
@@ -17,6 +18,7 @@ import {
   overviewGoal,
   minCoreDiameterPx,
   CORE_KEEP_OUT,
+  PLANET_VIEW,
   SYSTEM_FIT,
   resolveSafeFrame,
   selectionGoal,
@@ -766,5 +768,159 @@ describe('configurator framing lift (MN-4)', () => {
         }
       }
     }
+  });
+});
+
+describe('planet focus invariants for every service (S1, S2)', () => {
+  const views = [
+    [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+    [PHONE_VIEW, PHONE_SHEET_RECT],
+  ] as const;
+
+  /** Distance from a point to an orbit path (sampled), optionally skipping a window around `skip`. */
+  function orbitDistance(
+    point: Vec3,
+    node: (typeof model.categories)[number],
+    orbit: (typeof node.orbits)[number],
+    skip?: number,
+  ) {
+    let best = Infinity;
+    for (let k = 0; k < 360; k++) {
+      const a = (k / 360) * Math.PI * 2;
+      if (skip !== undefined) {
+        const delta = Math.abs(Math.atan2(Math.sin(a - skip), Math.cos(a - skip)));
+        if (delta < PLANET_VIEW.ownOrbitSkip) continue;
+      }
+      best = Math.min(best, dist(point, planetWorldPosition(node.position, orbit, a)));
+    }
+    return best;
+  }
+
+  it('keeps the camera clear of the planet, the core, every orbit and the near plane', () => {
+    expect(model.categories.reduce((n, node) => n + node.orbits.length, 0)).toBe(20);
+    for (const [view, rect] of views) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      for (const node of model.categories) {
+        for (const orbit of node.orbits) {
+          for (const angle of [orbit.phase, 0, 1.3, 2.6, 4.1, 5.5]) {
+            const goal = computeCameraGoal(
+              { mode: 'planet', category: node.categoryId, service: orbit.serviceSlug },
+              model,
+              view.width / view.height,
+              frame,
+              { planetAngle: angle },
+            );
+            const planet = planetWorldPosition(node.position, orbit, angle);
+            const reach = planetReach(orbit);
+            const camera = goal.position;
+            const label = `${node.categoryId}/${orbit.serviceSlug} @${angle.toFixed(2)} ${view.width}`;
+            expect(dist(camera, planet), label).toBeGreaterThanOrEqual(reach * 2.5);
+            expect(dist(camera, planet), label).toBeGreaterThan(0.4);
+            expect(dist(camera, node.position), label).toBeGreaterThan(CORE_CORONA_RADIUS);
+            if (node.core === 'comet') {
+              // Outside the comet core's particle tail.
+              const end: Vec3 = [
+                node.position[0] + COMET_TAIL_CAPSULE.end[0],
+                node.position[1] + COMET_TAIL_CAPSULE.end[1],
+                node.position[2] + COMET_TAIL_CAPSULE.end[2],
+              ];
+              let nearest = Infinity;
+              for (let k = 0; k <= 50; k++) {
+                const t = k / 50;
+                nearest = Math.min(
+                  nearest,
+                  dist(camera, [
+                    node.position[0] + (end[0] - node.position[0]) * t,
+                    node.position[1] + (end[1] - node.position[1]) * t,
+                    node.position[2] + (end[2] - node.position[2]) * t,
+                  ]),
+                );
+              }
+              expect(nearest, `${label} comet tail`).toBeGreaterThanOrEqual(
+                COMET_TAIL_CAPSULE.radius - 0.01,
+              );
+            }
+            for (const other of node.orbits) {
+              const clearance = orbitDistance(
+                camera,
+                node,
+                other,
+                other === orbit ? angle : undefined,
+              );
+              expect(clearance, `${label} vs ${other.serviceSlug}`).toBeGreaterThanOrEqual(
+                planetReach(other),
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('shows the planet body at 25–60 % of the free rect short side', () => {
+    for (const [view, rect] of views) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      const short = Math.min(rect.width, rect.height);
+      for (const node of model.categories) {
+        for (const orbit of node.orbits) {
+          const goal = computeCameraGoal(
+            { mode: 'planet', category: node.categoryId, service: orbit.serviceSlug },
+            model,
+            view.width / view.height,
+            frame,
+          );
+          const planet = planetWorldPosition(node.position, orbit, orbit.phase);
+          const p = projectPx(goal, planet, view, frame, orbit.size);
+          const fraction = (2 * p.r) / short;
+          const label = `${node.categoryId}/${orbit.serviceSlug} ${view.width}`;
+          expect(fraction, label).toBeGreaterThanOrEqual(0.25 - 0.01);
+          expect(fraction, label).toBeLessThanOrEqual(0.6 + 0.01);
+          // Its rings and moons stay inside the rect.
+          expect(sphereInRect(goal, planet, planetReach(orbit), view, frame, rect), label).toBe(
+            true,
+          );
+        }
+      }
+    }
+  });
+});
+
+describe('portfolio framing room in the overview (S4)', () => {
+  it('keeps the whole cluster (and its reticle) inside the free rect, clear of the HUD', () => {
+    for (const [view, rect] of [
+      [DESKTOP_VIEW, DESKTOP_HOME_RECT],
+      [DESKTOP_VIEW, { x: 560, y: 72, width: 880, height: 560 }],
+    ] as const) {
+      const { goal, frame } = goalFor({ mode: 'universe' }, view, rect);
+      expect(sphereInRect(goal, model.portfolio.position, 2.1, view, frame, rect)).toBe(true);
+    }
+  });
+});
+
+describe('planet focus follows the free frame (S3)', () => {
+  it('re-targets the planet size when the sheet collapses, keeping the chosen side', () => {
+    const node = model.categories[0]!;
+    const orbit = node.orbits[0]!;
+    const target = {
+      mode: 'planet' as const,
+      category: node.categoryId,
+      service: orbit.serviceSlug,
+    };
+    const memo = {};
+    const sheet = resolveSafeFrame(PHONE_SHEET_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
+    const collapsedRect = { x: 0, y: 64, width: 390, height: 560 };
+    const collapsed = resolveSafeFrame(collapsedRect, PHONE_VIEW.width, PHONE_VIEW.height);
+    const aspect = PHONE_VIEW.width / PHONE_VIEW.height;
+    const before = computeCameraGoal(target, model, aspect, sheet, { planetView: memo });
+    const after = computeCameraGoal(target, model, aspect, collapsed, { planetView: memo });
+    const fresh = computeCameraGoal(target, model, aspect, collapsed);
+    const planet = planetWorldPosition(node.position, orbit, orbit.phase);
+    // The bigger free area brings the camera closer (same body share of a bigger rect)…
+    expect(dist(after.position, planet)).not.toBeCloseTo(dist(before.position, planet), 3);
+    // …to the same distance a fresh framing of that area would use.
+    expect(dist(after.position, planet)).toBeCloseTo(dist(fresh.position, planet), 6);
+    const p = projectPx(after, planet, PHONE_VIEW, collapsed, orbit.size);
+    const fraction = (2 * p.r) / Math.min(collapsedRect.width, collapsedRect.height);
+    expect(fraction).toBeGreaterThan(0.25);
   });
 });

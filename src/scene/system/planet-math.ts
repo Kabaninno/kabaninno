@@ -1,3 +1,4 @@
+import { CORE_KEEP_OUT } from './constants';
 import { SYSTEM_BASE_TILT } from '../config';
 import { orbitPosition } from '../orbit-math';
 import type { Vec3 } from '../types';
@@ -66,4 +67,20 @@ export function planetScreenBoost(size: number, pxPerUnit: number): number {
   const px = 2 * size * pxPerUnit;
   if (!(px > 0)) return 1;
   return Math.min(Math.max(MIN_PLANET_DIAMETER_PX / px, 1), MAX_PLANET_BOOST);
+}
+
+/**
+ * Whether a planet-focus camera can keep the system core clear of this planet
+ * at all (out of frame or 1.5 planet radii away): not for inner orbits, where
+ * the core's keep-out plus the planet's reach exceed the orbit radius. There
+ * the core dims and shrinks harder instead (visual S2).
+ */
+export function coreClearable(orbit: OrbitPreview): boolean {
+  return orbit.radius >= CORE_KEEP_OUT + planetReach(orbit) + 1.5 * orbit.size;
+}
+
+/** Core brightness and corona scale while a planet is focused (1 = normal). */
+export function focusCoreLook(orbit: OrbitPreview | undefined): { dim: number; corona: number } {
+  if (!orbit) return { dim: 1, corona: 1 };
+  return coreClearable(orbit) ? { dim: 0.5, corona: 0.55 } : { dim: 0.28, corona: 0.4 };
 }

@@ -113,8 +113,11 @@ test('the hero waits for the flight home and reveals on its progress', async ({ 
   test.info().annotations.push({ type: 'reveal reason', description: reason ?? '' });
   expect(['flight', 'flight-end']).toContain(reason);
   await page.clock.resume();
-  await expect(hero).toHaveCSS('opacity', '1');
   await expect(hero).not.toHaveClass(/ui-enter-pending/);
+  // The 250 ms entrance itself runs in real time; with the fake clock just
+  // resumed, software GL renders the backlog of scene frames first, which can
+  // hold the CSS animation's start for several seconds (F2 flake, 1 in 3).
+  await expect(hero).toHaveCSS('opacity', '1', { timeout: 30_000 });
 });
 
 test('a panel waits for the flight to its system, then reveals (V2-06)', async ({ page }) => {
@@ -176,7 +179,10 @@ test('the outgoing UI fades out as a dead ghost', async ({ page }) => {
   expect(ghost!.clean, 'no ids or overlay markers in the ghost').toBe(true);
   expect(ghost!.inert, 'ghost is inert and aria-hidden').toBe(true);
   expect(ghost!.removed, 'ghost removed').toBeDefined();
-  expect(ghost!.removed! - ghost!.added).toBeLessThan(700);
+  // 150 ms fade + a 400 ms fallback timer; software GL can block the main
+  // thread for a few hundred ms while the system's shaders compile on entry,
+  // which delays both (F2: 949 ms with two workers). Still: never stuck.
+  expect(ghost!.removed! - ghost!.added).toBeLessThan(1500);
   await expect(page.locator('.ui-exit-layer')).toHaveCount(0);
 
   // The panel leaving (back to the universe) fades too, once it has fully

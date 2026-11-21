@@ -36,7 +36,8 @@ async function recordSimpleBeforeBody(page: Page) {
           }
         }
       }
-    }).observe(document.documentElement, { childList: true });
+      // Init scripts run before <html> exists: watch the whole document.
+    }).observe(document, { childList: true, subtree: true });
   });
 }
 
@@ -97,7 +98,8 @@ test.describe('simple (2D) mode', () => {
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
     await expect(toggle).toHaveAttribute('aria-disabled', 'true');
     await expect(toggle).toHaveAccessibleDescription(ui[locale].hud.simpleModeForced);
-    await toggle.click();
+    // aria-disabled keeps it focusable; Playwright treats it as disabled, hence `force`.
+    await toggle.click({ force: true });
     await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
     // Panels and the hero never wait for flights (D44/D60).
@@ -234,7 +236,7 @@ test.describe('mobile fixes', () => {
     page,
   }) => {
     await page.goto(sitePath(localized(locale, planet.path)));
-    const crumbs = page.locator('main nav ol');
+    const crumbs = page.getByRole('navigation', { name: ui[locale].common.breadcrumbs });
     await expect(crumbs.locator('a').first()).toBeVisible();
     const current = crumbs.locator('[aria-current="page"]');
     await expect(current).toBeAttached();

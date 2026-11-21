@@ -23,7 +23,12 @@ export function Breadcrumbs({ label, items }: { label: string; items: readonly B
           <li
             key={`${index}-${item.label}`}
             className={`flex items-center gap-1 ${
-              index === 0 ? 'shrink-0' : item.href ? 'min-w-0' : 'sr-only min-w-0 side:not-sr-only'
+              index === 0
+                ? 'shrink-0'
+                : item.href
+                  ? 'min-w-0'
+                  : // The current page gives way first (it repeats the h1 below).
+                    'sr-only min-w-0 shrink-[8] side:not-sr-only'
             }`}
           >
             {index > 0 ? (

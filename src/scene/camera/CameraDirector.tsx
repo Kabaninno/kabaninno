@@ -13,7 +13,13 @@ import { CAMERA, MOTION } from '../config';
 import { focusKeyForTarget } from '../node-ids';
 import { isPerspectiveCamera } from '../three-utils';
 import type { UniverseModel } from '../universe/model';
-import { dampFactor, smoothDamp, type ScalarDampState } from './damp';
+import {
+  FAST_REFRAME,
+  dampFactor,
+  reframeSmoothTime,
+  smoothDamp,
+  type ScalarDampState,
+} from './damp';
 import {
   FLIGHT_PROFILES,
   classifyFlight,
@@ -65,6 +71,8 @@ const TOUCHES = { one: ACTION.TOUCH_ROTATE, two: ACTION.TOUCH_DOLLY, three: ACTI
 const INTRO = { pullback: 3.4, azimuth: 0.55, polar: -0.16, duration: 2.8 } as const;
 /** Safe-rect changes this early in the intro re-base it instead of sliding (D28). */
 const INTRO_SNAP_SECONDS = 0.5;
+/** CameraControls' smoothing of programmatic moves and inertia (seconds). */
+const CONTROLS_SMOOTH_TIME = 0.5;
 /** Frame changes below this (viewport fractions) are ignored. */
 const FRAME_EPSILON = 1e-4;
 /** Idle auto-rotate: delay after the last input, sway / spin per focus. */
@@ -74,6 +82,8 @@ const IDLE = {
   /** ±11.5°: the overview fit covers it (computeCameraGoal `sway`, visual V2-08). */
   overview: { amplitude: 0.2, period: 70 },
   anchor: { amplitude: 0.2, period: 60 },
+  /** Planet focus: a small sway around the chosen side (no spin, S1). */
+  planet: { amplitude: 0.18, period: 50 },
   /** Systems are round: a slow continuous spin (rad/s). */
   systemSpin: 0.028,
 } as const;
@@ -180,6 +190,8 @@ interface DirectorState {
   parallaxX: number;
   parallaxY: number;
   refreshHover: boolean;
+  /** `performance.now()` until which a settled reframe uses the fast smoothing (S3). */
+  fastReframeUntil: number;
 }
 
 /**
@@ -445,14 +457,25 @@ export function CameraDirector({
         stepFlight(d, shared, controls, motionDt, target, goalPose, goal, center);
       }
     } else {
+      // A frame change (sheet collapsing, panel resizing) reframes fast (S3).
+      if (goalChanged && frameChanged) d.fastReframeUntil = performance.now() + FAST_REFRAME.ms;
+      const now = performance.now();
+      const controlsSmooth = reframeSmoothTime(now, d.fastReframeUntil, CONTROLS_SMOOTH_TIME);
+      if (controls.smoothTime !== controlsSmooth) controls.smoothTime = controlsSmooth;
       if (goalChanged) reframe(d, controls, target, goalPose, reducedMotion);
       if (reducedMotion) {
         d.fov = { value: goal.fov, velocity: 0 };
         snapCenter(d, center);
       } else {
-        smoothDamp(d.fov, goal.fov, MOTION.fovSmoothTime, dt);
-        smoothDamp(d.centerX, center.x, MOTION.cameraSmoothTime, dt);
-        smoothDamp(d.centerY, center.y, MOTION.cameraSmoothTime, dt);
+        const centerSmooth = reframeSmoothTime(now, d.fastReframeUntil, MOTION.cameraSmoothTime);
+        smoothDamp(
+          d.fov,
+          goal.fov,
+          reframeSmoothTime(now, d.fastReframeUntil, MOTION.fovSmoothTime),
+          dt,
+        );
+        smoothDamp(d.centerX, center.x, centerSmooth, dt);
+        smoothDamp(d.centerY, center.y, centerSmooth, dt);
         idleMotion(d, shared, controls, target, dt);
         if (finePointer && !d.dragging) {
           const distance = controls.distance;
@@ -495,7 +518,7 @@ export function CameraDirector({
     <CameraControls
       ref={controlsRef}
       makeDefault
-      smoothTime={0.5}
+      smoothTime={CONTROLS_SMOOTH_TIME}
       draggingSmoothTime={0.16}
       azimuthRotateSpeed={0.4}
       polarRotateSpeed={0.3}
@@ -867,18 +890,22 @@ function idleMotion(
   // Hover (3D or HTML highlight) pauses the motion without resetting its phase.
   if (shared.hovering) return;
   d.idleClock += dt;
-  if ((target.mode === 'system' || target.mode === 'planet') && !usesSystemSway(d.frame)) {
+  // Planet focus never spins: a full turn would sweep the camera through the
+  // zones its framing keeps clear (orbits, the core); it sways a little instead.
+  if (target.mode === 'system' && !usesSystemSway(d.frame)) {
     const ramp = Math.min(d.idleClock / IDLE.rampIn, 1);
     void controls.rotate(IDLE.systemSpin * ramp * ramp * dt, 0, false);
     return;
   }
   // Short free areas (phone band): systems sway instead of spinning (their fit covers it).
   const { amplitude, period } =
-    target.mode === 'system' || target.mode === 'planet'
-      ? { amplitude: SYSTEM_SWAY, period: IDLE.anchor.period }
-      : isOverview(target)
-        ? IDLE.overview
-        : IDLE.anchor;
+    target.mode === 'planet'
+      ? IDLE.planet
+      : target.mode === 'system'
+        ? { amplitude: SYSTEM_SWAY, period: IDLE.anchor.period }
+        : isOverview(target)
+          ? IDLE.overview
+          : IDLE.anchor;
   const sway = idleSway(d.idleClock, amplitude, period, IDLE.rampIn);
   void controls.rotate(sway - d.swayApplied, 0, false);
   d.swayApplied = sway;
@@ -992,6 +1019,7 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     goalPlanetAngle: undefined,
     goalEmphasis: undefined,
     planetView: {},
+    fastReframeUntil: 0,
     azimuthOffset: 0,
     settledRadius: 1,
     safeRect: undefined,

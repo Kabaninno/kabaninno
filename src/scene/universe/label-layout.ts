@@ -47,6 +47,11 @@ export interface LabelLayout {
   diagonal: number;
   /** Horizontal leader leg, px. */
   run: number;
+  /**
+   * Height of the horizontal leader leg relative to the node centre, px: just
+   * below (rising) or above (dropping) the text box, also after a clamp.
+   */
+  leaderY: number;
   /** Text box relative to the node centre, px. */
   textX: number;
   textY: number;
@@ -105,12 +110,17 @@ export function layoutLabel(input: LabelInput): LabelLayout {
   const box = textBox(input, fallback, width);
   const dx = clampShift(box.left, box.right, input.bounds.left, input.bounds.right);
   const dy = clampShift(box.top, box.bottom, input.bounds.top, input.bounds.bottom);
+  const textY = fallback.textY + dy;
+  // The text moved: keep the leader's run off it (S4: it crossed "coming soon").
+  const leaderY =
+    fallback.rise > 0 ? textY + input.textHeight + LABEL_METRICS.gap : textY - LABEL_METRICS.gap;
   return {
     ...fallback,
     compact: true,
     clamped: true,
     textX: fallback.textX + dx,
-    textY: fallback.textY + dy,
+    textY,
+    leaderY,
   };
 }
 
@@ -128,7 +138,18 @@ function place(
   const y1 = -rise * (reticle + m.diagonal);
   const textX = side > 0 ? x1 + 4 : x1 - 4 - width;
   const textY = rise > 0 ? y1 - m.gap - input.textHeight : y1 + m.gap;
-  return { side, rise, reticle, diagonal: m.diagonal, run, textX, textY, compact, clamped: false };
+  return {
+    side,
+    rise,
+    reticle,
+    diagonal: m.diagonal,
+    run,
+    leaderY: y1,
+    textX,
+    textY,
+    compact,
+    clamped: false,
+  };
 }
 
 /** Text box in screen px. */

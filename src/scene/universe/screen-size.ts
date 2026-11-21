@@ -43,3 +43,51 @@ export function smallCoreBoost(diameterPx: number): number {
   const t = Math.min(Math.max((diameterPx - 12) / (34 - 12), 0), 1);
   return 1 - t * t * (3 - 2 * t);
 }
+
+/**
+ * On-screen radius (CSS px) of what a universe node visibly occupies, for
+ * the presence fade (a node never shows clipped by the free frame's edge,
+ * visual MN-2, mn4, S5, S6): a category's orbit preview, the beacon's
+ * stretched crystal with its glow, the portfolio's star cloud — not just
+ * the core.
+ */
+export function nodeVisualRadiusPx(
+  kind: 'category' | 'configurator' | 'portfolio',
+  corePx: number,
+  pxPerUnit: number,
+  systemRadius = 0,
+): number {
+  const core = corePx / 2;
+  switch (kind) {
+    case 'category':
+      return Math.max(core * 1.6, systemRadius * 0.8 * pxPerUnit);
+    case 'configurator':
+      return core * 2.6;
+    case 'portfolio':
+      return Math.max(core * 1.6, 2 * pxPerUnit);
+  }
+}
+
+/** Presence fade: tolerance and fade distance beyond the free frame's edge, CSS px. */
+export const PRESENCE_EDGE = { tolerance: 6, fade: 28 } as const;
+
+/**
+ * Presence target (1 = shown, 0 = faded) of a node of on-screen radius
+ * `radius` centred at (x, y), against a free frame in the same px.
+ */
+export function presenceInFrame(
+  x: number,
+  y: number,
+  radius: number,
+  frame: { left: number; top: number; right: number; bottom: number },
+): number {
+  const outside = Math.max(
+    frame.left - (x - radius),
+    x + radius - frame.right,
+    frame.top - (y - radius),
+    y + radius - frame.bottom,
+    0,
+  );
+  const t = Math.min(Math.max((outside - PRESENCE_EDGE.tolerance) / PRESENCE_EDGE.fade, 0), 1);
+  return 1 - t * t * (3 - 2 * t);
+}

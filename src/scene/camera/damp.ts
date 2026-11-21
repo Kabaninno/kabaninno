@@ -63,3 +63,16 @@ export function smoothDampVec3(
 export function dampFactor(rate: number, dt: number): number {
   return 1 - Math.exp(-rate * dt);
 }
+
+/**
+ * Settled reframe after the free frame changed (a sheet collapsing, a panel
+ * resizing): the controls and the principal point use this smoothing for
+ * FAST_REFRAME.ms, so the focus lands in the new free area within ~0.6 s
+ * (visual S3: the default ~0.5–0.6 s smoothing took ~2 s to settle).
+ */
+export const FAST_REFRAME = { smoothTime: 0.15, ms: 900 } as const;
+
+/** Smoothing time of a settled reframe: fast right after a frame change. */
+export function reframeSmoothTime(now: number, fastUntil: number, normal: number): number {
+  return now < fastUntil ? FAST_REFRAME.smoothTime : normal;
+}
