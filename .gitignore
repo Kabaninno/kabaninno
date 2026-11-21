@@ -1,0 +1,27 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# testing / visual checks
+/coverage
+/screenshots/
+/test-results/
+/playwright-report/
+
+# env
+.env
+.env*.local
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+.vercel
+
+# agent reports (local)
+/reports/
