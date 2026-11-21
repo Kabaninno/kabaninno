@@ -1,0 +1,272 @@
+import type { CategoryInput } from './schema';
+
+/**
+ * Service categories, their services (planets) and visual DNA.
+ *
+ * To add a category or a service: add an entry here and add its texts to
+ * `messages/<locale>/content.json` (categories.<id>, services.<id>.<slug>) for
+ * every locale. No scene code changes are needed as long as you reuse existing
+ * `core`, `shape`, `material` and `moons.kind` values.
+ */
+export const categoriesData = [
+  {
+    id: 'web',
+    order: 1,
+    dna: { color: '#4FF0D2', glow: '#B8FFF2', core: 'prism' },
+    services: [
+      {
+        slug: 'corporate-websites',
+        timelineWeeks: [3, 6],
+        planet: {
+          shape: 'icosahedron',
+          material: 'glass',
+          size: 0.55,
+          shell: 'wireframe',
+          orbit: { radius: 2.7, tilt: 6, speed: 0.16, phase: 0 },
+        },
+      },
+      {
+        slug: 'online-stores',
+        timelineWeeks: [6, 12],
+        planet: {
+          shape: 'torus-knot',
+          material: 'glass',
+          size: 0.45,
+          moons: { count: 3, kind: 'cube' },
+          orbit: { radius: 3.8, tilt: -10, speed: 0.11, phase: 0.3 },
+        },
+      },
+      {
+        slug: 'landing-pages',
+        timelineWeeks: [1, 3],
+        planet: {
+          shape: 'octahedron',
+          material: 'hologram',
+          size: 0.42,
+          rings: [{ inner: 1.5, outer: 1.9, tilt: 20 }],
+          orbit: { radius: 4.9, tilt: 14, speed: 0.085, phase: 0.62 },
+        },
+      },
+      {
+        slug: 'web-apps',
+        timelineWeeks: [8, 16],
+        planet: {
+          shape: 'sphere',
+          material: 'glass',
+          size: 0.6,
+          shell: 'wireframe',
+          moons: { count: 2, kind: 'shard' },
+          orbit: { radius: 6.1, tilt: -6, speed: 0.06, phase: 0.85 },
+        },
+      },
+    ],
+  },
+  {
+    id: 'crm',
+    order: 2,
+    dna: { color: '#FF6B8B', glow: '#FFC2D0', core: 'strata' },
+    services: [
+      {
+        slug: 'crm-implementation',
+        timelineWeeks: [2, 6],
+        planet: {
+          shape: 'sphere',
+          material: 'hologram',
+          size: 0.55,
+          rings: [{ inner: 1.4, outer: 2.2, bands: 6 }],
+          orbit: { radius: 2.8, tilt: -8, speed: 0.14, phase: 0.1 },
+        },
+      },
+      {
+        slug: 'custom-crm',
+        timelineWeeks: [8, 16],
+        planet: {
+          shape: 'sphere',
+          material: 'liquid-metal',
+          size: 0.5,
+          rings: [
+            { inner: 1.3, outer: 1.7, tilt: 30, bands: 4 },
+            { inner: 1.9, outer: 2.5, tilt: -20, bands: 8 },
+          ],
+          orbit: { radius: 3.9, tilt: 12, speed: 0.1, phase: 0.45 },
+        },
+      },
+      {
+        slug: 'sales-funnels',
+        timelineWeeks: [1, 3],
+        planet: {
+          shape: 'funnel',
+          material: 'glass',
+          size: 0.55,
+          moons: { count: 5, kind: 'orb', radius: 1.6, speed: 0.9 },
+          orbit: { radius: 5, tilt: -14, speed: 0.075, phase: 0.7 },
+        },
+      },
+      {
+        slug: 'reports-dashboards',
+        timelineWeeks: [2, 4],
+        planet: {
+          shape: 'cube-cluster',
+          material: 'hologram',
+          size: 0.5,
+          rings: [{ inner: 1.6, outer: 2, tilt: 10, bands: 12 }],
+          orbit: { radius: 6.2, tilt: 5, speed: 0.055, phase: 0.25 },
+        },
+      },
+    ],
+  },
+  {
+    id: 'automation',
+    order: 3,
+    dna: { color: '#FFA53B', glow: '#FFE0A8', core: 'forge' },
+    services: [
+      {
+        slug: 'api-integrations',
+        timelineWeeks: [1, 4],
+        planet: {
+          shape: 'gear',
+          material: 'liquid-metal',
+          size: 0.55,
+          moons: { count: 6, kind: 'conveyor', radius: 2, speed: 0.8 },
+          orbit: { radius: 2.9, tilt: 4, speed: 0.15, phase: 0.2 },
+        },
+      },
+      {
+        slug: 'document-automation',
+        timelineWeeks: [2, 5],
+        planet: {
+          shape: 'cube-cluster',
+          material: 'liquid-metal',
+          size: 0.5,
+          moons: { count: 4, kind: 'cube' },
+          orbit: { radius: 4, tilt: -12, speed: 0.1, phase: 0.55 },
+        },
+      },
+      {
+        slug: 'notifications-reminders',
+        timelineWeeks: [1, 2],
+        planet: {
+          shape: 'torus',
+          material: 'emissive',
+          size: 0.45,
+          moons: { count: 3, kind: 'orb', speed: 1.2 },
+          orbit: { radius: 5.1, tilt: 16, speed: 0.08, phase: 0.8 },
+        },
+      },
+      {
+        slug: 'data-processing',
+        timelineWeeks: [2, 6],
+        planet: {
+          shape: 'sphere',
+          material: 'liquid-metal',
+          size: 0.6,
+          shell: 'wireframe',
+          moons: { count: 8, kind: 'conveyor', radius: 1.7 },
+          orbit: { radius: 6.3, tilt: -4, speed: 0.058, phase: 0.35 },
+        },
+      },
+    ],
+  },
+  {
+    id: 'ai',
+    order: 4,
+    dna: { color: '#B57BFF', glow: '#F3B8FF', core: 'neural' },
+    services: [
+      {
+        slug: 'ai-assistants',
+        timelineWeeks: [2, 6],
+        planet: {
+          shape: 'blob',
+          material: 'iridescent',
+          size: 0.6,
+          orbit: { radius: 2.8, tilt: 10, speed: 0.13, phase: 0.05 },
+        },
+      },
+      {
+        slug: 'ai-document-processing',
+        timelineWeeks: [3, 8],
+        planet: {
+          shape: 'crystal',
+          material: 'iridescent',
+          size: 0.5,
+          shell: 'hologram',
+          orbit: { radius: 3.9, tilt: -14, speed: 0.095, phase: 0.4 },
+        },
+      },
+      {
+        slug: 'content-generation',
+        timelineWeeks: [1, 3],
+        planet: {
+          shape: 'blob',
+          material: 'iridescent',
+          size: 0.48,
+          rings: [{ inner: 1.5, outer: 2.1, tilt: 25, bands: 3 }],
+          moons: { count: 3, kind: 'shard' },
+          orbit: { radius: 5, tilt: 8, speed: 0.075, phase: 0.7 },
+        },
+      },
+      {
+        slug: 'ai-analytics',
+        timelineWeeks: [3, 8],
+        planet: {
+          shape: 'torus-knot',
+          material: 'hologram',
+          size: 0.45,
+          orbit: { radius: 6.1, tilt: -8, speed: 0.055, phase: 0.2 },
+        },
+      },
+    ],
+  },
+  {
+    id: 'telegram',
+    order: 5,
+    dna: { color: '#4AA8FF', glow: '#BFE3FF', core: 'comet' },
+    services: [
+      {
+        slug: 'sales-orders',
+        timelineWeeks: [2, 5],
+        planet: {
+          shape: 'dart',
+          material: 'glass',
+          size: 0.45,
+          trail: true,
+          orbit: { radius: 2.9, tilt: 12, speed: 0.2, phase: 0.15 },
+        },
+      },
+      {
+        slug: 'booking',
+        timelineWeeks: [2, 4],
+        planet: {
+          shape: 'sphere',
+          material: 'hologram',
+          size: 0.5,
+          rings: [{ inner: 1.4, outer: 1.8, tilt: -15, bands: 7 }],
+          orbit: { radius: 3.9, tilt: -6, speed: 0.12, phase: 0.5 },
+        },
+      },
+      {
+        slug: 'customer-support',
+        timelineWeeks: [2, 4],
+        planet: {
+          shape: 'dart',
+          material: 'emissive',
+          size: 0.4,
+          trail: true,
+          moons: { count: 2, kind: 'orb' },
+          orbit: { radius: 5, tilt: 18, speed: 0.09, phase: 0.8 },
+        },
+      },
+      {
+        slug: 'mini-apps',
+        timelineWeeks: [4, 10],
+        planet: {
+          shape: 'cube-cluster',
+          material: 'glass',
+          size: 0.5,
+          shell: 'wireframe',
+          orbit: { radius: 6.1, tilt: -10, speed: 0.065, phase: 0.3 },
+        },
+      },
+    ],
+  },
+] satisfies CategoryInput[];

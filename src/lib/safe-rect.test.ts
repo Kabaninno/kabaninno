@@ -1,0 +1,115 @@
+import { describe, expect, it } from 'vitest';
+import { largestFreeRect, preferredFrameAspect, sameRect, type Rect } from './safe-rect';
+
+const desktop = { width: 1440, height: 900 };
+const phone = { width: 390, height: 844 };
+const hudDesktop: Rect = { x: 0, y: 0, width: 1440, height: 68 };
+const hudPhone: Rect = { x: 0, y: 0, width: 390, height: 68 };
+
+describe('largestFreeRect', () => {
+  it('returns the whole viewport without obstacles', () => {
+    expect(largestFreeRect(desktop, [])).toEqual({ x: 0, y: 0, width: 1440, height: 900 });
+  });
+
+  it('returns null for an empty viewport or a fully covered one', () => {
+    expect(largestFreeRect({ width: 0, height: 900 }, [])).toBeNull();
+    expect(largestFreeRect(phone, [{ x: -10, y: -10, width: 500, height: 900 }])).toBeNull();
+  });
+
+  it('ignores obstacles outside the viewport and clips partial ones', () => {
+    const rect = largestFreeRect(desktop, [
+      { x: 2000, y: 0, width: 100, height: 100 },
+      { x: -50, y: -20, width: 1600, height: 88 },
+    ]);
+    expect(rect).toEqual({ x: 0, y: 68, width: 1440, height: 832 });
+  });
+
+  it('desktop home: picks the area right of the hero and above the category index', () => {
+    const hero: Rect = { x: 40, y: 470, width: 576, height: 390 };
+    const index: Rect = { x: 1190, y: 640, width: 210, height: 220 };
+    const rect = largestFreeRect(desktop, [hudDesktop, hero, index]);
+    expect(rect).toEqual({ x: 616, y: 68, width: 824, height: 572 });
+  });
+
+  it('desktop system view: the area left of the content panel, below the HUD', () => {
+    const panel: Rect = { x: 988, y: 76, width: 440, height: 812 };
+    expect(largestFreeRect(desktop, [hudDesktop, panel])).toEqual({
+      x: 0,
+      y: 68,
+      width: 988,
+      height: 832,
+    });
+  });
+
+  it('desktop with a short panel still prefers the column left of it', () => {
+    const panel: Rect = { x: 988, y: 76, width: 440, height: 380 };
+    const rect = largestFreeRect(desktop, [hudDesktop, panel]);
+    expect(rect).toEqual({ x: 0, y: 68, width: 988, height: 832 });
+  });
+
+  it('mobile home: between the HUD and the top of the hero block', () => {
+    const hero: Rect = { x: 16, y: 410, width: 358, height: 250 };
+    const chips: Rect = { x: 16, y: 680, width: 358, height: 140 };
+    expect(largestFreeRect(phone, [hudPhone, hero, chips])).toEqual({
+      x: 0,
+      y: 68,
+      width: 390,
+      height: 342,
+    });
+  });
+
+  it('mobile system view: between the HUD and the bottom sheet', () => {
+    const sheet: Rect = { x: 0, y: 338, width: 390, height: 506 };
+    expect(largestFreeRect(phone, [hudPhone, sheet])).toEqual({
+      x: 0,
+      y: 68,
+      width: 390,
+      height: 270,
+    });
+  });
+
+  it('handles fractional overlay edges (60dvh sheet top at 337.6 px)', () => {
+    const sheet: Rect = { x: 0, y: 337.6, width: 390, height: 506.4 };
+    expect(largestFreeRect(phone, [hudPhone, sheet])).toEqual({
+      x: 0,
+      y: 68,
+      width: 390,
+      height: 270,
+    });
+    const hud: Rect = { x: 0, y: 0, width: 390, height: 68.4 };
+    expect(largestFreeRect({ width: 390.2, height: 844 }, [hud, sheet])).toEqual({
+      x: 0,
+      y: 68,
+      width: 390,
+      height: 270,
+    });
+  });
+
+  it('scores candidates by the preferred aspect, not by raw area', () => {
+    // A wide strip (1440×300) vs. a squarer block (700×600): the block fits a
+    // larger 1.5:1 box (466 px tall vs. 300 px).
+    const obstacles: Rect[] = [{ x: 0, y: 300, width: 740, height: 600 }];
+    expect(largestFreeRect(desktop, obstacles)).toEqual({ x: 740, y: 0, width: 700, height: 900 });
+  });
+
+  it('rounds edges to whole pixels', () => {
+    const rect = largestFreeRect(desktop, [{ x: 0, y: 0, width: 1440, height: 67.6 }]);
+    expect(rect).toEqual({ x: 0, y: 68, width: 1440, height: 832 });
+  });
+});
+
+describe('preferredFrameAspect', () => {
+  it('is wider on landscape screens', () => {
+    expect(preferredFrameAspect(desktop)).toBeGreaterThan(preferredFrameAspect(phone));
+  });
+});
+
+describe('sameRect', () => {
+  it('compares with a tolerance and handles null', () => {
+    const a = { x: 0, y: 68, width: 988, height: 832 };
+    expect(sameRect(a, { ...a, width: 988.4 })).toBe(true);
+    expect(sameRect(a, { ...a, width: 990 })).toBe(false);
+    expect(sameRect(null, null)).toBe(true);
+    expect(sameRect(a, null)).toBe(false);
+  });
+});

@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "homeTitle": "{studio} — websites, CRM, automation, AI and Telegram bots",
+    "homeDescription": "Websites, CRM systems, automation, AI solutions and Telegram bots for small businesses. Describe your project in a few steps and send us a request.",
+    "portfolioTitle": "Portfolio",
+    "portfolioDescription": "Projects by {studio}: the task, the solution, the result and the tech stack.",
+    "configuratorTitle": "Build your request",
+    "configuratorDescription": "Choose the type of solution, features, budget and timeline, then send a ready-made message via Telegram."
+  },
+  "common": {
+    "skipToContent": "Skip to content",
+    "backToUniverse": "Universe",
+    "breadcrumbs": "Breadcrumb"
+  },
+  "hud": {
+    "homeLabel": "{studio} — home",
+    "primaryNav": "Main navigation",
+    "services": "Services",
+    "portfolio": "Portfolio",
+    "configurator": "Configurator",
+    "cta": "Build your request",
+    "menuOpen": "Open menu",
+    "menuClose": "Close menu",
+    "language": "Language",
+    "languageNames": {
+      "pl": "Polski",
+      "en": "English",
+      "uk": "Українська"
+    }
+  },
+  "home": {
+    "eyebrow": "Digital studio for small companies",
+    "title": "We bring your business together in one system",
+    "lead": "Websites, CRM, automation, AI and Telegram bots — designed to work together.",
+    "cta": "Build your request",
+    "servicesNav": "Service categories",
+    "explore": "Pick a system to explore"
+  },
+  "system": {
+    "eyebrow": "System {index} / {total}",
+    "servicesHeading": "Services"
+  },
+  "service": {
+    "audience": "Who it's for",
+    "features": "Key features",
+    "example": "Example",
+    "timeline": "Estimated timeline",
+    "timelineValue": "{min}–{max, plural, one {# week} other {# weeks}}",
+    "addToRequest": "Add to request",
+    "relatedProjects": "Related projects",
+    "previous": "Previous service",
+    "next": "Next service",
+    "siblings": "Services in this system"
+  },
+  "portfolio": {
+    "eyebrow": "Observatory",
+    "title": "Portfolio",
+    "lead": "Selected projects: the task, the solution and the result.",
+    "emptyTitle": "Coming soon",
+    "emptyBody": "We're preparing our first case studies. Check back shortly.",
+    "emptyCta": "Build your request",
+    "emptyExplore": "In the meantime, explore our services",
+    "draftBadge": "Draft",
+    "client": "Client",
+    "industry": "Industry",
+    "year": "Year",
+    "task": "Task",
+    "solution": "Solution",
+    "result": "Result",
+    "stack": "Tech stack",
+    "services": "Services",
+    "allProjects": "All projects"
+  },
+  "configurator": {
+    "eyebrow": "Configurator",
+    "title": "Build your request",
+    "lead": "A few quick steps, and you'll have a ready-made message to send us via Telegram.",
+    "stepsHeading": "Steps",
+    "steps": {
+      "type": "Solution type",
+      "features": "Features",
+      "business": "Your business",
+      "budget": "Budget",
+      "timeline": "Timeline",
+      "contact": "Name and comment",
+      "summary": "Summary"
+    },
+    "comingSoon": "The interactive wizard is coming soon."
+  },
+  "notFound": {
+    "title": "This sector is empty",
+    "body": "This page doesn't exist or has moved.",
+    "home": "Back to the universe"
+  },
+  "error": {
+    "eyebrow": "Signal lost",
+    "title": "Something went wrong",
+    "body": "This page couldn't be displayed. Try again, and if that doesn't help, go back to the universe.",
+    "retry": "Try again",
+    "home": "Back to the universe"
+  }
+}

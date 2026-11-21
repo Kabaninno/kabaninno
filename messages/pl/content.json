@@ -1,0 +1,345 @@
+{
+  "categories": {
+    "web": {
+      "name": "Strony i aplikacje",
+      "tagline": "Strona, która pracuje na Twoją firmę 24/7",
+      "description": "Projektujemy i budujemy strony firmowe, sklepy internetowe, landing page i aplikacje webowe. Szybkie, wygodne na telefonie i gotowe do połączenia z CRM, płatnościami czy botem. Dbamy o to, żeby klient łatwo znalazł to, czego szuka, i od razu mógł działać.",
+      "seoDescription": "Strony firmowe, sklepy internetowe, landing page i aplikacje webowe dla małych firm. Szybkie, mobilne i połączone z Twoimi narzędziami."
+    },
+    "crm": {
+      "name": "CRM",
+      "tagline": "Wszyscy klienci i zlecenia w jednym miejscu",
+      "description": "Wdrażamy gotowe systemy CRM i budujemy własne, dopasowane do sposobu pracy Twojej firmy. Porządkujemy kontakty, zapytania i sprzedaż, a raporty pokazują, co naprawdę przynosi pieniądze.",
+      "seoDescription": "Wdrożenie CRM, CRM na zamówienie, lejki sprzedażowe i dashboardy dla małych firm. Uporządkuj klientów i sprzedaż w jednym systemie."
+    },
+    "automation": {
+      "name": "Automatyzacja",
+      "tagline": "Niech powtarzalne zadania robią się same",
+      "description": "Łączymy usługi, z których już korzystasz, i przejmujemy żmudną pracę: przepisywanie danych, wystawianie dokumentów, wysyłanie przypomnień. Ty i Twój zespół zyskujecie czas na to, co naprawdę wymaga człowieka.",
+      "seoDescription": "Integracje przez API, automatyzacja dokumentów, powiadomienia i przetwarzanie danych. Mniej ręcznej pracy i mniej błędów w Twojej firmie."
+    },
+    "ai": {
+      "name": "AI",
+      "tagline": "Sztuczna inteligencja do konkretnych zadań",
+      "description": "Wdrażamy AI tam, gdzie daje realną korzyść: asystentów odpowiadających klientom, odczytywanie dokumentów, przygotowywanie treści i analizę danych. Bez eksperymentów na Twoim biznesie — zaczynamy od małego, mierzalnego kroku.",
+      "seoDescription": "Asystenci AI i chatboty, przetwarzanie dokumentów, generowanie treści i analityka. Praktyczne wdrożenia AI dla małych i średnich firm."
+    },
+    "telegram": {
+      "name": "Boty Telegram",
+      "tagline": "Sprzedaż, zapisy i obsługa klienta w czacie",
+      "description": "Tworzymy boty i Mini Apps w Telegramie, które przyjmują zamówienia, zapisują na wizyty i odpowiadają na pytania klientów. Klient nie musi niczego instalować — wszystko dzieje się w aplikacji, której już używa.",
+      "seoDescription": "Boty Telegram do sprzedaży, rezerwacji i obsługi klienta oraz Telegram Mini Apps. Obsługuj klientów tam, gdzie już są."
+    }
+  },
+  "services": {
+    "web": {
+      "corporate-websites": {
+        "title": "Strony firmowe",
+        "summary": "Nowoczesna strona, która jasno mówi, czym się zajmujesz, buduje zaufanie i zamienia odwiedzających w zapytania.",
+        "audience": "Dla firm usługowych, gabinetów, warsztatów i biur, które chcą wyglądać profesjonalnie w sieci i dostawać więcej zapytań.",
+        "features": [
+          "Projekt dopasowany do Twojej marki",
+          "Wersja mobilna i szybkie ładowanie",
+          "Prosty panel do edycji treści",
+          "Podstawy SEO i analityka",
+          "Formularze połączone z CRM lub e-mailem"
+        ],
+        "example": "Firma remontowa dostaje stronę z galerią realizacji, orientacyjnym cennikiem i formularzem wyceny, który trafia od razu do jej CRM.",
+        "seoDescription": "Strony firmowe dla małych firm: nowoczesny projekt, wersja mobilna, SEO i formularze, które zamieniają odwiedzających w klientów."
+      },
+      "online-stores": {
+        "title": "Sklepy internetowe",
+        "summary": "Sklep online z wygodnym katalogiem, płatnościami i dostawą — gotowy do sprzedaży od pierwszego dnia.",
+        "audience": "Dla producentów, sklepów stacjonarnych i marek, które chcą sprzedawać w internecie bez chaosu w zamówieniach.",
+        "features": [
+          "Katalog z filtrami i wariantami produktów",
+          "Płatności online, w tym BLIK",
+          "Integracja z kurierami i paczkomatami",
+          "Powiadomienia o statusie zamówienia"
+        ],
+        "example": "Lokalna palarnia kawy sprzedaje ziarna i subskrypcje online, a zamówienia automatycznie trafiają do magazynu i na etykiety kurierskie.",
+        "seoDescription": "Sklepy internetowe dla małych firm: katalog produktów, płatności online i BLIK, integracja z kurierami. Sprzedawaj w sieci bez chaosu."
+      },
+      "landing-pages": {
+        "title": "Landing page",
+        "summary": "Jedna strona skupiona na jednym celu: sprzedaży produktu, zapisach na wydarzenie lub zbieraniu zapytań z kampanii.",
+        "audience": "Dla firm, które uruchamiają reklamy, nowy produkt lub promocję i chcą szybko sprawdzić, czy to działa.",
+        "features": [
+          "Struktura nastawiona na konwersję",
+          "Szybkie uruchomienie",
+          "Integracja z reklamami i analityką",
+          "Warianty do testów A/B"
+        ],
+        "example": "Szkoła językowa przed wrześniem uruchamia landing page z zapisami na kurs, a każde zgłoszenie trafia do arkusza i do menedżera na Telegramie.",
+        "seoDescription": "Landing page pod kampanie i nowe produkty: szybkie wdrożenie, struktura nastawiona na konwersję, integracja z reklamami i analityką."
+      },
+      "web-apps": {
+        "title": "Aplikacje webowe",
+        "summary": "Aplikacja w przeglądarce dopasowana do Twoich procesów: panel klienta, system rezerwacji, kalkulator czy narzędzie wewnętrzne.",
+        "audience": "Dla firm, którym gotowe narzędzia już nie wystarczają, albo które chcą dać klientom wygodny dostęp do usług online.",
+        "features": [
+          "Projekt pod Twój proces, a nie odwrotnie",
+          "Konta użytkowników i role",
+          "Integracje z istniejącymi systemami",
+          "Rozwój etapami, od wersji MVP"
+        ],
+        "example": "Biuro rachunkowe udostępnia klientom panel, w którym wgrywają faktury i widzą status swoich rozliczeń.",
+        "seoDescription": "Aplikacje webowe na zamówienie: panele klienta, systemy rezerwacji i narzędzia wewnętrzne dopasowane do procesów Twojej firmy."
+      }
+    },
+    "crm": {
+      "crm-implementation": {
+        "title": "Wdrożenie CRM",
+        "summary": "Dobieramy i konfigurujemy gotowy CRM, przenosimy dane i szkolimy zespół, żeby system był używany, a nie tylko kupiony.",
+        "audience": "Dla firm, które prowadzą klientów w Excelu, w notesie albo w głowie i czują, że coś im ucieka.",
+        "features": [
+          "Wybór systemu pod budżet i potrzeby",
+          "Import kontaktów i historii",
+          "Konfiguracja etapów i pól",
+          "Szkolenie zespołu i wsparcie"
+        ],
+        "example": "Agencja nieruchomości przenosi kontakty z arkuszy do CRM, a każdy agent widzi swoje zadania i terminy spotkań.",
+        "seoDescription": "Wdrożenie CRM w małej firmie: wybór systemu, migracja danych, konfiguracja i szkolenie zespołu. CRM, z którego naprawdę się korzysta."
+      },
+      "custom-crm": {
+        "title": "CRM na zamówienie",
+        "summary": "Własny system zbudowany pod Twoją branżę i sposób pracy, bez zbędnych funkcji i opłat za każdego użytkownika.",
+        "audience": "Dla firm o nietypowych procesach, dla których gotowe CRM-y są za ciasne albo za drogie przy większej skali.",
+        "features": [
+          "Moduły tylko pod Twoje procesy",
+          "Dostęp z komputera i telefonu",
+          "Integracje z płatnościami i botami",
+          "Pełna kontrola nad danymi"
+        ],
+        "example": "Firma eventowa ma CRM, który łączy zapytania, kalendarz sprzętu i rozliczenia z podwykonawcami w jednym widoku.",
+        "seoDescription": "CRM na zamówienie dla firm o nietypowych procesach: dopasowane moduły, integracje i pełna kontrola nad danymi."
+      },
+      "sales-funnels": {
+        "title": "Lejki sprzedażowe",
+        "summary": "Projektujemy ścieżkę klienta od pierwszego kontaktu do zakupu i ustawiamy ją w CRM, żeby żaden lead nie przepadł.",
+        "audience": "Dla firm, które mają zapytania, ale nie wiedzą, na którym etapie tracą klientów.",
+        "features": [
+          "Mapa etapów sprzedaży",
+          "Automatyczne zadania i follow-upy",
+          "Źródła leadów w jednym miejscu",
+          "Przypomnienia dla handlowców"
+        ],
+        "example": "Studio mebli na wymiar widzi każde zapytanie od pomiaru do montażu, a system sam przypomina o ofercie, na którą klient nie odpowiedział.",
+        "seoDescription": "Lejki sprzedażowe w CRM: etapy sprzedaży, automatyczne follow-upy i przypomnienia. Zobacz, gdzie tracisz klientów, i odzyskaj ich."
+      },
+      "reports-dashboards": {
+        "title": "Raporty i dashboardy",
+        "summary": "Najważniejsze liczby Twojej firmy na jednym ekranie: sprzedaż, źródła klientów, wyniki zespołu — aktualne i czytelne.",
+        "audience": "Dla właścicieli i menedżerów, którzy chcą podejmować decyzje na podstawie danych, a nie przeczucia.",
+        "features": [
+          "Dashboardy z danych z CRM i innych źródeł",
+          "Raporty wysyłane automatycznie",
+          "Wskaźniki sprzedaży i marży",
+          "Widoki dla właściciela i zespołu"
+        ],
+        "example": "Sieć trzech salonów kosmetycznych co poniedziałek dostaje raport obłożenia, przychodu i powracających klientów dla każdego salonu.",
+        "seoDescription": "Raporty i dashboardy dla małych firm: sprzedaż, źródła klientów i wyniki zespołu na jednym ekranie, aktualizowane automatycznie."
+      }
+    },
+    "automation": {
+      "api-integrations": {
+        "title": "Integracje przez API",
+        "summary": "Łączymy Twoje narzędzia — sklep, CRM, księgowość, płatności, kalendarz — żeby dane przepływały same, bez przepisywania.",
+        "audience": "Dla firm, które korzystają z kilku programów i tracą czas na ręczne przenoszenie informacji między nimi.",
+        "features": [
+          "Połączenia z popularnymi usługami",
+          "Synchronizacja danych w czasie rzeczywistym",
+          "Obsługa błędów i monitoring",
+          "Polskie systemy księgowe i płatności"
+        ],
+        "example": "Każde zamówienie ze sklepu internetowego automatycznie tworzy fakturę w systemie księgowym i kontakt w CRM.",
+        "seoDescription": "Integracje przez API dla małych firm: sklep, CRM, księgowość i płatności połączone tak, by dane przepływały automatycznie."
+      },
+      "document-automation": {
+        "title": "Automatyzacja dokumentów",
+        "summary": "Umowy, oferty, faktury i protokoły generowane automatycznie z Twoich danych — w kilka sekund i bez literówek.",
+        "audience": "Dla firm, które codziennie przygotowują podobne dokumenty i kopiują te same dane z miejsca na miejsce.",
+        "features": [
+          "Szablony umów, ofert i protokołów",
+          "Dane pobierane z CRM lub formularza",
+          "Wysyłka do podpisu elektronicznego",
+          "Archiwum z wyszukiwarką"
+        ],
+        "example": "Wypożyczalnia sprzętu generuje umowę najmu i protokół wydania jednym kliknięciem, a klient podpisuje je na tablecie.",
+        "seoDescription": "Automatyzacja dokumentów: umowy, oferty i faktury generowane z Twoich danych, z podpisem elektronicznym i archiwum z wyszukiwarką."
+      },
+      "notifications-reminders": {
+        "title": "Powiadomienia i przypomnienia",
+        "summary": "Automatyczne SMS-y, e-maile i wiadomości w komunikatorach: przypomnienia o wizytach, płatnościach i terminach.",
+        "audience": "Dla gabinetów, serwisów i firm usługowych, które tracą pieniądze przez nieodbyte wizyty i spóźnione płatności.",
+        "features": [
+          "Przypomnienia o wizytach i terminach",
+          "Monity o płatnościach",
+          "SMS, e-mail, Telegram i inne kanały",
+          "Własne reguły i harmonogramy"
+        ],
+        "example": "Warsztat samochodowy wysyła klientom przypomnienie o przeglądzie i wymianie opon, z linkiem do rezerwacji terminu.",
+        "seoDescription": "Automatyczne powiadomienia i przypomnienia SMS, e-mail i Telegram: mniej nieodbytych wizyt i spóźnionych płatności w Twojej firmie."
+      },
+      "data-processing": {
+        "title": "Przetwarzanie danych",
+        "summary": "Zbieramy, czyścimy i porządkujemy dane z różnych źródeł, żeby były gotowe do raportów, analiz i dalszej automatyzacji.",
+        "audience": "Dla firm, które mają dane w wielu arkuszach i systemach, ale nie mogą z nich szybko skorzystać.",
+        "features": [
+          "Import z arkuszy, plików i systemów",
+          "Czyszczenie i usuwanie duplikatów",
+          "Regularne zadania według harmonogramu",
+          "Eksport do raportów i narzędzi BI"
+        ],
+        "example": "Hurtownia codziennie rano łączy cenniki od dostawców w jeden aktualny plik i aktualizuje ceny w sklepie internetowym.",
+        "seoDescription": "Przetwarzanie danych dla firm: import, czyszczenie i łączenie danych z wielu źródeł, gotowych do raportów i automatyzacji."
+      }
+    },
+    "ai": {
+      "ai-assistants": {
+        "title": "Asystenci AI i chatboty",
+        "summary": "Asystent, który zna Twoją ofertę i odpowiada klientom na stronie lub w komunikatorze, a trudne sprawy przekazuje człowiekowi.",
+        "audience": "Dla firm, które dostają wiele powtarzalnych pytań i chcą odpowiadać szybko, także wieczorami i w weekendy.",
+        "features": [
+          "Odpowiedzi na podstawie Twojej wiedzy",
+          "Działanie na stronie i w komunikatorach",
+          "Przekazanie rozmowy do człowieka",
+          "Zbieranie zapytań do CRM"
+        ],
+        "example": "Hotel butikowy ma asystenta, który odpowiada na pytania o pokoje, parking i śniadania, a prośby o rezerwację przekazuje recepcji.",
+        "seoDescription": "Asystenci AI i chatboty dla firm: odpowiedzi na pytania klientów 24/7 na stronie i w komunikatorach, z przekazaniem do człowieka."
+      },
+      "ai-document-processing": {
+        "title": "Przetwarzanie dokumentów z AI",
+        "summary": "AI odczytuje faktury, umowy i formularze, wyciąga z nich potrzebne dane i przekazuje je do Twoich systemów.",
+        "audience": "Dla firm, które ręcznie przepisują dane z dokumentów: logistyki, biur rachunkowych, firm handlowych i usługowych.",
+        "features": [
+          "Odczyt skanów, zdjęć i plików PDF",
+          "Wyciąganie pól do Twojego systemu",
+          "Weryfikacja i kontrola człowieka",
+          "Klasyfikacja i archiwizacja"
+        ],
+        "example": "Biuro rachunkowe wgrywa paczkę faktur kosztowych, a system rozpoznaje kontrahentów, kwoty i stawki VAT jeszcze przed księgowaniem.",
+        "seoDescription": "Przetwarzanie dokumentów z AI: odczyt faktur, umów i formularzy, wyciąganie danych i przekazanie ich do Twoich systemów."
+      },
+      "content-generation": {
+        "title": "Generowanie treści",
+        "summary": "AI przygotowuje opisy produktów, posty, newslettery i odpowiedzi w stylu Twojej marki, a Ty tylko je zatwierdzasz.",
+        "audience": "Dla sklepów i firm, które potrzebują dużo treści, a nie mają na nie czasu ani osobnego copywritera.",
+        "features": [
+          "Opisy produktów na dużą skalę",
+          "Treści w kilku językach",
+          "Styl zgodny z Twoją marką",
+          "Akceptacja przed publikacją"
+        ],
+        "example": "Sklep z częściami rowerowymi generuje opisy setek produktów po polsku i angielsku na podstawie danych z hurtowni.",
+        "seoDescription": "Generowanie treści z AI: opisy produktów, posty i newslettery w stylu Twojej marki, w kilku językach, z akceptacją przed publikacją."
+      },
+      "ai-analytics": {
+        "title": "Analityka AI",
+        "summary": "AI analizuje sprzedaż, opinie i zgłoszenia klientów, wskazuje trendy i odpowiada na pytania o Twoje dane prostym językiem.",
+        "audience": "Dla firm, które mają dane, ale brakuje im czasu albo analityka, żeby wyciągać z nich wnioski.",
+        "features": [
+          "Pytania o dane zadawane zwykłym językiem",
+          "Analiza opinii i zgłoszeń klientów",
+          "Wykrywanie trendów i anomalii",
+          "Cykliczne podsumowania wyników"
+        ],
+        "example": "Restauracja dostaje cotygodniowe podsumowanie opinii z Google i aplikacji dostawczych, z najczęstszymi uwagami i zmianą ocen.",
+        "seoDescription": "Analityka AI dla małych firm: analiza sprzedaży i opinii klientów, wykrywanie trendów i odpowiedzi na pytania o dane prostym językiem."
+      }
+    },
+    "telegram": {
+      "sales-orders": {
+        "title": "Sprzedaż i zamówienia",
+        "summary": "Bot w Telegramie z katalogiem, koszykiem i płatnością, który przyjmuje zamówienia całą dobę.",
+        "audience": "Dla gastronomii, piekarni, sklepów lokalnych i marek, których klienci i tak piszą w komunikatorach.",
+        "features": [
+          "Katalog i koszyk w czacie",
+          "Płatności online",
+          "Powiadomienia dla obsługi o nowych zamówieniach",
+          "Statusy zamówień dla klienta"
+        ],
+        "example": "Pizzeria przyjmuje zamówienia przez bota, kuchnia widzi je na tablecie, a klient dostaje wiadomość, gdy kurier wyrusza.",
+        "seoDescription": "Boty Telegram do sprzedaży: katalog, koszyk i płatności w czacie, powiadomienia o zamówieniach. Przyjmuj zamówienia całą dobę."
+      },
+      "booking": {
+        "title": "Zapisy i rezerwacje",
+        "summary": "Bot, przez który klienci sami wybierają usługę, termin i specjalistę, a potem dostają przypomnienie.",
+        "audience": "Dla salonów beauty, gabinetów, szkół, trenerów i wszystkich, którzy umawiają klientów na konkretne godziny.",
+        "features": [
+          "Wolne terminy w czasie rzeczywistym",
+          "Synchronizacja z kalendarzem",
+          "Przypomnienia i przekładanie wizyt",
+          "Przedpłaty i zadatki"
+        ],
+        "example": "Barber shop przyjmuje rezerwacje przez bota, a klient może jednym kliknięciem przełożyć wizytę bez dzwonienia.",
+        "seoDescription": "Bot Telegram do zapisów i rezerwacji: wolne terminy, synchronizacja z kalendarzem, przypomnienia i przedpłaty."
+      },
+      "customer-support": {
+        "title": "Obsługa klienta",
+        "summary": "Bot odpowiada na typowe pytania, zbiera zgłoszenia i przekazuje je właściwej osobie z zespołu.",
+        "audience": "Dla firm, w których pytania klientów giną w prywatnych wiadomościach pracowników.",
+        "features": [
+          "Odpowiedzi na częste pytania",
+          "Zgłoszenia z numerem i statusem",
+          "Przekazanie rozmowy do operatora",
+          "Historia rozmów w jednym miejscu"
+        ],
+        "example": "Serwis elektroniki przyjmuje zgłoszenia napraw przez bota, a klient sprawdza status naprawy bez dzwonienia.",
+        "seoDescription": "Bot Telegram do obsługi klienta: odpowiedzi na częste pytania, zgłoszenia ze statusem i przekazanie rozmowy do operatora."
+      },
+      "mini-apps": {
+        "title": "Telegram Mini Apps",
+        "summary": "Pełnoprawna aplikacja otwierana w Telegramie: sklep, karta lojalnościowa, kalendarz czy panel klienta — bez instalacji.",
+        "audience": "Dla firm, które chcą mieć własną aplikację dla klientów bez kosztów i barier sklepów z aplikacjami.",
+        "features": [
+          "Interfejs jak w aplikacji mobilnej",
+          "Logowanie przez konto Telegram",
+          "Płatności i programy lojalnościowe",
+          "Połączenie z CRM i botem"
+        ],
+        "example": "Kawiarnia ma Mini App z menu, zamówieniem na wynos i cyfrową kartą lojalnościową — co dziesiąta kawa gratis.",
+        "seoDescription": "Telegram Mini Apps dla firm: sklep, program lojalnościowy lub panel klienta w Telegramie, bez instalacji i sklepów z aplikacjami."
+      }
+    }
+  },
+  "projects": {
+    "bakery-telegram-orders": {
+      "title": "Zamówienia z piekarni przez Telegram",
+      "client": "Piekarnia Kłosek",
+      "industry": "Piekarnictwo",
+      "summary": "Bot w Telegramie i prosty katalog online, dzięki którym stali klienci zamawiają pieczywo na następny dzień bez telefonowania.",
+      "task": "Piekarnia przyjmowała zamówienia telefonicznie i w prywatnych wiadomościach. Część zamówień ginęła, a rano trudno było policzyć, ile czego upiec.",
+      "solution": "Zbudowaliśmy bota w Telegramie z katalogiem, koszykiem i wyborem godziny odbioru oraz prostą stronę z aktualnym asortymentem. Zamówienia z obu kanałów trafiają na jedną listę, a wieczorem piekarnia dostaje zestawienie produkcji na kolejny dzień.",
+      "result": "Zamówienia przestały ginąć, a poranne planowanie wypieków jest szybsze i prostsze."
+    },
+    "dental-clinic-crm": {
+      "title": "CRM i przypomnienia dla kliniki stomatologicznej",
+      "client": "Klinika Uśmiech+",
+      "industry": "Stomatologia",
+      "summary": "System CRM z automatycznymi przypomnieniami o wizytach, który porządkuje pracę recepcji i ogranicza liczbę nieodbytych wizyt.",
+      "task": "Recepcja prowadziła pacjentów w kalendarzu i arkuszach, a przypomnienia wysyłała ręcznie, gdy starczyło czasu. Pacjenci zapominali o wizytach, a wolne terminy zostawały niewykorzystane.",
+      "solution": "Wdrożyliśmy CRM z kartoteką pacjentów, historią kontaktów i etapami leczenia. Dodaliśmy automatyczne przypomnienia SMS i Telegram dzień przed wizytą, z opcją potwierdzenia lub przełożenia terminu. Zwolnione terminy od razu wracają do grafiku.",
+      "result": "Recepcja nie musi już ręcznie obdzwaniać pacjentów, a odwołane wizyty szybciej trafiają do kolejnych osób."
+    },
+    "logistics-document-ai": {
+      "title": "AI do faktur i dokumentów CMR",
+      "client": "Vistula Cargo",
+      "industry": "Logistyka",
+      "summary": "Rozwiązanie AI, które odczytuje faktury i listy przewozowe CMR i przenosi dane do systemu firmy.",
+      "task": "Dział administracji codziennie przepisywał dane z dziesiątek faktur i dokumentów CMR, często ze zdjęć zrobionych przez kierowców. Praca była żmudna, a pomyłki wychodziły dopiero przy rozliczeniach.",
+      "solution": "Przygotowaliśmy proces, w którym dokumenty trafiają na skrzynkę e-mail lub do bota, a model AI rozpoznaje typ dokumentu i wyciąga kluczowe pola: numery, daty, kontrahentów i kwoty. Wątpliwe pozycje są oznaczane do sprawdzenia przez człowieka, a zatwierdzone dane trafiają przez API do systemu firmy.",
+      "result": "Zespół sprawdza dane zamiast je przepisywać, a błędy są wychwytywane już przy wprowadzaniu, a nie przy rozliczeniach."
+    },
+    "fitness-studio-platform": {
+      "title": "Strona, Mini App i CRM dla studia fitness",
+      "client": "Studio Pulse",
+      "industry": "Fitness",
+      "summary": "Nowa strona, Telegram Mini App do zapisów na zajęcia i CRM do obsługi karnetów — w jednym połączonym systemie.",
+      "task": "Studio korzystało z kilku niepołączonych narzędzi: strona bez grafiku, zapisy w komunikatorze i karnety w arkuszu. Klienci nie widzieli wolnych miejsc, a obsługa ręcznie pilnowała limitów.",
+      "solution": "Zaprojektowaliśmy stronę z aktualnym grafikiem zajęć i Mini App w Telegramie, w której klient zapisuje się na zajęcia, kupuje karnet i widzi pozostałe wejścia. Wszystko jest połączone z CRM, który prowadzi karnety, obecności i przypomnienia.",
+      "result": "Zapisy i karnety są w jednym systemie, a klienci rezerwują miejsca sami, bez pisania do obsługi."
+    }
+  }
+}

@@ -1,0 +1,213 @@
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getCategories, getCategory, getProjectsForService, getService } from '~/content';
+import { HighlightLink } from '@/components/nav/HighlightLink';
+import { Breadcrumbs } from '@/components/panel/Breadcrumbs';
+import { ContentPanel } from '@/components/panel/ContentPanel';
+import { primaryButton } from '@/components/ui/styles';
+import { Link } from '@/i18n/navigation';
+import { isLocale } from '@/i18n/routing';
+import { getCategoryText, getProjectText, getServiceText } from '@/lib/content-text';
+import { buildPageMetadata } from '@/lib/metadata';
+import { paths } from '@/lib/routes';
+import { sceneNodeId } from '@/scene/node-ids';
+import { accentStyle, formatIndex } from '@/lib/style';
+
+interface ServicePageProps {
+  params: Promise<{ locale: string; category: string; service: string }>;
+}
+
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return getCategories().flatMap((category) =>
+    category.services.map((service) => ({ category: category.id, service: service.slug })),
+  );
+}
+
+export async function generateMetadata({ params }: ServicePageProps): Promise<Metadata> {
+  const { locale, category: categoryId, service: slug } = await params;
+  if (!isLocale(locale) || !getService(categoryId, slug)) return {};
+  const text = getServiceText(locale, categoryId, slug);
+  const categoryName = getCategoryText(locale, categoryId).name;
+  return buildPageMetadata({
+    locale,
+    path: paths.service(categoryId, slug),
+    title: `${text.title} · ${categoryName}`,
+    description: text.seoDescription,
+  });
+}
+
+export default async function ServicePage({ params }: ServicePageProps) {
+  const { locale, category: categoryId, service: slug } = await params;
+  if (!isLocale(locale)) notFound();
+  setRequestLocale(locale);
+  const category = getCategory(categoryId);
+  const service = getService(categoryId, slug);
+  if (!category || !service) notFound();
+
+  const t = await getTranslations('service');
+  const tCommon = await getTranslations('common');
+  const categoryText = getCategoryText(locale, category.id);
+  const text = getServiceText(locale, category.id, service.slug);
+  const [minWeeks, maxWeeks] = service.timelineWeeks;
+
+  const siblings = category.services;
+  const position = siblings.findIndex((item) => item.slug === service.slug);
+  // Planets orbit, so previous/next wrap around the system.
+  const previous = siblings[(position - 1 + siblings.length) % siblings.length]!;
+  const next = siblings[(position + 1) % siblings.length]!;
+  const related = getProjectsForService(category.id, service.slug);
+  const serviceRef = `${category.id}/${service.slug}`;
+
+  return (
+    <ContentPanel labelledBy="service-title" style={accentStyle(category.dna.color)}>
+      <Breadcrumbs
+        label={tCommon('breadcrumbs')}
+        items={[
+          { label: tCommon('backToUniverse'), href: paths.home() },
+          { label: categoryText.name, href: paths.category(category.id) },
+          { label: text.title },
+        ]}
+      />
+      <p className="flex items-center gap-2 mono-index text-muted">
+        <span
+          aria-hidden="true"
+          className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]"
+        />
+        {formatIndex(position + 1)} / {formatIndex(siblings.length)}
+      </p>
+      <h1
+        id="service-title"
+        className="mt-3 font-display text-[1.625rem] leading-tight font-medium text-ink md:text-[1.875rem]"
+      >
+        {text.title}
+      </h1>
+      <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink/90">{text.summary}</p>
+
+      <Link
+        href={{ pathname: paths.configurator(), query: { add: serviceRef } }}
+        className={`${primaryButton} mt-5 min-h-12 w-full px-6 text-sm sm:w-auto`}
+      >
+        <span aria-hidden="true">+</span>
+        {t('addToRequest')}
+      </Link>
+
+      <div className="mt-8 flex flex-col gap-6">
+        <section>
+          <h2 className="mb-2 eyebrow">{t('audience')}</h2>
+          <p className="text-[0.9375rem] leading-relaxed text-muted">{text.audience}</p>
+        </section>
+        <section>
+          <h2 className="mb-2 eyebrow">{t('features')}</h2>
+          <ul className="flex flex-col gap-2">
+            {text.features.map((feature) => (
+              <li key={feature} className="flex gap-3 text-[0.9375rem] text-ink/90">
+                <span
+                  aria-hidden="true"
+                  className="mt-[0.6em] h-0.5 w-3 shrink-0 rounded-full bg-[var(--accent)] opacity-80"
+                />
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2 className="mb-2 eyebrow">{t('example')}</h2>
+          <p className="border-l border-[color-mix(in_srgb,var(--accent)_50%,transparent)] pl-4 text-[0.9375rem] leading-relaxed text-muted">
+            {text.example}
+          </p>
+        </section>
+        <section>
+          <h2 className="mb-2 eyebrow">{t('timeline')}</h2>
+          <p className="font-display text-lg text-ink">
+            {t('timelineValue', { min: minWeeks, max: maxWeeks })}
+          </p>
+        </section>
+      </div>
+
+      {related.length > 0 ? (
+        <section aria-labelledby="related-title" className="mt-8">
+          <h2 id="related-title" className="mb-3 eyebrow">
+            {t('relatedProjects')}
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {related.map((project) => (
+              <li key={project.slug}>
+                <Link
+                  href={paths.project(project.slug)}
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-white/[0.07] px-4 py-2 text-sm text-ink transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07]"
+                >
+                  {getProjectText(locale, project.slug).title}
+                  <span aria-hidden="true" className="text-faint">
+                    →
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <nav aria-labelledby="siblings-title" className="mt-8 border-t border-white/[0.07] pt-6">
+        <h2 id="siblings-title" className="mb-3 eyebrow">
+          {t('siblings')}
+        </h2>
+        <ol className="flex flex-col">
+          {siblings.map((sibling, index) => {
+            const current = sibling.slug === service.slug;
+            return (
+              <li key={sibling.slug}>
+                <HighlightLink
+                  href={paths.service(category.id, sibling.slug)}
+                  highlightId={sceneNodeId.service(category.id, sibling.slug)}
+                  aria-current={current ? 'page' : undefined}
+                  className="group flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-muted transition-colors duration-150 hover:bg-white/[0.04] hover:text-ink active:bg-white/[0.07] aria-[current]:text-ink"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="mono-index text-faint group-aria-[current]:text-[var(--accent)]"
+                  >
+                    {formatIndex(index + 1)}
+                  </span>
+                  {getServiceText(locale, category.id, sibling.slug).title}
+                </HighlightLink>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <HighlightLink
+            href={paths.service(category.id, previous.slug)}
+            highlightId={sceneNodeId.service(category.id, previous.slug)}
+            rel="prev"
+            className="flex min-h-14 flex-col justify-start rounded-xl border border-white/[0.07] px-3 py-2 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07]"
+          >
+            <span className="text-xs text-muted">
+              <span aria-hidden="true">← </span>
+              {t('previous')}
+            </span>
+            <span className="line-clamp-2 text-sm leading-snug text-ink">
+              {getServiceText(locale, category.id, previous.slug).title}
+            </span>
+          </HighlightLink>
+          <HighlightLink
+            href={paths.service(category.id, next.slug)}
+            highlightId={sceneNodeId.service(category.id, next.slug)}
+            rel="next"
+            className="flex min-h-14 flex-col items-end justify-start rounded-xl border border-white/[0.07] px-3 py-2 text-right transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07]"
+          >
+            <span className="text-xs text-muted">
+              {t('next')}
+              <span aria-hidden="true"> →</span>
+            </span>
+            <span className="line-clamp-2 max-w-full text-sm leading-snug text-ink">
+              {getServiceText(locale, category.id, next.slug).title}
+            </span>
+          </HighlightLink>
+        </div>
+      </nav>
+    </ContentPanel>
+  );
+}

@@ -1,0 +1,53 @@
+{
+  "name": "kabaninno-site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KABANINNO studio website: an interactive 3D universe built with Next.js and React Three Fiber, exported as a static site.",
+  "engines": {
+    "node": ">=20.9"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node scripts/postbuild.mjs",
+    "build:preview": "node scripts/build-preview.mjs",
+    "serve": "node scripts/serve-out.mjs",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node scripts/vitest.mjs run",
+    "test:watch": "node scripts/vitest.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "fonts:report": "node scripts/font-report.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@react-three/postprocessing": "^3.2.2",
+    "gsap": "^3.15.1",
+    "next": "16.4.6",
+    "next-intl": "^4.15.3",
+    "postprocessing": "^6.39.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "three": "^0.187.0",
+    "zod": "^4.6.7",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
+    "eslint": "~9.39.5",
+    "eslint-config-next": "16.4.6",
+    "eslint-config-prettier": "^10.1.8",
+    "postcss": "^8.5.33",
+    "prettier": "^3.10.1",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.1"
+  }
+}

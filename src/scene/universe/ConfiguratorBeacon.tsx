@@ -1,0 +1,186 @@
+'use client';
+
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
+import {
+  AdditiveBlending,
+  Color,
+  DoubleSide,
+  type Group,
+  type Mesh,
+  type ShaderMaterial,
+} from 'three';
+import { qualityDefines, type QualityPreset } from '../quality';
+import { beamFragment, beamVertex, pingFragment, pingVertex } from '../shaders/beacon';
+import { nodeCoreFragment, nodeCoreVertex } from '../shaders/node-core';
+import { fogUniforms } from '../three-utils';
+import { Halo } from './Halo';
+import { HitZone } from './HitZone';
+import type { ConfiguratorNodeModel } from './model';
+import type { UniverseRuntimeRef } from './runtime';
+
+const CORE_RADIUS = 0.3;
+/** Seconds each palette color dominates before blending into the next. */
+const COLOR_PERIOD = 6;
+
+interface ConfiguratorBeaconProps {
+  node: ConfiguratorNodeModel;
+  runtime: UniverseRuntimeRef;
+  preset: QualityPreset;
+  onNavigate: (path: string) => void;
+}
+
+/**
+ * The configurator "beacon": faceted core, vertical signal beam and sonar
+ * pings. Its tint slowly blends the category accents (in M4 it will blend the
+ * categories the visitor selected).
+ */
+export function ConfiguratorBeacon({ node, runtime, preset, onNavigate }: ConfiguratorBeaconProps) {
+  const groupRef = useRef<Group>(null);
+  const coreRef = useRef<Mesh>(null);
+  const coreMaterialRef = useRef<ShaderMaterial>(null);
+  const beamMaterialRef = useRef<ShaderMaterial>(null);
+  const pingMaterialRef = useRef<ShaderMaterial>(null);
+  const haloMaterialRef = useRef<ShaderMaterial>(null);
+
+  const palette = useMemo(() => node.palette.map((hex) => new Color(hex)), [node.palette]);
+  const white = useMemo(() => new Color('#ffffff'), []);
+
+  const coreUniforms = useMemo(
+    () => ({
+      ...fogUniforms(),
+      uColor: { value: new Color(node.color) },
+      uGlow: { value: new Color(node.glow) },
+      uTime: { value: 0 },
+      uEmphasis: { value: 0 },
+      uSeed: { value: 11.3 },
+    }),
+    [node.color, node.glow],
+  );
+  const beamUniforms = useMemo(
+    () => ({
+      ...fogUniforms(),
+      uColor: { value: new Color(node.color) },
+      uTime: { value: 0 },
+      uEmphasis: { value: 0 },
+      uIntensity: { value: 0.7 },
+      uWidth: { value: 0.5 },
+      uHeight: { value: 4.8 },
+    }),
+    [node.color],
+  );
+  const pingUniforms = useMemo(
+    () => ({
+      ...fogUniforms(),
+      uColor: { value: new Color(node.color) },
+      uTime: { value: 0 },
+      uEmphasis: { value: 0 },
+      uPing: { value: 1 },
+    }),
+    [node.color],
+  );
+
+  useFrame(() => {
+    const rt = runtime.current;
+    if (!rt) return;
+    const group = groupRef.current;
+    if (group) {
+      const offset = rt.offsets[node.index];
+      group.position.set(node.position[0], node.position[1], node.position[2]);
+      if (offset) group.position.add(offset);
+    }
+    const emphasis = rt.emphasis[node.index] ?? 0;
+    const time = rt.time;
+
+    // Blend through the palette with long, eased crossfades.
+    const cycle = time / COLOR_PERIOD;
+    const from = palette[Math.floor(cycle) % palette.length];
+    const to = palette[(Math.floor(cycle) + 1) % palette.length];
+    const blend = smoothstep(0.55, 1, cycle - Math.floor(cycle));
+
+    if (coreRef.current) {
+      const grow = 1 + 0.15 * emphasis;
+      coreRef.current.rotation.set(0, time * 0.33, 0);
+      coreRef.current.scale.set(grow, grow * 1.6, grow);
+    }
+    for (const ref of [coreMaterialRef, beamMaterialRef, pingMaterialRef, haloMaterialRef]) {
+      const material = ref.current;
+      if (!material) continue;
+      const color = material.uniforms.uColor.value as Color;
+      if (from && to) color.copy(from).lerp(to, blend);
+      if (ref === haloMaterialRef || ref === coreMaterialRef) {
+        (material.uniforms.uGlow.value as Color)
+          .copy(color)
+          .lerp(white, ref === haloMaterialRef ? 0.5 : 0.3);
+      }
+      if (material.uniforms.uTime) material.uniforms.uTime.value = time;
+      material.uniforms.uEmphasis.value = emphasis;
+    }
+    if (pingMaterialRef.current) pingMaterialRef.current.uniforms.uPing.value = rt.animated ? 1 : 0;
+  });
+
+  const defines = qualityDefines(preset);
+  const variant = preset.lowQualityShaders ? 'low' : 'full';
+
+  return (
+    <group ref={groupRef} position={node.position}>
+      <mesh ref={coreRef} scale={[1, 1.6, 1]}>
+        <icosahedronGeometry args={[CORE_RADIUS, 0]} />
+        <shaderMaterial
+          key={variant}
+          ref={coreMaterialRef}
+          uniforms={coreUniforms}
+          vertexShader={nodeCoreVertex}
+          fragmentShader={nodeCoreFragment}
+          defines={defines}
+        />
+      </mesh>
+      <mesh frustumCulled={false} renderOrder={1}>
+        <planeGeometry args={[2, 2]} />
+        <shaderMaterial
+          key={variant}
+          ref={beamMaterialRef}
+          uniforms={beamUniforms}
+          vertexShader={beamVertex}
+          fragmentShader={beamFragment}
+          defines={defines}
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
+        <planeGeometry args={[5.4, 5.4]} />
+        <shaderMaterial
+          key={variant}
+          ref={pingMaterialRef}
+          uniforms={pingUniforms}
+          vertexShader={pingVertex}
+          fragmentShader={pingFragment}
+          defines={defines}
+          transparent
+          depthWrite={false}
+          side={DoubleSide}
+          blending={AdditiveBlending}
+        />
+      </mesh>
+      <Halo
+        color={node.color}
+        glow={node.glow}
+        size={1.9}
+        lift={CORE_RADIUS * 1.7}
+        intensity={0.85}
+        runtime={runtime}
+        index={node.index}
+        preset={preset}
+        materialRef={haloMaterialRef}
+      />
+      <HitZone radius={2.3} nodeKey={node.key} path={node.path} onNavigate={onNavigate} />
+    </group>
+  );
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1);
+  return t * t * (3 - 2 * t);
+}

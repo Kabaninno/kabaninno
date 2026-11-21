@@ -1,0 +1,102 @@
+{
+  "meta": {
+    "homeTitle": "{studio} — strony, CRM, automatyzacje, AI i boty Telegram",
+    "homeDescription": "Strony WWW, systemy CRM, automatyzacje, rozwiązania AI i boty Telegram dla małych firm. Opisz projekt w kilku krokach i wyślij zapytanie.",
+    "portfolioTitle": "Portfolio",
+    "portfolioDescription": "Realizacje studia {studio}: zadanie, rozwiązanie, efekt i użyte technologie.",
+    "configuratorTitle": "Utwórz zapytanie",
+    "configuratorDescription": "Wybierz rodzaj rozwiązania, funkcje, budżet i termin, a na koniec wyślij gotową wiadomość przez Telegram."
+  },
+  "common": {
+    "skipToContent": "Przejdź do treści",
+    "backToUniverse": "Wszechświat",
+    "breadcrumbs": "Ścieżka nawigacyjna"
+  },
+  "hud": {
+    "homeLabel": "{studio} — strona główna",
+    "primaryNav": "Nawigacja główna",
+    "services": "Usługi",
+    "portfolio": "Portfolio",
+    "configurator": "Konfigurator",
+    "cta": "Utwórz zapytanie",
+    "menuOpen": "Otwórz menu",
+    "menuClose": "Zamknij menu",
+    "language": "Język",
+    "languageNames": {
+      "pl": "Polski",
+      "en": "English",
+      "uk": "Українська"
+    }
+  },
+  "home": {
+    "eyebrow": "Studio cyfrowe dla małych firm",
+    "title": "Łączymy Twój biznes w jeden system",
+    "lead": "Strony WWW, CRM, automatyzacje, AI i boty Telegram — zaprojektowane tak, by działały razem.",
+    "cta": "Utwórz zapytanie",
+    "servicesNav": "Kategorie usług",
+    "explore": "Wybierz system, by go zbadać"
+  },
+  "system": {
+    "eyebrow": "System {index} / {total}",
+    "servicesHeading": "Usługi"
+  },
+  "service": {
+    "audience": "Dla kogo",
+    "features": "Kluczowe funkcje",
+    "example": "Przykład",
+    "timeline": "Orientacyjny czas realizacji",
+    "timelineValue": "{min}–{max, plural, one {# tydzień} few {# tygodnie} many {# tygodni} other {# tygodnia}}",
+    "addToRequest": "Dodaj do zapytania",
+    "relatedProjects": "Powiązane realizacje",
+    "previous": "Poprzednia usługa",
+    "next": "Następna usługa",
+    "siblings": "Usługi w tym systemie"
+  },
+  "portfolio": {
+    "eyebrow": "Obserwatorium",
+    "title": "Portfolio",
+    "lead": "Wybrane realizacje: zadanie, rozwiązanie i efekt.",
+    "emptyTitle": "Wkrótce",
+    "emptyBody": "Właśnie opisujemy pierwsze realizacje. Zajrzyj tu niedługo.",
+    "emptyCta": "Utwórz zapytanie",
+    "emptyExplore": "Tymczasem poznaj nasze usługi",
+    "draftBadge": "Szkic",
+    "client": "Klient",
+    "industry": "Branża",
+    "year": "Rok",
+    "task": "Zadanie",
+    "solution": "Rozwiązanie",
+    "result": "Efekt",
+    "stack": "Technologie",
+    "services": "Usługi",
+    "allProjects": "Wszystkie realizacje"
+  },
+  "configurator": {
+    "eyebrow": "Konfigurator",
+    "title": "Utwórz zapytanie",
+    "lead": "Kilka prostych kroków, a na końcu gotowa wiadomość, którą wyślesz nam przez Telegram.",
+    "stepsHeading": "Kroki",
+    "steps": {
+      "type": "Rodzaj rozwiązania",
+      "features": "Funkcje",
+      "business": "Twoja firma",
+      "budget": "Budżet",
+      "timeline": "Termin",
+      "contact": "Imię i komentarz",
+      "summary": "Podsumowanie"
+    },
+    "comingSoon": "Interaktywny kreator pojawi się tu wkrótce."
+  },
+  "notFound": {
+    "title": "Ten sektor jest pusty",
+    "body": "Ta strona nie istnieje albo została przeniesiona.",
+    "home": "Wróć do wszechświata"
+  },
+  "error": {
+    "eyebrow": "Sygnał utracony",
+    "title": "Coś poszło nie tak",
+    "body": "Nie udało się wyświetlić tej strony. Spróbuj ponownie, a jeśli to nie pomoże, wróć do wszechświata.",
+    "retry": "Spróbuj ponownie",
+    "home": "Wróć do wszechświata"
+  }
+}
