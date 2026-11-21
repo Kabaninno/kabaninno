@@ -27,8 +27,14 @@
 
 1. ✅ Репозиторій: https://github.com/Kabaninno/kabaninno (remote `origin` додано, `main` запушено 2026-11-21).
 2. ✅ Перший запуск «Deploy to GitHub Pages» упав на кроці «Configure GitHub Pages», бо Pages ще не ввімкнені. Код не винен, збірка не стартувала.
-3. ⏳ Власник вмикає Settings → Pages → Source = GitHub Actions і перезапускає workflow (Actions → Deploy to GitHub Pages → Re-run all jobs). Очікувана адреса: https://kabaninno.github.io/kabaninno/.
-   - Тепер, коли є remote, локальний `build:preview` сам бере `https://kabaninno.github.io/kabaninno` замість `.invalid` (D123).
+3. ✅ Власник увімкнув Pages (Source = GitHub Actions); деплой `73e3f08` пройшов. **Сайт: https://kabaninno.github.io/kabaninno/**
+   - Перевірено після деплою (curl + один headless Chrome, `reports/qa/live-check.mjs`):
+     - сторінки 200, невідомі шляхи 404;
+     - canonical, hreflang, og і twitter, sitemap (84 URL), robots, JSON-LD — на `https://kabaninno.github.io/kabaninno`;
+     - 0 входжень localhost, `.invalid` і плейсхолдерів; 19/19 ассетів головної — 200;
+     - на 4 сторінках у трьох мовах 0 console errors і 0 невдалих запитів, сцена доходить до `data-scene-ready`;
+     - на підсумку конфігуратора одна кнопка `https://t.me/wa1demarr?text=…`.
+   - Локальний `build:preview` тепер сам бере `https://kabaninno.github.io/kabaninno` з git remote (D123).
 4. Деплой бере `base_url`/`base_path` з `actions/configure-pages` (D123).
 5. Домену поки немає (`[ДОМЕН]` у `site.config.ts` лишається). Коли з’явиться: Settings → Pages → Custom domain.
 
