@@ -77,7 +77,8 @@ export interface WizardLabels {
     copy: string;
     copied: string;
     copyFailed: string;
-    openChat: string;
+    /** Under "Send via Telegram": the text is already copied (D135). */
+    sendHint: string;
     newTab: string;
     truncated: string;
     unconfigured: string;
@@ -217,7 +218,7 @@ export function buildWizardLabels({
       copy: t('summary.copy'),
       copied: t('summary.copied'),
       copyFailed: t('summary.copyFailed'),
-      openChat: t('summary.openChat'),
+      sendHint: t('summary.sendHint'),
       newTab: t('summary.newTab'),
       truncated: t('summary.truncated'),
       unconfigured: t('summary.unconfigured'),

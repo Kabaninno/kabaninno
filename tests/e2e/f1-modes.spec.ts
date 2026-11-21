@@ -50,7 +50,8 @@ test.describe('simple (2D) mode', () => {
       ),
     ).toBe(true);
     await expect(page.locator('.simple-sky')).toBeVisible();
-    await expect(page.locator('.simple-constellation circle').first()).toBeAttached();
+    // The 2D map (D124) replaced the static constellation.
+    await expect(page.locator('nav[data-simple-map] a').first()).toBeVisible();
     await expect(page.locator(HUD_SWITCH)).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator(HERO)).toHaveCSS('opacity', '1');
     await page.waitForTimeout(1500);

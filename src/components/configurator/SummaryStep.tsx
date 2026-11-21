@@ -41,8 +41,6 @@ export interface LeadHandoff {
   prepared: PreparedTelegramLink | null;
   /** The link had to shorten the text. */
   shortened: boolean;
-  /** Plain chat link (no text), or null. */
-  chatUrl: string | null;
   /** A link submitter without a valid username (only "Copy" works). */
   unconfigured: boolean;
   /** A non-link submitter (future API): "Send" calls `submit`. */
@@ -54,7 +52,7 @@ export interface LeadHandoff {
 
 /**
  * The hand-off state of the summary step, shared by its body (message,
- * notices, "Open chat", status) and the wizard's sticky footer ("Send in
+ * notices, status) and the wizard's sticky footer ("Send via
  * Telegram" / "Copy text", MJ-1). The textarea holds the full message (what
  * "Copy" copies); the link carries the version that fits the URL budget:
  * the compact / trimmed default while unedited, or the edited text cut to
@@ -85,7 +83,6 @@ export function useLeadHandoff({
     stale: isEditStale(edit, full),
     prepared,
     shortened: Boolean(prepared?.truncated) || (edit === null && fitted.truncated),
-    chatUrl: link?.chatUrl() ?? null,
     unconfigured: link !== null && !link.configured,
     submits: link === null,
     status,
@@ -108,10 +105,16 @@ export function useLeadHandoff({
 
 /**
  * Primary actions of the summary step, rendered in the wizard's sticky
- * footer: "Send in Telegram" — a real `<a target="_blank">` to t.me with the
- * text, the most reliable way on desktop and phones (D80) — or "Send" for a
- * non-link submitter, and "Copy text" (the only action while Telegram is not
- * configured, then styled as the primary one).
+ * footer:
+ * - "Send via Telegram": ONE button that copies the full message and opens
+ *   `t.me/<username>?text=…`. It stays a real `<a target="_blank">` (the most
+ *   reliable way on desktop and phones, D80); the copy starts in its click
+ *   handler fire-and-forget, without preventing the navigation, so the new
+ *   tab is never blocked. A hint under it says the text is already copied if
+ *   Telegram did not prefill it (D135);
+ * - "Send" for a non-link submitter (a future API);
+ * - "Copy text" as the secondary action (the only one while Telegram is not
+ *   configured, then styled as the primary one).
  */
 export function SummaryActions({
   handoff,
@@ -129,9 +132,12 @@ export function SummaryActions({
           href={prepared.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() =>
-            analytics.track('lead_submit', { via: 'telegram', truncated: prepared.truncated })
-          }
+          aria-describedby={SEND_HINT_ID}
+          onClick={() => {
+            // Fire-and-forget: the default navigation (new tab) must go ahead.
+            void handoff.copy();
+            analytics.track('lead_submit', { via: 'telegram', truncated: prepared.truncated });
+          }}
           className={`${primaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
         >
           {labels.summary.send}
@@ -154,9 +160,17 @@ export function SummaryActions({
       >
         {labels.summary.copy}
       </button>
+      {prepared ? (
+        <p id={SEND_HINT_ID} className="w-full text-xs leading-snug text-muted">
+          {labels.summary.sendHint}
+        </p>
+      ) : null}
     </>
   );
 }
+
+/** The hint under "Send via Telegram" (also its accessible description). */
+const SEND_HINT_ID = 'cfg-send-hint';
 
 interface SummaryStepProps {
   draft: ConfiguratorDraft;
@@ -174,8 +188,8 @@ interface SummaryStepProps {
 /**
  * Step 7: the answers at a glance (each with "Change"), the message in an
  * editable textarea (the full default message, "Restore default"), notices
- * (shortened link, Telegram not configured), "Open chat" (no text) as an
- * extra fallback, and the status of the last copy/send. The primary actions
+ * (shortened link, Telegram not configured) and the status of the last
+ * copy/send (a polite live region: "Copied" after "Send via Telegram" too). The primary actions
  * live in the wizard's sticky footer (`SummaryActions`).
  *
  * When an answer changes after the visitor edited the message, the edit is
@@ -322,17 +336,6 @@ export function SummaryStep({
         </p>
       ) : null}
 
-      {handoff.chatUrl ? (
-        <a
-          href={handoff.chatUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`${secondaryButton} min-h-12 w-full px-6 text-sm sm:w-auto sm:self-start`}
-        >
-          {labels.summary.openChat}
-          <span className="sr-only"> ({labels.summary.newTab})</span>
-        </a>
-      ) : null}
       <p role="status" className="min-h-5 text-sm text-muted">
         {handoff.status}
       </p>

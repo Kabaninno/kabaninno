@@ -313,7 +313,7 @@ Komentarz:
 - `industries.other`: «Inna / Other / Інша» → «Inna branża / Other industry / Інша галузь». У повідомленні рядок «Firma: Inna, 2–10 osób» був незрозумілим.
 - `sizes.solo`: «Jednoosobowa / One-person business / Одна особа» → «1 osoba / 1 person / 1 особа», у тому самому стилі, що й «2–10 osób». В en зник повтор «Business: …, One-person business».
 - `errors.requiredText`: додано «lub nazwę firmy / or company name / або назву компанії», бо підказка поля дозволяє вписати назву компанії.
-- `summary.openChat`: додано «w Telegramie / in Telegram / у Telegram», бо кнопка стоїть окремо від основних дій.
+- ~~`summary.openChat`~~ — ключ видалено: кнопки Telegram об’єднано в одну (REPORT.md, D135). Новий ключ для вичитки: `summary.sendHint` (підказка під кнопкою «Надіслати в Telegram»).
 - `summary.unconfigured`: технічне «czat nie jest skonfigurowany» → «Wysyłka przez Telegram nie jest jeszcze dostępna. Skopiuj tekst i wyślij go nam w inny sposób.» (en, uk так само).
 - `hud.simpleModeForced` узагальнено: тепер він охоплює не лише браузери без WebGL 2, а й ті, де WebGL є, але не працює (GPU в чорному списку, WebGL вимкнено). pl «Grafika 3D jest niedostępna w tej przeglądarce, dlatego strona działa w trybie prostym 2D.», en «3D is not available in this browser, so the site runs in simple 2D mode.», uk «У цьому браузері 3D-графіка недоступна, тому сайт працює в простому режимі 2D.»
 - `meta.ogImageAlt`: alt тепер передає текст на самій картинці: назву студії, слоган (`home.title`) і назви категорій із чипів. Наприклад, pl «KABANINNO. Łączymy Twój biznes w jeden system: strony i aplikacje, CRM, automatyzacja, AI i boty Telegram». Якщо зміниться `home.title` або назви категорій, alt треба оновити разом із картинками (`npm run og:images`).

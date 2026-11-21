@@ -57,7 +57,7 @@ export interface PreparedTelegramLink {
 export interface LinkLeadSubmitter extends LeadSubmitter {
   readonly configured: boolean;
   prepare(text: string): PreparedTelegramLink | null;
-  /** The chat without a prefilled text ("Open chat" fallback), or null when unconfigured. */
+  /** The chat without a prefilled text, or null when unconfigured (no longer rendered, D135). */
   chatUrl(): string | null;
 }
 

@@ -306,9 +306,33 @@ test.describe('summary and hand-off', () => {
 
     await panel(page).getByLabel(ui.pl.configurator.summary.message).fill('@studio cześć');
     await expect(send).toHaveAttribute('href', /\?text=%20%40studio%20cze%C5%9B%C4%87$/);
-    await expect(
-      panel(page).getByRole('link', { name: new RegExp(ui.pl.configurator.summary.openChat) }),
-    ).toHaveAttribute('href', `https://t.me/${siteConfig.telegramUsername.replace(/^@/, '')}`);
+    // One Telegram action (D135): no separate "open chat" link; the hint describes the button.
+    await expect(panel(page).getByRole('link', { name: /t\.me|Telegram/ })).toHaveCount(1);
+    await expect(send).toHaveAccessibleDescription(ui.pl.configurator.summary.sendHint);
+  });
+
+  test('"Send via Telegram" copies the full text and opens t.me in a new tab', async ({
+    page,
+    context,
+  }) => {
+    test.skip(!configured, 'siteConfig.telegramUsername is still the placeholder in this build');
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    // Keep the test offline: answer the t.me tab locally.
+    await context.route('https://t.me/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<title>t.me</title>' }),
+    );
+    await seed(page, 'summary');
+    await open(page);
+    const text = await panel(page).getByLabel(ui.pl.configurator.summary.message).inputValue();
+    const send = panel(page).getByRole('link', {
+      name: new RegExp(ui.pl.configurator.summary.send),
+    });
+    const [tab] = await Promise.all([context.waitForEvent('page'), send.click()]);
+    expect(tab.url()).toMatch(/^https:\/\/t\.me\/[^?]+\?text=/);
+    await expect(panel(page)).toContainText(ui.pl.configurator.summary.copied);
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied.replace(/\r\n/g, '\n')).toBe(text);
+    await tab.close();
   });
 
   test('unconfigured Telegram: no send link, a notice, Copy stays', async ({ page }) => {

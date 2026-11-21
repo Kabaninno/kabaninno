@@ -250,7 +250,7 @@ After the first deployment, check the site on a real phone (Safari on iOS and Ch
 All studio-wide settings live in [`site.config.ts`](site.config.ts):
 
 - `studioName` — `KABANINNO`;
-- `telegramUsername` — `wa1demarr` (without `@`): the request configurator links to `https://t.me/wa1demarr` and the home JSON-LD lists it in `sameAs`. With an invalid value or a bracketed placeholder the configurator falls back to Copy only;
+- `telegramUsername` — `wa1demarr` (without `@`): the configurator's single «Wyślij przez Telegram» button copies the message and opens `https://t.me/wa1demarr?text=…` (a hint says the text is already copied if Telegram does not prefill it; «Skopiuj tekst» stays as a secondary action), and the home JSON-LD lists it in `sameAs`. With an invalid value or a bracketed placeholder the configurator falls back to Copy only;
 - `domain` — still the placeholder `[ДОМЕН]`; the production domain without protocol (used for absolute URLs when
   `NEXT_PUBLIC_SITE_URL` is not set). The placeholder never reaches a page: deploys use the URL from the
   Pages workflow, and the postbuild guard fails on `[ДОМЕН]`;
