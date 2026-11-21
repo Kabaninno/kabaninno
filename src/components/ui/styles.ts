@@ -25,9 +25,9 @@ export const secondaryButton =
   'transition-colors duration-200 ease-calm ' +
   'hover:border-white/35 hover:bg-white/[0.06] active:bg-white/10';
 
-/** Quiet text link inside the HUD. */
+/** Quiet text link inside the HUD (44 px tall on touch screens, M3-03). */
 export const hudLink =
-  'relative inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[0.8125rem] text-muted ' +
+  'relative inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[0.8125rem] text-muted pointer-coarse:h-11 ' +
   'transition-colors duration-150 ease-calm ' +
   'hover:bg-white/[0.06] hover:text-ink active:bg-white/10 ' +
   'aria-[current]:text-ink aria-expanded:bg-white/[0.06] aria-expanded:text-ink';

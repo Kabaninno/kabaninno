@@ -193,7 +193,7 @@ export default async function ServicePage({ params }: ServicePageProps) {
             href={paths.service(category.id, previous.slug)}
             highlightId={sceneNodeId.service(category.id, previous.slug)}
             rel="prev"
-            className="flex min-h-14 flex-col justify-start rounded-xl border border-white/[0.07] px-3 py-2 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07]"
+            className="flex min-h-14 flex-col justify-start rounded-xl border border-white/[0.07] px-3 py-2 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] focus-visible:outline-offset-[-1px] active:bg-white/[0.07]"
           >
             <span className="text-xs text-muted">
               <span aria-hidden="true">← </span>
@@ -207,7 +207,7 @@ export default async function ServicePage({ params }: ServicePageProps) {
             href={paths.service(category.id, next.slug)}
             highlightId={sceneNodeId.service(category.id, next.slug)}
             rel="next"
-            className="flex min-h-14 flex-col items-end justify-start rounded-xl border border-white/[0.07] px-3 py-2 text-right transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07]"
+            className="flex min-h-14 flex-col items-end justify-start rounded-xl border border-white/[0.07] px-3 py-2 text-right transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] focus-visible:outline-offset-[-1px] active:bg-white/[0.07]"
           >
             <span className="text-xs text-muted">
               {t('next')}

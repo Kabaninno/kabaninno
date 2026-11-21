@@ -56,23 +56,20 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
     serviceTitle: (categoryId, slug) => getServiceText(locale, categoryId, slug).title,
   });
 
+  // The wizard renders the panel header itself: its lead shows on the first
+  // step only (MJ-1). Phones opening the configurator directly get a tall sheet.
   return (
-    <ContentPanel labelledBy="configurator-title">
-      <p className="eyebrow">{t('eyebrow')}</p>
-      <h1
-        id="configurator-title"
-        className="mt-3 font-display text-[1.75rem] leading-tight font-medium text-ink md:text-[2rem]"
-      >
-        {bindShortWords(t('title'), locale)}
-      </h1>
-      <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted">
-        {bindShortWords(t('lead'), locale)}
-      </p>
+    <ContentPanel labelledBy="configurator-title" tallOnLoad>
       <ConfiguratorWizard
         model={model}
         labels={labels}
         locale={locale}
         telegramUsername={siteConfig.telegramUsername}
+        header={{
+          eyebrow: t('eyebrow'),
+          title: bindShortWords(t('title'), locale),
+          lead: bindShortWords(t('lead'), locale),
+        }}
       />
     </ContentPanel>
   );

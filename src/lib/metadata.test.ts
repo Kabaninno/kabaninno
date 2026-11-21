@@ -72,3 +72,28 @@ describe('buildPageMetadata', () => {
     expect(result.robots).toEqual({ index: false, follow: true });
   });
 });
+
+describe('Open Graph images', () => {
+  it('points every locale at its own PNG under the base path', () => {
+    for (const locale of ['pl', 'en', 'uk'] as const) {
+      const image = metadata.ogImage(locale);
+      expect(image.url).toBe(`${SITE}/og/${locale}.png`);
+      expect(image).toMatchObject({ width: 1200, height: 630, type: 'image/png' });
+      expect(image.alt).toContain('KABANINNO');
+      expect(image.alt).not.toContain('{studio}');
+    }
+  });
+
+  it('is part of the page metadata (Open Graph and Twitter)', () => {
+    const result = metadata.buildPageMetadata({
+      locale: 'uk',
+      path: '/portfolio/',
+      title: 'Портфоліо',
+      description: 'd',
+    });
+    const og = result.openGraph as { images?: { url: string }[] };
+    expect(og.images?.[0]?.url).toBe(`${SITE}/og/uk.png`);
+    const twitter = result.twitter as { images?: { url: string }[] };
+    expect(twitter.images?.[0]?.url).toBe(`${SITE}/og/uk.png`);
+  });
+});

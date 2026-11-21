@@ -95,7 +95,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               <HighlightLink
                 href={paths.service(category.id, service.slug)}
                 highlightId={sceneNodeId.service(category.id, service.slug)}
-                className="group flex gap-4 rounded-2xl border border-white/[0.07] p-4 transition-colors duration-200 ease-calm hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:bg-white/[0.04] active:bg-white/[0.07]"
+                className="group flex gap-4 rounded-2xl border border-white/[0.07] p-4 transition-colors duration-200 ease-calm hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:bg-white/[0.04] focus-visible:outline-offset-[-1px] active:bg-white/[0.07]"
               >
                 <span
                   aria-hidden="true"

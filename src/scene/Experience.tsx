@@ -13,9 +13,15 @@ import {
 } from 'react';
 import { Canvas, useFrame, useThree, type GLProps, type RootState } from '@react-three/fiber';
 import { useRouter } from '@/i18n/navigation';
-import { sceneStateToPath } from '@/lib/route-state';
+import { sceneStateToPath, type SceneTarget } from '@/lib/route-state';
 import { useSceneStore, type QualityTier } from '@/store/scene';
-import { createSceneBus, keepAlive, type SceneBusRef } from './bus';
+import {
+  ARCHIVE_READY_KEY,
+  createSceneBus,
+  keepAlive,
+  systemReadyKey,
+  type SceneBusRef,
+} from './bus';
 import { CameraDirector } from './camera/CameraDirector';
 import { CAMERA, MOTION, PALETTE } from './config';
 import { SceneStats } from './debug/SceneStats';
@@ -183,6 +189,18 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   useEffect(() => () => archiveMaterials.dispose(), [archiveMaterials]);
   useEffect(() => archiveMaterials.retain(preset.lowQualityShaders), [preset, archiveMaterials]);
   useEffect(() => useSceneStore.getState().setQuality(tier), [tier]);
+  // Boot progress (D94): the chunk is loaded once this component runs.
+  useEffect(() => useSceneStore.getState().setBootProgress(0.25), []);
+  // Leaving the 3D layer (simple mode, D94): nothing of the scene stays in the store.
+  useEffect(
+    () => () => {
+      const store = useSceneStore.getState();
+      store.setFocus(null);
+      store.setFlight({ active: false, progress: 1, to: null });
+      if (store.introActive) store.setIntroActive(false);
+    },
+    [],
+  );
 
   const advance = useCallback((next: BootStage) => {
     requestAnimationFrame(() => {
@@ -194,6 +212,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
     bloomRef.current = bloom;
   }, [bloom]);
   const handleFirstFrame = useCallback(() => {
+    useSceneStore.getState().setBootProgress(0.5);
     advance(bloomRef.current ? 1 : 2);
     deadlineTimer.current = window.setTimeout(() => {
       deadlineTimer.current = null;
@@ -203,6 +222,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   }, [advance]);
   const handleEffectsReady = useCallback(() => advance(2), [advance]);
   const handleRevealed = useCallback(() => {
+    useSceneStore.getState().setBootProgress(0.85);
     setRevealed(true);
     advance(3);
   }, [advance]);
@@ -216,6 +236,9 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   );
   // On screen: compiled through the queue, or forced by the deadline.
   const shown = revealed || deadlinePassed;
+  useEffect(() => {
+    if (shown) useSceneStore.getState().setBootProgress(1);
+  }, [shown]);
 
   const navigate = useCallback(
     (to: string, replace = false) => (replace ? router.replace(to) : router.push(to)),
@@ -238,6 +261,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
       }}
     >
       <FirstFrameSignal onFirstFrame={handleFirstFrame} />
+      <SceneReadySignal busRef={busRef} target={target} path={path} shown={shown} />
       <DemandDriver busRef={busRef} active={frameloop === 'demand'} booting={!shown} path={path} />
       <CompileService apiRef={compileRef} linearTarget={bloom} />
       <Backdrop preset={preset} />
@@ -292,6 +316,62 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
       <SceneStats />
     </Canvas>
   );
+}
+
+/** `bus.readyContent` key the URL's focused content must reach, or null (universe). */
+function readyKeyFor(target: SceneTarget): string | null {
+  switch (target.mode) {
+    case 'system':
+    case 'planet':
+      return systemReadyKey(target.category);
+    case 'portfolio':
+    case 'project':
+      return ARCHIVE_READY_KEY;
+    default:
+      return null;
+  }
+}
+
+/**
+ * `html[data-scene-ready="<path>"]` for automation (screenshots wait for it):
+ * set on every scene route (home, systems, planets, portfolio — also with no
+ * projects —, projects, configurator) while the camera has settled on the
+ * URL's state and its focused content (system, archive) is compiled and on
+ * screen; removed otherwise, and never set on unknown routes.
+ */
+function SceneReadySignal({
+  busRef,
+  target,
+  path,
+  shown,
+}: {
+  busRef: SceneBusRef;
+  target: SceneTarget;
+  path: string;
+  shown: boolean;
+}) {
+  const last = useRef<string | null>(null);
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.sceneReady;
+    },
+    [],
+  );
+  useFrame(() => {
+    const bus = busRef.current;
+    // Unknown routes (404) need no readiness signal.
+    const required = target.mode === 'unknown' ? undefined : readyKeyFor(target);
+    const store = useSceneStore.getState();
+    const settled = shown && !bus.flying && !store.introActive && store.focus === path;
+    const contentReady =
+      required !== undefined && (required === null || bus.readyContent.has(required));
+    const value = settled && contentReady ? path : null;
+    if (value === last.current) return;
+    last.current = value;
+    if (value) document.documentElement.dataset.sceneReady = value;
+    else delete document.documentElement.dataset.sceneReady;
+  });
+  return null;
 }
 
 /** Calls `onFirstFrame` once, right before the first frame is drawn. */

@@ -6,6 +6,7 @@ import { Color, type Group, type Mesh, type ShaderMaterial } from 'three';
 import type { SceneBusRef } from '../bus';
 import { SYSTEM_BASE_TILT } from '../config';
 import { systemPrewarmKey, type CompileApiRef, type PrewarmApiRef } from '../prewarm/api';
+import { COMPILE_PRIORITY } from '../prewarm/compile-queue';
 import type { SystemMaterialCache } from '../prewarm/system-materials';
 import { qualityDefines, type QualityPreset } from '../quality';
 import { nodeCoreFragment, nodeCoreVertex } from '../shaders/node-core';
@@ -20,7 +21,7 @@ import { Halo } from './Halo';
 import { HitZone } from './HitZone';
 import type { CategoryNodeModel } from './model';
 import { NodeOrbits } from './NodeOrbits';
-import type { UniverseRuntimeRef } from './runtime';
+import { neighbourDim, type UniverseRuntimeRef } from './runtime';
 import { orbitClearanceScale } from './screen-size';
 
 /** Halo half size and lift relative to the core radius. */
@@ -125,7 +126,8 @@ export function CategoryNode({
       material.uniforms.uTime.value = rt.time;
       material.uniforms.uEmphasis.value = emphasis;
       material.uniforms.uSmall.value = rt.small[i] ?? 0;
-      material.uniforms.uPresence.value = rt.presence[i] ?? 1;
+      // Neighbours of the focused node step back with the network (mn4: no bare core).
+      material.uniforms.uPresence.value = (rt.presence[i] ?? 1) * neighbourDim(rt, i, 0.4);
     }
     const halo = haloMaterialRef.current;
     if (halo) {
@@ -178,6 +180,7 @@ export function CategoryNode({
           focusedService={focusedService}
           onNavigate={onNavigate}
           readyRef={systemReadyRef}
+          priority={focused ? COMPILE_PRIORITY.boot : COMPILE_PRIORITY.live}
         />
       ) : null}
       <Halo

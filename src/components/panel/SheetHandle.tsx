@@ -17,8 +17,7 @@ function sheetOf(element: Element): HTMLElement | null {
 }
 
 /**
- * Handle of the mobile bottom sheet (hidden from md up, where panels are a
- * side column). A real button: tap, Enter or Space toggles between expanded
+ * Handle of the mobile bottom sheet (hidden in the side layout, `side:`). A real button: tap, Enter or Space toggles between expanded
  * (60 % of the height) and collapsed (a peek that leaves the planet visible);
  * dragging it down collapses and up expands, with the sheet following the
  * finger meanwhile. The state lives in `store/ui.ts`, so it survives
@@ -67,7 +66,9 @@ export function SheetHandle({ label, controls }: SheetHandleProps) {
   };
 
   return (
-    <div className="flex shrink-0 justify-center md:hidden">
+    // An opaque strip above the panel's top scroll fade: the handle keeps its
+    // contrast however the content under it is scrolled (V5-05, mn5).
+    <div className="relative z-[2] flex shrink-0 justify-center bg-[rgb(8_11_22/0.97)] side:hidden">
       <button
         type="button"
         data-sheet-handle=""

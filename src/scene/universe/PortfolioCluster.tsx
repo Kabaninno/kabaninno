@@ -8,6 +8,7 @@ import { PALETTE } from '../config';
 import { ArchiveContent } from '../portfolio/ArchiveContent';
 import type { ArchiveMaterialCache } from '../portfolio/archive-materials';
 import { ARCHIVE_PREWARM_KEY, type CompileApiRef, type PrewarmApiRef } from '../prewarm/api';
+import { COMPILE_PRIORITY } from '../prewarm/compile-queue';
 import { qualityDefines, type QualityPreset } from '../quality';
 import { createRandom } from '../random';
 import { clusterFragment, clusterVertex } from '../shaders/cluster';
@@ -175,6 +176,7 @@ export function PortfolioCluster({
           focusedProject={focusedProject}
           active={focused}
           onNavigate={onNavigate}
+          priority={focused ? COMPILE_PRIORITY.boot : COMPILE_PRIORITY.live}
         />
       ) : null}
       <HitZone

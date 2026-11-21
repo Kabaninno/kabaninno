@@ -350,6 +350,9 @@ function layoutChanged(a: LabelLayout, b: LabelLayout): boolean {
 }
 
 function setContent(dom: LabelDom, target: LabelTarget) {
+  // Planet and card labels sit among orbit lines and glass: a subtle plate (visual mn1).
+  const plate = target.key.startsWith('service:') || target.key.startsWith('project:');
+  dom.root.dataset.plate = plate ? 'true' : 'false';
   dom.name.textContent = target.label;
   dom.index.textContent = target.index ?? '';
   dom.index.style.display = target.index ? '' : 'none';
@@ -418,6 +421,8 @@ function createLabelDom(reducedMotion: boolean): LabelDom {
 [data-scene-labels] .sl-text { transition: opacity ${fade}, filter ${fade}, translate ${fade};
   opacity: 0; ${reducedMotion ? '' : 'filter: blur(2px); translate: 0 6px;'} }
 [data-scene-labels][data-visible='true'] .sl-text { opacity: 1; filter: none; translate: 0 0; }
+[data-scene-labels][data-plate='true'] .sl-text { background: rgb(5 7 13 / 0.64);
+  padding: 5px 9px 6px; border-radius: 6px; box-shadow: 0 0 0 1px rgb(232 236 245 / 0.07); }
 `;
   root.appendChild(style);
 

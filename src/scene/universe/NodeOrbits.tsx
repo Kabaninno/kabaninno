@@ -18,7 +18,7 @@ import {
 } from '../shaders/orbits';
 import { fogUniforms, pointScale } from '../three-utils';
 import type { OrbitPreview } from './model';
-import type { UniverseRuntimeRef } from './runtime';
+import { neighbourDim, type UniverseRuntimeRef } from './runtime';
 
 /** Sparks are drawn larger than the real planet so they read from afar. */
 const SPARK_EXAGGERATION = 2.6;
@@ -93,7 +93,9 @@ export function NodeOrbits({
     const rt = runtime.current;
     if (!rt) return;
     const emphasis = rt.emphasis[index] ?? 0;
-    const presence = rt.presence[index] ?? 1;
+    // A neighbour of the focused node dims with the network (visual mn4: bright
+    // white sparks on neighbouring orbits read as fireflies in a system view).
+    const presence = (rt.presence[index] ?? 1) * neighbourDim(rt, index, 0.25);
     // In the system view the real planets replace the sparks and their tails.
     const detail = systemDetail(rt.focus[index] ?? 0, rt.corePx[index] ?? 0);
     // Hovered planet (3D or HTML highlight) lights its orbit; the focused one stays lit.

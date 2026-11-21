@@ -118,7 +118,12 @@ export function ArchiveCard({
   const gate = () => {
     const card = stateRef.current?.cards[index];
     return (
-      !!busRef?.current.archiveInteractive && !focused && !!card && card.fade > 0.5 && card.inFront
+      !!busRef?.current.archiveInteractive &&
+      !focused &&
+      !!card &&
+      card.fade > 0.5 &&
+      card.dim > 0.15 &&
+      card.inFront
     );
   };
 

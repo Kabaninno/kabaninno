@@ -5,10 +5,13 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { siteConfig } from '~/site.config';
 import { Hud } from '@/components/hud/Hud';
+import { BootState } from '@/components/layout/BootState';
 import { EscapeToParent } from '@/components/layout/EscapeToParent';
 import { FlightStatus } from '@/components/layout/FlightStatus';
+import { IntroControl } from '@/components/layout/IntroControl';
 import { RouteFocus } from '@/components/layout/RouteFocus';
 import { SafeAreaPublisher } from '@/components/layout/SafeAreaPublisher';
+import { SimpleBackdrop } from '@/components/layout/SimpleBackdrop';
 import { SkipLink } from '@/components/layout/SkipLink';
 import { RouteExit } from '@/components/motion/RouteExit';
 import { RequestSync } from '@/components/request/RequestSync';
@@ -16,6 +19,7 @@ import { getMessagesFor, pickMessages } from '@/i18n/messages';
 import { isLocale, locales } from '@/i18n/routing';
 import { allServiceRefs, buildNavCategories } from '@/lib/nav-data';
 import { buildSceneManifest } from '@/lib/scene-manifest';
+import { simpleModeBootScript } from '@/lib/simple-mode';
 import { SITE_URL } from '@/lib/site-url';
 import { SceneRoot } from '@/scene/SceneRoot';
 import { fontVariables } from '../fonts';
@@ -62,12 +66,20 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   // localized error boundary (`error.tsx`) and the panel's sheet handle.
   const clientMessages = pickMessages(getMessagesFor(locale), ['hud', 'error', 'panel']);
 
+  // `suppressHydrationWarning`: the inline boot script may add
+  // `data-simple` to <html> before React hydrates (simple mode, D94).
   return (
-    <html lang={locale} className={fontVariables}>
+    <html lang={locale} className={fontVariables} suppressHydrationWarning>
+      <head>
+        {/* Decides simple (2D) mode before the first paint: no flash of the 3D layout. */}
+        <script dangerouslySetInnerHTML={{ __html: simpleModeBootScript() }} />
+      </head>
       <body>
         <SkipLink label={t('skipToContent')} />
         <div className="backdrop-cosmos" aria-hidden="true" />
+        <SimpleBackdrop />
         <NextIntlClientProvider messages={clientMessages}>
+          <BootState />
           <SceneRoot manifest={buildSceneManifest(locale)} />
           <SafeAreaPublisher />
           <FlightStatus />
@@ -75,6 +87,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           <RouteFocus />
           <RouteExit />
           <RequestSync serviceRefs={allServiceRefs()} />
+          <IntroControl label={tHud('skipIntro')} />
           <Hud
             categories={buildNavCategories(locale)}
             studioName={siteConfig.studioName}

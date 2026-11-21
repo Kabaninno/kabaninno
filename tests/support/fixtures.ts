@@ -7,7 +7,28 @@ import { formatIssues, IssueCollector } from './issues';
  * 4xx/5xx response fails the test, unless the test allowed it explicitly
  * (`issues.allowNotFound(...)`, `issues.allow(...)`).
  */
-export const test = base.extend<{ issues: IssueCollector }>({
+export const test = base.extend<{ issues: IssueCollector; introSeen: boolean; seedIntro: void }>({
+  /**
+   * The first-visit intro (D94) plays on a fresh profile's first home visit.
+   * Tests start as returning visitors by default, so flights and reveals stay
+   * deterministic; intro tests opt out with `test.use({ introSeen: false })`.
+   */
+  introSeen: [true, { option: true }],
+  seedIntro: [
+    async ({ context, introSeen }, provide) => {
+      if (introSeen) {
+        await context.addInitScript(() => {
+          try {
+            localStorage.setItem('kabaninno.intro.v1', 'true');
+          } catch {
+            // Storage blocked: the intro may play; tests that care check for it.
+          }
+        });
+      }
+      await provide();
+    },
+    { auto: true },
+  ],
   issues: [
     async ({ context }, provide, testInfo) => {
       const collector = new IssueCollector(context);

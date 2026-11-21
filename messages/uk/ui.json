@@ -5,7 +5,8 @@
     "portfolioTitle": "Портфоліо",
     "portfolioDescription": "Кейси студії {studio}: задача, рішення, результат і технології.",
     "configuratorTitle": "Сформувати запит",
-    "configuratorDescription": "Оберіть тип рішення, функції, бюджет і терміни, а потім надішліть готове повідомлення в Telegram."
+    "configuratorDescription": "Оберіть тип рішення, функції, бюджет і терміни, а потім надішліть готове повідомлення в Telegram.",
+    "ogImageAlt": "{studio} — сайти, CRM, автоматизація, AI та Telegram-боти"
   },
   "common": {
     "skipToContent": "Перейти до основного вмісту",
@@ -27,7 +28,10 @@
       "en": "English",
       "uk": "Українська"
     },
-    "requestCount": "{count, plural, one {# послуга в запиті} few {# послуги в запиті} many {# послуг у запиті} other {# послуги в запиті}}"
+    "requestCount": "{count, plural, one {# послуга в запиті} few {# послуги в запиті} many {# послуг у запиті} other {# послуги в запиті}}",
+    "simpleMode": "Простий режим 2D",
+    "simpleModeForced": "Цей браузер не підтримує WebGL 2, тому сайт працює в простому режимі 2D.",
+    "skipIntro": "Пропустити інтро"
   },
   "home": {
     "eyebrow": "Цифрова студія для невеликих компаній",

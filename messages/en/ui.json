@@ -5,7 +5,8 @@
     "portfolioTitle": "Portfolio",
     "portfolioDescription": "Projects by {studio}: the task, the solution, the result and the tech stack.",
     "configuratorTitle": "Build your request",
-    "configuratorDescription": "Choose the type of solution, features, budget and timeline, then send a ready-made message via Telegram."
+    "configuratorDescription": "Choose the type of solution, features, budget and timeline, then send a ready-made message via Telegram.",
+    "ogImageAlt": "{studio} — websites, CRM, automation, AI and Telegram bots"
   },
   "common": {
     "skipToContent": "Skip to content",
@@ -27,7 +28,10 @@
       "en": "English",
       "uk": "Українська"
     },
-    "requestCount": "{count, plural, one {# service} other {# services}} in your request"
+    "requestCount": "{count, plural, one {# service} other {# services}} in your request",
+    "simpleMode": "Simple 2D mode",
+    "simpleModeForced": "This browser does not support WebGL 2, so the site runs in simple 2D mode.",
+    "skipIntro": "Skip intro"
   },
   "home": {
     "eyebrow": "Digital studio for small companies",

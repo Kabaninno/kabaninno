@@ -48,6 +48,8 @@ const BASE_RADIUS: Record<UniverseNode['kind'], number> = {
 const PRESENCE_TOLERANCE_PX = 6;
 const PRESENCE_FADE_PX = 28;
 const PRESENCE_RATE = 6;
+/** Visible disc of a node relative to its core radius (core plus inner halo). */
+const PRESENCE_DISC = 1.6;
 
 /** Share of the minimum on-screen core size each kind gets. */
 const MIN_SIZE_SHARE: Record<UniverseNode['kind'], number> = {
@@ -219,7 +221,16 @@ export function Universe({
       rt.inFront[i] = inFront;
       const focusTarget =
         node.key === focusKey || (shared.focusDriven && node.key === shared.focusTo);
-      const outside = Math.max(frameLeft - sx, sx - frameRight, frameTop - sy, sy - frameBottom, 0);
+      // The node's glowing disc, not just its centre: a node never shows clipped by
+      // the frame edge (visual MN-2, mn4) — it fades as soon as its disc crosses it.
+      const disc = ((rt.corePx[i] ?? 0) / 2) * PRESENCE_DISC;
+      const outside = Math.max(
+        frameLeft - (sx - disc),
+        sx + disc - frameRight,
+        frameTop - (sy - disc),
+        sy + disc - frameBottom,
+        0,
+      );
       const presenceTarget =
         focusTarget || !inFront
           ? 1

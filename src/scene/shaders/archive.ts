@@ -92,6 +92,31 @@ void main() {
 `;
 
 /**
+ * Card emblem: a crisp, faceted body in the main category's colour — lit by
+ * the cluster core with a fresnel rim and glowing facet edges, no noise
+ * (visual V5-04: the noisy emissive skin made the CRM and AI emblems read as
+ * lumps).
+ */
+export const archiveEmblemFragment = /* glsl */ `
+${planetFragmentHead}
+
+void main() {
+  Surface s = surface();
+  float f = fresnel(s.n, s.v, 2.2);
+  float edge = clamp(length(fwidth(s.n)) * 4.0, 0.0, 1.0);
+  vec3 r = reflect(-s.v, s.n);
+  vec3 color = uColor * (0.5 + 0.55 * s.light) + uColor * 0.25;
+  color += uGlow * (f * 0.9 + edge * 0.7) * (1.0 + 0.4 * uHover);
+  color += uCoreColor * pow(max(dot(r, s.l), 0.0), 40.0) * 1.2;
+#ifndef LOW_QUALITY
+  color += uGlow * 0.1 * (0.5 + 0.5 * sin(vObjPos.y * 9.0 - uTime * 1.4));
+#endif
+  gl_FragColor = finishOpaque(color);
+  #include <colorspace_fragment>
+}
+`;
+
+/**
  * Observatory rings: three concentric circles around the archive wall made
  * of long arcs and fine ticks that turn slowly in alternating directions —
  * an observatory dial; with no projects yet it is the calm "archive being

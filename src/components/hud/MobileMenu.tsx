@@ -14,6 +14,7 @@ import { sceneNodeId } from '@/scene/node-ids';
 import { useSceneStore } from '@/store/scene';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { NodeMark } from './NodeMark';
+import { SimpleModeToggle } from './SimpleModeToggle';
 import type { NavCategory } from '@/lib/nav';
 import { useHudLocation } from './use-hud-section';
 
@@ -183,6 +184,7 @@ export function MobileMenu({ categories, studioName, className }: MobileMenuProp
           </nav>
 
           <div className="flex shrink-0 flex-col gap-3 border-t border-white/[0.06] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <SimpleModeToggle variant="row" />
             <LocaleSwitcher size="large" className="self-center" />
             <Link
               href={paths.configurator()}

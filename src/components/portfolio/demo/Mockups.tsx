@@ -61,7 +61,8 @@ function ChatMockup({ labels }: { labels: MockupLabels['chat'] }) {
           </span>
         </span>
       </div>
-      <ol role="log" className="flex min-h-48 flex-col justify-end gap-2 py-3">
+      {/* Top-aligned: the bot's greeting is the first thing under the header (V5-07). */}
+      <ol role="log" className="flex min-h-48 flex-col justify-start gap-2 py-3">
         {messages.map((message, index) => (
           <li
             key={index}

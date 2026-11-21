@@ -8,6 +8,7 @@ import {
   archiveCenterOffset,
   archiveExtents,
 } from '../portfolio/archive-layout';
+import { NODE_CORE_RADIUS } from '../system/constants';
 import { planetReach, planetWorldPosition } from '../system/planet-math';
 import type { Vec3 } from '../types';
 import type { CategoryNodeModel, UniverseModel, UniverseNode } from '../universe/model';
@@ -239,14 +240,64 @@ export function overviewGoal(
     }));
   });
 
-  const { look, distance } = fitPoints(
-    points,
-    dir,
-    centroid,
-    OVERVIEW.minDistance,
-    OVERVIEW.maxDistance,
-  );
+  const fitted = fitPoints(points, dir, centroid, OVERVIEW.minDistance, OVERVIEW.maxDistance);
+  const distance = fitted.distance;
+  const mass = model.nodes.filter((node) => node.kind !== 'portfolio').map((node) => node.position);
+  const look = balanceOnMass(fitted.look, distance, dir, points, mass);
   return { position: add(look, scale(dir, distance)), lookAt: look, fov };
+}
+
+/** Share of the way the network's centroid moves toward the frame centre (visual L-04). */
+const OVERVIEW_BALANCE = 0.6;
+
+/**
+ * The fit centres the bounding box of every node, so the distant portfolio
+ * cluster (up and back) pulled the network off-centre (visual L-04: pushed
+ * right, empty top-left). The slack left on the looser axis is used to move
+ * the network's centroid toward the frame centre, never letting any fitted
+ * sphere leave its frame tangents.
+ */
+function balanceOnMass(
+  look: Vec3,
+  distance: number,
+  dir: Vec3,
+  points: readonly FitPoint[],
+  mass: readonly Vec3[],
+): Vec3 {
+  if (mass.length === 0) return look;
+  const forward = scale(dir, -1);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const up = cross(right, forward);
+  const project = (p: Vec3) => {
+    const rel = sub(p, look);
+    const depth = Math.max(distance + dot(rel, forward), 0.1);
+    return { x: dot(rel, right) / depth, y: dot(rel, up) / depth, depth };
+  };
+  let cx = 0;
+  let cy = 0;
+  for (const p of mass) {
+    const q = project(p);
+    cx += q.x / mass.length;
+    cy += q.y / mass.length;
+  }
+  // Allowed shift (tangent units) keeping every sphere inside its tangents.
+  let loX = -Infinity;
+  let hiX = Infinity;
+  let loY = -Infinity;
+  let hiY = Infinity;
+  for (const point of points) {
+    const q = project(point.p);
+    const r = point.r / q.depth;
+    // Moving the look target by s (tangent units at `distance`) moves this point by s·k.
+    const k = distance / q.depth;
+    loX = Math.max(loX, (q.x + r - point.tanH) / k);
+    hiX = Math.min(hiX, (q.x - r + point.tanH) / k);
+    loY = Math.max(loY, (q.y + r - point.tanV) / k);
+    hiY = Math.min(hiY, (q.y - r + point.tanV) / k);
+  }
+  const shiftX = clamp(cx * OVERVIEW_BALANCE, Math.min(loX, 0), Math.max(hiX, 0));
+  const shiftY = clamp(cy * OVERVIEW_BALANCE, Math.min(loY, 0), Math.max(hiY, 0));
+  return add(look, add(scale(right, shiftX * distance), scale(up, shiftY * distance)));
 }
 
 /** A sphere to keep in the frame: centre, radius and the frame tangents it may use. */
@@ -372,6 +423,41 @@ export function selectionGoal(
   return best;
 }
 
+/** Configurator: content sits this share of the frame height above centre (visual MN-4). */
+export const CONFIGURATOR_LIFT = 0.08;
+
+/**
+ * Raises the framed content by `lift` × the frame height (camera and look
+ * target move down together), as far as the topmost node — with its framing
+ * radius — stays inside the frame.
+ */
+export function liftInFrame(
+  goal: CameraGoal,
+  nodes: readonly UniverseNode[],
+  aspect: number,
+  frame: SafeFrame,
+  lift: number,
+): CameraGoal {
+  const { tanV } = frameTangents(goal.fov, aspect, frame);
+  const back = sub(goal.position, goal.lookAt);
+  const distance = Math.hypot(...back);
+  const forward = scale(back, -1 / distance);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const up = cross(right, forward);
+  let top = -Infinity;
+  for (const node of nodes) {
+    const rel = sub(node.position, goal.position);
+    const z = dot(rel, forward);
+    if (z <= 0.1) continue;
+    top = Math.max(top, (dot(rel, up) + selectionFraming(node).radius) / z);
+  }
+  const room = Number.isFinite(top) ? tanV * 0.97 - top : 2 * lift * tanV;
+  const shift = Math.max(0, Math.min(2 * lift * tanV, room)) * distance;
+  if (shift <= 0) return goal;
+  const down = scale(up, -shift);
+  return { ...goal, position: add(goal.position, down), lookAt: add(goal.lookAt, down) };
+}
+
 /**
  * Selection framing per node: the beacon with its pings, a selected category
  * with its glowing core and halo (not the whole orbit preview, which would
@@ -400,7 +486,13 @@ export function computeCameraGoal(
   model: UniverseModel,
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
-  options: { sway?: number; planetAngle?: number; emphasis?: readonly string[] } = {},
+  options: {
+    sway?: number;
+    planetAngle?: number;
+    emphasis?: readonly string[];
+    /** Planet focus: keeps the chosen viewing side stable while the planet parks. */
+    planetView?: PlanetViewMemo;
+  } = {},
 ): CameraGoal {
   const overview = overviewGoal(model, aspect, frame, options.sway ?? 0);
   const fov = overview.fov;
@@ -410,14 +502,20 @@ export function computeCameraGoal(
     case 'planet': {
       const node = findCategory(model, target.category);
       if (!node) return overview;
-      const radius = Math.max(node.systemRadius * 1.2, 0.8);
-      const distance = Math.max(fitDistance(radius, radius, fov, aspect, frame), 3.2);
-      const system = approach(node.position, overview.position, distance, fov, 0.35);
+      const system = systemGoal(node, overview.position, fov, aspect, frame);
       if (target.mode === 'planet') {
         const orbit = node.orbits.find((o) => o.serviceSlug === target.service);
         // The live angle comes from the system view; deep links start at the orbit phase.
         if (orbit) {
-          return planetGoal(node, orbit, options.planetAngle ?? orbit.phase, system, aspect, frame);
+          return planetGoal(
+            node,
+            orbit,
+            options.planetAngle ?? orbit.phase,
+            system,
+            aspect,
+            frame,
+            options.planetView,
+          );
         }
       }
       return system;
@@ -438,7 +536,7 @@ export function computeCameraGoal(
       const selected = (options.emphasis ?? [])
         .map((key) => model.byKey.get(key))
         .filter((node): node is UniverseNode => !!node && node.kind !== 'configurator');
-      return selectionGoal(
+      const goal = selectionGoal(
         model,
         focus,
         selected,
@@ -448,6 +546,7 @@ export function computeCameraGoal(
         Math.hypot(...sub(overview.position, overview.lookAt)),
         options.sway ?? 0,
       );
+      return liftInFrame(goal, [anchor, ...selected], aspect, frame, CONFIGURATOR_LIFT);
     }
     default:
       return overview;
@@ -455,11 +554,92 @@ export function computeCameraGoal(
 }
 
 /**
+ * System view fit (visual MJ2): the camera looks at the core from the side the
+ * system is approached from (lifted), at the distance where the actual
+ * orbits — sampled with each planet's reach, over the whole idle spin around
+ * the vertical axis — span at most SYSTEM_FIT.width of the free width and
+ * SYSTEM_FIT.height of its height. A bounding sphere left phone systems tiny.
+ */
+/**
+ * Idle motion range a system view must cover: the full spin, or — in short
+ * free areas (a phone band above the sheet), where the spin's envelope would
+ * keep the system small — a gentle sway of ±SYSTEM_SWAY (CameraDirector).
+ */
+export const SYSTEM_SWAY = 0.35;
+
+export function usesSystemSway(frame: SafeFrame): boolean {
+  return frame.height < 0.5;
+}
+
+export function systemSpinRange(frame: SafeFrame): number {
+  return usesSystemSway(frame) ? SYSTEM_SWAY : Math.PI;
+}
+
+export const SYSTEM_FIT = {
+  width: 0.9,
+  height: 0.9,
+  lift: 0.35,
+  shortLift: 0.1,
+  /** Samples per orbit and camera spin angles covered. */
+  samples: 24,
+  spins: 8,
+  /** Planets may grow on small screens (planetScreenBoost): keep room for it. */
+  reachMargin: 1.2,
+  minDistance: 3.2,
+} as const;
+
+export function systemGoal(
+  node: CategoryNodeModel,
+  from: Vec3,
+  fov: number,
+  aspect: number,
+  frame: SafeFrame,
+  spinRange: number = systemSpinRange(frame),
+): CameraGoal {
+  const toward = normalize(sub(from, node.position));
+  // Short free areas: a flatter view, so the orbit ellipses take less height.
+  const lift = usesSystemSway(frame) ? SYSTEM_FIT.shortLift : SYSTEM_FIT.lift;
+  const dir = normalize([toward[0], toward[1] + lift, toward[2]]);
+  const forward = scale(dir, -1);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const up = cross(right, forward);
+  const { tanV, tanH } = frameTangents(fov, aspect, frame);
+  const limitH = tanH * SYSTEM_FIT.width;
+  const limitV = tanV * SYSTEM_FIT.height;
+  let distance: number = SYSTEM_FIT.minDistance;
+  const fit = (offset: Vec3, r: number) => {
+    const x = Math.abs(dot(offset, right)) + r;
+    const y = Math.abs(dot(offset, up)) + r;
+    distance = Math.max(distance, Math.max(x / limitH, y / limitV) - dot(offset, forward));
+  };
+  fit([0, 0, 0], CORE_KEEP_OUT);
+  for (const orbit of node.orbits) {
+    const r = planetReach(orbit) * SYSTEM_FIT.reachMargin;
+    for (let k = 0; k < SYSTEM_FIT.samples; k++) {
+      const p = sub(
+        planetWorldPosition(node.position, orbit, (k / SYSTEM_FIT.samples) * Math.PI * 2),
+        node.position,
+      );
+      for (let spin = 0; spin < SYSTEM_FIT.spins; spin++) {
+        const t = SYSTEM_FIT.spins > 1 ? spin / (SYSTEM_FIT.spins - 1) : 0.5;
+        const angle =
+          spinRange >= Math.PI ? (spin / SYSTEM_FIT.spins) * Math.PI * 2 : (t * 2 - 1) * spinRange;
+        fit(rotateY(p, [0, 0, 0], angle), r);
+      }
+    }
+  }
+  return { position: add(node.position, scale(dir, distance)), lookAt: [...node.position], fov };
+}
+
+/**
  * Planet focus: the camera looks at the planet's live position (the planet
  * parks on its orbit while focused) from outside its orbit, roughly from the
- * side the system was approached from, so the core stays in the background
- * and lights the planet from the side. The planet with its rings and moons
- * is fitted into the free frame (the panel or sheet covers the rest).
+ * side the system was approached from, so the core lights the planet from
+ * the side. The planet with its rings and moons is fitted into the free
+ * frame (the panel or sheet covers the rest). The viewing side turns around
+ * the planet (nearest yaw first) until the core with its corona is out of
+ * the frame, or at least 1.5 planet radii clear of the planet's reach
+ * (visual MJ1: a big, close core overlapped the rings and flooded the frame).
  */
 export function planetGoal(
   node: CategoryNodeModel,
@@ -468,6 +648,7 @@ export function planetGoal(
   system: CameraGoal,
   aspect: number,
   frame: SafeFrame,
+  memo?: PlanetViewMemo,
 ): CameraGoal {
   const planet = planetWorldPosition(node.position, orbit, angle);
   const reach = planetReach(orbit);
@@ -478,8 +659,108 @@ export function planetGoal(
   );
   const toSystemCamera = normalize(sub(system.position, node.position));
   const outward = normalize(sub(planet, node.position));
-  const dir = normalize(add(add(toSystemCamera, scale(outward, 0.6)), [0, 0.22, 0]));
-  return { position: add(planet, scale(dir, distance)), lookAt: planet, fov };
+  const base = normalize(add(add(toSystemCamera, scale(outward, 0.6)), [0, 0.22, 0]));
+  const { tanV, tanH } = frameTangents(fov, aspect, frame);
+  const azimuth = Math.atan2(base[0], base[2]);
+  const elevation = Math.asin(clamp(base[1], -1, 1));
+  const viewDir = ([yaw, pitch]: readonly [number, number]): Vec3 => {
+    const e = clamp(elevation + pitch, -0.9, 1.25);
+    const a = azimuth + yaw;
+    return [Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e)];
+  };
+  const clearance = (offset: readonly [number, number]) =>
+    planetCoreClearance(
+      node.position,
+      planet,
+      viewDir(offset),
+      distance,
+      reach,
+      orbit.size,
+      tanV,
+      tanH,
+    );
+  let best: readonly [number, number] = [0, 0];
+  let bestScore = -Infinity;
+  for (const offset of PLANET_VIEW_OFFSETS) {
+    const score = clearance(offset);
+    if (score > bestScore) {
+      bestScore = score;
+      best = offset;
+    }
+    if (score >= 1) break;
+  }
+  // Hysteresis: keep the previous side while it is still (nearly) as good.
+  const key = `${node.categoryId}/${orbit.serviceSlug}`;
+  if (memo?.key === key && memo.offset) {
+    const kept = clearance(memo.offset);
+    if (kept >= Math.min(bestScore, 1) - 0.1) best = memo.offset;
+  }
+  if (memo) {
+    memo.key = key;
+    memo.offset = best;
+  }
+  return { position: add(planet, scale(viewDir(best), distance)), lookAt: planet, fov };
+}
+
+/** Planet focus: the viewing side chosen last time (see planetGoal). */
+export interface PlanetViewMemo {
+  key?: string;
+  offset?: readonly [number, number];
+}
+
+/**
+ * Viewing sides tried around a focused planet as [yaw, pitch] offsets from
+ * the approach side (radians), the smallest change first.
+ */
+const PLANET_VIEW_OFFSETS: ReadonlyArray<readonly [number, number]> = (() => {
+  const offsets: Array<[number, number]> = [];
+  for (let step = -10; step <= 10; step++) {
+    for (const pitch of [0, 0.3, -0.25, 0.6, 0.9]) offsets.push([step * 0.25, pitch]);
+  }
+  return offsets.sort(
+    (a, b) => Math.abs(a[0]) + Math.abs(a[1]) * 1.2 - (Math.abs(b[0]) + Math.abs(b[1]) * 1.2),
+  );
+})();
+/**
+ * Radius the system core occupies in planet focus, world units: the core
+ * body (slightly enlarged in the system view) plus the inner glow — the
+ * corona shrinks and dims while a planet is focused (SystemContent).
+ */
+export const CORE_KEEP_OUT = NODE_CORE_RADIUS * 1.1 * 1.6;
+
+/**
+ * How clear the system core is of a planet viewed from `dir` (camera at
+ * `planet + dir · distance`, looking at the planet, up = +Y): 1 when the core
+ * is outside the frame or at least 1.5 planet radii (`size`) clear of the
+ * planet's reach on screen; less when it crowds the planet (0 = touching,
+ * negative = overlapping);
+ * 0.9 when the core is behind the camera (clear, but the planet is lit from
+ * the front, so a side view is preferred).
+ */
+export function planetCoreClearance(
+  core: Vec3,
+  planet: Vec3,
+  dir: Vec3,
+  distance: number,
+  reach: number,
+  size: number,
+  tanV: number,
+  tanH: number,
+): number {
+  const camera = add(planet, scale(dir, distance));
+  const forward = scale(dir, -1);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const up = cross(right, forward);
+  const rel = sub(core, camera);
+  const z = dot(rel, forward);
+  if (z <= 0) return Math.hypot(...rel) > CORE_KEEP_OUT ? 0.9 : 0;
+  const x = dot(rel, right) / z;
+  const y = dot(rel, up) / z;
+  const coreSize = CORE_KEEP_OUT / z;
+  if (Math.abs(x) - coreSize > tanH || Math.abs(y) - coreSize > tanV) return 1;
+  const gap = Math.hypot(x, y) - coreSize - reach / distance;
+  // Negative while the core overlaps the planet's reach: the least overlap still wins.
+  return Math.min(gap / ((1.5 * size) / distance), 1);
 }
 
 /** Planet focus: half extent of the fitted box relative to the planet's reach. */

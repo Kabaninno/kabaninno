@@ -41,8 +41,8 @@ interface ConfiguratorBeaconProps {
 
 /**
  * The configurator "beacon": faceted core, vertical signal beam and sonar
- * pings. Its tint slowly blends the category accents — only those the
- * visitor selected in the configurator while there is a selection (D81).
+ * pings. Idle, its tint slowly cycles through the category accents; with a
+ * configurator selection (D81) it holds a steady blend of the selected ones.
  */
 export function ConfiguratorBeacon({
   node,
@@ -121,16 +121,27 @@ export function ConfiguratorBeacon({
     for (let i = 0; i < palette.length; i++) {
       if ((rt.selected[i] ?? 0) > 0.5) active.push(i);
     }
-    const count = active.length > 0 ? active.length : palette.length;
-    const pick = (slot: number) =>
-      palette[active.length > 0 ? active[slot % count]! : slot % count];
-    const cycle = time / COLOR_PERIOD;
-    const from = pick(Math.floor(cycle));
-    const to = pick(Math.floor(cycle) + 1);
-    const blend = smoothstep(0.55, 1, cycle - Math.floor(cycle));
     const current = currentColor.current;
-    if (from && to) {
-      const [r, g, b] = mixOklch([from.r, from.g, from.b], [to.r, to.g, to.b], blend);
+    let target: [number, number, number] | null = null;
+    if (active.length > 0) {
+      // A selection holds one steady blend of its colours (visual MN-3): equal
+      // weights, mixed in OKLCH one colour at a time.
+      const first = palette[active[0]!]!;
+      target = [first.r, first.g, first.b];
+      for (let k = 1; k < active.length; k++) {
+        const next = palette[active[k]!]!;
+        target = mixOklch(target, [next.r, next.g, next.b], 1 / (k + 1));
+      }
+    } else {
+      // Idle: slowly cycle through every category accent.
+      const cycle = time / COLOR_PERIOD;
+      const from = palette[Math.floor(cycle) % palette.length];
+      const to = palette[(Math.floor(cycle) + 1) % palette.length];
+      const blend = smoothstep(0.55, 1, cycle - Math.floor(cycle));
+      if (from && to) target = mixOklch([from.r, from.g, from.b], [to.r, to.g, to.b], blend);
+    }
+    if (target) {
+      const [r, g, b] = target;
       // Ease toward the palette colour so a selection change never pops.
       const k = rt.animated ? dampFactor(TINT_RATE, Math.min(delta, 0.1)) : 1;
       const [cr, cg, cb] = mixOklch([current.r, current.g, current.b], [r, g, b], k);

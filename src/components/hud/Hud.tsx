@@ -9,10 +9,12 @@ import { paths } from '@/lib/routes';
 import { RequestCountBadge, useConfiguratorName } from '@/components/request/RequestCount';
 import { hudLink, primaryButton } from '@/components/ui/styles';
 import { sceneNodeId } from '@/scene/node-ids';
+import { BootIndicator } from './BootIndicator';
 import { LocaleSwitcher } from './LocaleSwitcher';
 import { MobileMenu } from './MobileMenu';
 import { NodeMark } from './NodeMark';
 import { ServicesMenu } from './ServicesMenu';
+import { SimpleModeToggle } from './SimpleModeToggle';
 import type { NavCategory } from '@/lib/nav';
 import { useHudLocation } from './use-hud-section';
 
@@ -48,7 +50,7 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
       data-scene-overlay=""
       className="pointer-events-none fixed inset-x-0 top-0 z-30 pt-[max(0.75rem,env(safe-area-inset-top))] pr-[max(0.75rem,env(safe-area-inset-right))] pl-[max(0.75rem,env(safe-area-inset-left))] shorter:pt-[max(0.5rem,env(safe-area-inset-top))]"
     >
-      <div className="pointer-events-auto flex h-14 items-center gap-2 rounded-2xl glass pr-1.5 pl-2 md:pr-2 shorter:h-12">
+      <div className="pointer-events-auto relative flex h-14 items-center gap-2 rounded-2xl glass pr-1.5 pl-2 md:pr-2 shorter:h-12">
         <Link
           href={paths.home()}
           aria-label={homeLabel}
@@ -88,16 +90,18 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <SimpleModeToggle className="max-md:hidden" />
           <LocaleSwitcher className="hidden md:block" />
           <Link
             href={paths.configurator()}
             onClick={() => analytics.track('cta_click', { placement: 'hud' })}
-            className={`${primaryButton} h-10 px-5 text-[0.8125rem] max-lg:hidden`}
+            className={`${primaryButton} h-10 px-5 text-[0.8125rem] max-lg:hidden pointer-coarse:h-11`}
           >
             {t('cta')}
           </Link>
           <MobileMenu categories={categories} studioName={studioName} className="md:hidden" />
         </div>
+        <BootIndicator />
       </div>
     </header>
   );

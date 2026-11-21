@@ -51,3 +51,19 @@ export function planetSpeedTarget(focused: boolean, hovered: boolean): number {
   if (focused) return PLANET_SPEED.focused;
   return hovered ? PLANET_SPEED.hovered : PLANET_SPEED.normal;
 }
+
+/** Smallest on-screen planet diameter before the boost kicks in, CSS px (visual MJ2). */
+export const MIN_PLANET_DIAMETER_PX = 16;
+/** Largest on-screen boost of a small planet. */
+export const MAX_PLANET_BOOST = 1.8;
+
+/**
+ * Scale boost that keeps a planet readable in small free areas (phone system
+ * views): planets under MIN_PLANET_DIAMETER_PX grow, up to MAX_PLANET_BOOST.
+ * 1 for planets that are already big enough (desktop, planet focus).
+ */
+export function planetScreenBoost(size: number, pxPerUnit: number): number {
+  const px = 2 * size * pxPerUnit;
+  if (!(px > 0)) return 1;
+  return Math.min(Math.max(MIN_PLANET_DIAMETER_PX / px, 1), MAX_PLANET_BOOST);
+}

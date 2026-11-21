@@ -1,4 +1,9 @@
-import { CylinderGeometry, OctahedronGeometry, type BufferGeometry } from 'three';
+import {
+  CylinderGeometry,
+  OctahedronGeometry,
+  TorusKnotGeometry,
+  type BufferGeometry,
+} from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CategoryDna } from '~/content/schema';
 import { PLANET_SHAPES } from '../system/planet-geometry';
@@ -20,17 +25,34 @@ export interface EmblemEntry {
   tilt: readonly [number, number, number];
 }
 
-function strata(detail: number): BufferGeometry {
-  const segments = 20 + detail * 12;
-  const discs = [-0.42, 0, 0.42].map((y, i) => {
-    const radius = 0.95 - i * 0.18;
-    const disc = new CylinderGeometry(radius, radius, 0.2, segments, 1);
-    disc.translate(0, y, 0);
-    return disc;
+/** Flat shading: crisp facets that catch the light (V5-04). */
+function faceted(geometry: BufferGeometry): BufferGeometry {
+  const flat = geometry.index ? geometry.toNonIndexed() : geometry;
+  if (flat !== geometry) geometry.dispose();
+  flat.computeVertexNormals();
+  return flat;
+}
+
+/** CRM: three hexagonal data slabs with clear gaps (a database stack, not a cake). */
+function strata(): BufferGeometry {
+  const slabs = [-0.5, 0, 0.5].map((y, i) => {
+    const radius = 0.9 - i * 0.14;
+    const slab = new CylinderGeometry(radius, radius, 0.2, 6, 1);
+    slab.translate(0, y, 0);
+    return slab;
   });
-  const merged = mergeGeometries(discs);
-  for (const disc of discs) disc.dispose();
-  return merged;
+  const merged = mergeGeometries(slabs);
+  for (const slab of slabs) slab.dispose();
+  return faceted(merged);
+}
+
+/** AI: a thin, clearly readable neural knot (a thick knot read as a lump). */
+function neuralKnot(detail: number): BufferGeometry {
+  const knot = new TorusKnotGeometry(0.62, 0.11, 96 + detail * 48, 8 + detail * 2, 2, 3);
+  knot.computeBoundingSphere();
+  const scale = 1 / (knot.boundingSphere?.radius ?? 1);
+  knot.scale(scale, scale, scale);
+  return knot;
 }
 
 export const EMBLEMS: Record<EmblemKey, EmblemEntry> = {
@@ -39,10 +61,10 @@ export const EMBLEMS: Record<EmblemKey, EmblemEntry> = {
     spin: 0.45,
     tilt: [0, 0, 0],
   },
-  strata: { create: strata, spin: 0.3, tilt: [0.32, 0, 0] },
+  strata: { create: strata, spin: 0.3, tilt: [0.38, 0, 0] },
   forge: { create: (detail) => PLANET_SHAPES.gear.create(detail, 0), spin: 0.5, tilt: [0.2, 0, 0] },
   neural: {
-    create: (detail) => PLANET_SHAPES['torus-knot'].create(detail, 0),
+    create: neuralKnot,
     spin: 0.35,
     tilt: [0.4, 0, 0],
   },

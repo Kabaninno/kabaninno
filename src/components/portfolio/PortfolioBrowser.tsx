@@ -145,7 +145,7 @@ function PortfolioView({
               href={paths.project(card.slug)}
               highlightId={sceneNodeId.project(card.slug)}
               style={accentStyle(card.colors[0] ?? '#E8ECF5')}
-              className="group relative flex flex-col gap-2 overflow-hidden rounded-2xl glass p-4 transition-[border-color,background-color] duration-200 ease-calm hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:bg-[rgb(10_14_28/0.8)] focus-visible:border-[var(--accent)] active:bg-[rgb(10_14_28/0.9)]"
+              className="group relative flex flex-col gap-2 overflow-hidden rounded-2xl glass p-4 transition-[border-color,background-color] duration-200 ease-calm hover:border-[color-mix(in_srgb,var(--accent)_45%,transparent)] hover:bg-[rgb(10_14_28/0.8)] focus-visible:border-[var(--accent)] focus-visible:outline-offset-[-1px] active:bg-[rgb(10_14_28/0.9)]"
             >
               {/* Accent hairline: the object's signal color. */}
               <span

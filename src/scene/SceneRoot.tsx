@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useState, useSyncExternalStore, type ComponentType } from 'react';
 import { isWebGLAvailable } from '@/lib/webgl';
+import { useSceneStore } from '@/store/scene';
 import { SceneErrorBoundary } from './SceneErrorBoundary';
 import type { SceneManifest } from './types';
 
@@ -38,18 +39,28 @@ const subscribe = () => () => {};
  * Persistent 3D layer (contract used by `src/app/[locale]/layout.tsx`).
  * Lives in the locale layout, so it is never remounted when navigating
  * between routes. Server HTML renders without it. Load and render failures
- * stay inside this layer (see SceneErrorBoundary).
+ * stay inside this layer (see SceneErrorBoundary). Simple (2D) mode (D94):
+ * while `simpleMode` is true the 3D layer is not mounted, and switching it on
+ * at runtime unmounts it (R3F disposes the renderer and its GPU resources;
+ * Experience resets the scene's store fields). `null` (undecided) mounts.
  */
 export function SceneRoot({ manifest }: { manifest: SceneManifest }) {
   // null on the server / first hydration pass, boolean afterwards. A cheap API
   // check (no probe context, perf P-01); the real context may still fail.
   const webgl = useSyncExternalStore(subscribe, isWebGLAvailable, () => null);
   const [unavailable, setUnavailable] = useState(false);
-  const handleUnavailable = useCallback(() => setUnavailable(true), []);
+  const simple = useSceneStore((state) => state.simpleMode === true);
+  // WebGL API present but no context (blocklisted GPU, D55): switch to simple mode
+  // (not persisted — the UI only stores the visitor's own toggle). `unavailable`
+  // stays true, so the scene never remounts, even if simple mode is turned off.
+  const handleUnavailable = useCallback(() => {
+    setUnavailable(true);
+    useSceneStore.getState().setSimpleMode(true);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-0" aria-hidden="true" data-scene-root="">
-      {webgl && !unavailable ? (
+      {webgl && !unavailable && !simple ? (
         <SceneErrorBoundary>
           <Experience manifest={manifest} onUnavailable={handleUnavailable} />
         </SceneErrorBoundary>

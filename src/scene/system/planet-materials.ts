@@ -281,7 +281,7 @@ export function createGlowMaterial(
       ...fogUniforms(),
       uColor: planet.uColor,
       uGlow: planet.uGlow,
-      uSize: { value: orbit.size * 3.2 },
+      uSize: { value: orbit.size * 2.4 },
       uLift: { value: orbit.size },
       uIntensity: { value: 0.55 },
       uEmphasis: planet.uHover,

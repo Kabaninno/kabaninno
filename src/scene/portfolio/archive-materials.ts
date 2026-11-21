@@ -10,12 +10,12 @@ import {
 import { PALETTE } from '../config';
 import {
   archiveCardFragment,
+  archiveEmblemFragment,
   observatoryRingsFragment,
   observatoryRingsVertex,
 } from '../shaders/archive';
 import { haloFragment, haloVertex } from '../shaders/halo';
 import { planetVertex } from '../shaders/planet-common';
-import { emissiveFragment } from '../shaders/planet-materials';
 import { lineFragment, lineVertex } from '../shaders/system-parts';
 import {
   createSystemUniforms,
@@ -112,7 +112,7 @@ export function createCardMaterials(
   const emblem = new ShaderMaterial({
     name: `archive-emblem:${project.slug}`,
     vertexShader: planetVertex,
-    fragmentShader: emissiveFragment,
+    fragmentShader: archiveEmblemFragment,
     defines: defines(lowQuality),
     uniforms: { ...fogUniforms(), ...system, ...uniforms, uDeform: { value: 0 } },
   });

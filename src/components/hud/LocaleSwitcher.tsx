@@ -51,7 +51,9 @@ function LocaleLinks({
   const router = useRouter();
 
   const itemClass =
-    size === 'large' ? 'min-h-11 min-w-14 px-3 text-xs' : 'h-8 min-w-9 px-2 text-[0.6875rem]';
+    size === 'large'
+      ? 'min-h-11 min-w-14 px-3 text-xs'
+      : 'h-8 min-w-9 px-2 text-[0.6875rem] pointer-coarse:h-11 pointer-coarse:min-w-11';
 
   return (
     <nav aria-label={t('language')} className={className}>

@@ -15,7 +15,7 @@ export const ENTER_PENDING_CLASS = 'ui-enter-pending';
  * (client-side navigation). React re-renders once after hydration with the
  * client value; callers capture the value of their first render.
  */
-function useIsHydrating(): boolean {
+export function useIsHydrating(): boolean {
   return useSyncExternalStore(
     subscribeNever,
     () => false,

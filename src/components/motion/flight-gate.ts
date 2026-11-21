@@ -24,14 +24,20 @@ function sceneCanvasPresent(): boolean {
  * Fallbacks: no such flight has started within a few animation frames (the
  * scene starts it in its first frame after the route change), the flight
  * stopped reporting progress, or a hard cap. Opens at once when there is no
- * 3D scene or the tab is hidden.
+ * 3D scene (no WebGL, simple mode) or the tab is hidden.
  *
  * Reads the store through a plain subscription: the scene may publish
  * `flight` every frame, and this never re-renders React.
  */
 function createFlightGate(config: RevealGateConfig): EnterGate {
   return (start) => {
-    if (document.visibilityState === 'hidden' || !sceneCanvasPresent()) {
+    // Simple (2D) mode (D94) has no flights to wait for, even while the canvas
+    // is still being torn down.
+    if (
+      document.visibilityState === 'hidden' ||
+      useSceneStore.getState().simpleMode === true ||
+      !sceneCanvasPresent()
+    ) {
       start('no-scene');
       return () => {};
     }

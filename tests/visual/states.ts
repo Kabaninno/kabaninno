@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { sitePath, type ViewportName } from '../support/env';
-import { withoutWebGL } from '../support/scene';
+import { withSimpleMode, withoutWebGL, withoutWebGL2Api } from '../support/scene';
 import { getAllProjects } from '~/content';
 import { builtProjects, categories, localized, paths, type TestLocale } from '../support/site';
 
@@ -18,7 +18,9 @@ import { builtProjects, categories, localized, paths, type TestLocale } from '..
  *
  *   { name: 'configurator-step-2-pl', path: '/pl/configurator/',
  *     prepare: async (page) => { await page.getByRole('button', { name: … }).click(); } }
- *   { name: 'simple-mode-pl', path: '/pl/', scene: false, init: withoutWebGL }
+ *
+ * Every state starts as a returning visitor (the first-visit intro is marked
+ * as seen) unless it sets `intro: true`.
  */
 
 export interface CaptureContext {
@@ -50,6 +52,8 @@ export interface CaptureState {
    * step JS time (camera flight, hero gate) exactly; see `transitionFrames`.
    */
   clock?: boolean;
+  /** Keep the first-visit intro (default: marked as seen before the page loads). */
+  intro?: boolean;
   tags?: readonly string[];
 }
 
@@ -79,10 +83,10 @@ function seedConfigurator(step: string) {
 }
 
 /**
- * Portfolio states need visible cases, i.e. a preview built with drafts:
- *   SHOW_DRAFTS=true npm run build:preview      (PowerShell: $env:SHOW_DRAFTS='true'; npm run build:preview)
- * On a production build (no published cases) these states are simply not
- * generated; the plain `portfolio-pl` state then shows the "coming soon" panel.
+ * Portfolio case states need visible cases, i.e. a preview built with drafts:
+ *   npm run build:preview -- --drafts       (or: npm run screenshots -- --build=drafts)
+ * On the default production build (no published cases) these states are
+ * simply not generated; `portfolio-pl` then shows the "coming soon" panel.
  */
 const built = builtProjects().map((project) => project.slug);
 const builtCases = getAllProjects().filter((project) => built.includes(project.slug));
@@ -162,6 +166,11 @@ async function transitionFrames(
 
 const first = categories[0]!;
 
+/** A landscape phone (D40: side panel instead of a bottom sheet; M3-03: 44 px HUD targets). */
+async function landscapePhone(page: Page) {
+  await page.setViewportSize({ width: 740, height: 360 });
+}
+
 export const STATES: CaptureState[] = [
   // Universe
   { name: 'universe-pl', path: pl(paths.home()), tags: ['universe'] },
@@ -179,12 +188,57 @@ export const STATES: CaptureState[] = [
     prepare: (page, { viewport }) => point(page, viewport, paths.portfolio()),
   },
   {
-    // Fallback without WebGL (precursor of the M6 simple mode).
+    // WebGL 2 API present but no context (blocklisted GPU): the scene gives up silently (D55).
     name: 'universe-no-webgl-pl',
     path: pl(paths.home()),
     scene: false,
     init: withoutWebGL,
     tags: ['universe', 'fallback'],
+  },
+
+  // Simple (2D) mode (D94): chosen in the HUD, or automatic without the WebGL 2 API.
+  {
+    name: 'simple-mode-pl',
+    path: pl(paths.home()),
+    scene: false,
+    init: (page) => withSimpleMode(page),
+    tags: ['simple'],
+  },
+  {
+    name: `simple-mode-system-${first.id}-pl`,
+    path: pl(first.path),
+    scene: false,
+    init: (page) => withSimpleMode(page),
+    tags: ['simple'],
+  },
+  {
+    name: 'simple-mode-auto-pl',
+    path: pl(paths.home()),
+    scene: false,
+    init: withoutWebGL2Api,
+    tags: ['simple', 'fallback'],
+  },
+  {
+    // First visit: the intro plays with "Skip intro"; then Esc skips it.
+    name: 'intro-pl',
+    path: pl(paths.home()),
+    scene: false,
+    intro: true,
+    tags: ['intro'],
+    series: async (page, context) => {
+      const skip = page.locator('[data-intro-skip]');
+      const playing = await skip
+        .waitFor({ state: 'visible', timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+      context.mark(playing ? 'intro playing' : 'intro never started');
+      await context.frame('playing');
+      if (!playing) return;
+      await page.keyboard.press('Escape');
+      await skip.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+      await page.waitForTimeout(900);
+      await context.frame('skipped');
+    },
   },
   {
     name: 'menu-open-pl',
@@ -222,6 +276,15 @@ export const STATES: CaptureState[] = [
     path: pl(category.services[0]!.path),
     tags: ['planet'],
   })),
+
+  // Landscape phone: side panel (D40) and 44 px touch targets in the HUD (M3-03).
+  {
+    name: `planet-landscape-${first.id}-${first.services[0]!.slug}-pl`,
+    path: pl(first.services[0]!.path),
+    viewports: ['mobile'],
+    tags: ['planet', 'landscape'],
+    init: landscapePhone,
+  },
 
   // Mobile bottom sheet on a planet: expanded (default) and collapsed by its handle.
   {
@@ -283,8 +346,11 @@ export const STATES: CaptureState[] = [
     path: pl(paths.project(slug)),
     tags: ['portfolio', 'case', 'drafts'],
     prepare: async (page) => {
-      // Bring the demo into view inside the panel.
-      await page.locator('#project-demo').scrollIntoViewIfNeeded();
+      // Bring the demo to the top of the panel (V5-02: "if needed" did not
+      // scroll when the heading was already partly visible).
+      await page.locator('#project-demo').evaluate((element) => {
+        element.scrollIntoView({ block: 'start' });
+      });
     },
   })),
 

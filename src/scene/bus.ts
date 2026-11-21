@@ -49,6 +49,11 @@ export interface SceneBus {
   archiveInteractive: boolean;
   /** Projected project card-objects of the mounted archive (by slug), for labels. */
   projectTargets: Map<string, PlanetTarget>;
+  /**
+   * Focused content that is compiled and on screen (`system:<category>`,
+   * `archive`): with the settled camera it drives `html[data-scene-ready]`.
+   */
+  readyContent: Set<string>;
   /** Text box of the visible canvas label, device px, GL origin (bottom-left), or null. */
   labelRect: [number, number, number, number] | null;
 }
@@ -93,9 +98,18 @@ export function createSceneBus(): SceneBus {
     planetTargets: new Map(),
     archiveInteractive: false,
     projectTargets: new Map(),
+    readyContent: new Set(),
     labelRect: null,
   };
 }
+
+/** `bus.readyContent` key of a category's system content. */
+export function systemReadyKey(categoryId: string): string {
+  return `system:${categoryId}`;
+}
+
+/** `bus.readyContent` key of the portfolio archive. */
+export const ARCHIVE_READY_KEY = 'archive';
 
 /** Demand mode: keep the render loop alive for at least `ms` from now. */
 export function keepAlive(bus: SceneBus, ms: number): void {

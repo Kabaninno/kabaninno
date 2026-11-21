@@ -33,6 +33,9 @@ import {
 import {
   FULL_FRAME,
   computeCameraGoal,
+  SYSTEM_SWAY,
+  usesSystemSway,
+  type PlanetViewMemo,
   controlLimits,
   frameCenter,
   minCoreDiameterPx,
@@ -55,7 +58,11 @@ const MOUSE_BUTTONS = {
 const TOUCHES = { one: ACTION.TOUCH_ROTATE, two: ACTION.TOUCH_DOLLY, three: ACTION.NONE } as const;
 
 /** Opening shot: the camera settles in from slightly farther while the canvas fades in. */
-const INTRO = { pullback: 1.32, azimuth: 0.12, polar: -0.05, duration: 2.6 } as const;
+/**
+ * First-visit intro (D94): from deep space into the overview, ≤ 3 s. Played
+ * only on reveal on the home route when the UI marked the visit eligible.
+ */
+const INTRO = { pullback: 3.4, azimuth: 0.55, polar: -0.16, duration: 2.8 } as const;
 /** Safe-rect changes this early in the intro re-base it instead of sliding (D28). */
 const INTRO_SNAP_SECONDS = 0.5;
 /** Frame changes below this (viewport fractions) are ignored. */
@@ -139,6 +146,8 @@ interface DirectorState {
   goalPlanetAngle: number | undefined;
   /** Configurator selection the goal was fitted to (store `emphasis`, D81). */
   goalEmphasis: readonly string[] | undefined;
+  /** Planet focus: the viewing side chosen for the parking planet (hysteresis). */
+  planetView: PlanetViewMemo;
   /** Visitor's azimuth deviation carried into focused views (approach from their side). */
   azimuthOffset: number;
   /** Goal distance the current limits and zoom ratio refer to. */
@@ -364,6 +373,7 @@ export function CameraDirector({
         sway: reducedMotion ? 0 : IDLE.overview.amplitude,
         planetAngle,
         emphasis,
+        planetView: d.planetView,
       });
       d.goalPose = poseFromLookAt(d.goal.position, d.goal.lookAt);
       d.goalModel = model;
@@ -385,7 +395,6 @@ export function CameraDirector({
       d.fov = { value: goal.fov, velocity: 0 };
       snapCenter(d, center);
       shared.interactive = false;
-      if (!reducedMotion) d.flight = createIntro(goalPose, goal.fov, center);
       // First rendered frame of a deep link / first load (D56).
       useSceneStore.getState().setFocus(path);
     } else if (targetChanged) {
@@ -397,7 +406,12 @@ export function CameraDirector({
     // The universe became visible (staged boot): interaction may start.
     if (revealed && !d.revealed) {
       d.revealed = true;
-      if (!d.cut && (!d.flight || d.flight.kind === 'intro')) {
+      if (!d.cut && !d.flight && introWanted(target, reducedMotion)) {
+        // First visit on the home route (D94): the intro flight, then interaction.
+        d.flight = createIntro(goalPose, goal.fov, center);
+        applyPose(controls, d.flight.from);
+        useSceneStore.getState().setIntroActive(true);
+      } else if (!d.cut && !d.flight) {
         shared.interactive = isOverview(target);
         shared.systemInteractive = systemCategory(target);
         shared.archiveInteractive = isArchive(target);
@@ -419,14 +433,17 @@ export function CameraDirector({
       stepCut(d, shared, controls, state.gl.domElement, motionDt, target, goalPose, goal, center);
     } else if (d.flight) {
       const flight = d.flight;
-      if (flight.kind === 'intro' && frameChanged && d.age < INTRO_SNAP_SECONDS) {
+      if (flight.kind === 'intro' && frameChanged && flight.elapsed < INTRO_SNAP_SECONDS) {
         flight.from = introStart(goalPose);
         flight.fromCenter = center;
         snapCenter(d, center);
       }
-      // The intro waits for the reveal (it is the canvas fade-in's camera move).
-      const introWaits = flight.kind === 'intro' && !d.revealed;
-      stepFlight(d, shared, controls, introWaits ? 0 : motionDt, target, goalPose, goal, center);
+      if (flight.kind === 'intro' && useSceneStore.getState().introSkip) {
+        // "Skip intro" (D94): straight to the end.
+        settle(d, shared, controls, target, goalPose, goal, center);
+      } else {
+        stepFlight(d, shared, controls, motionDt, target, goalPose, goal, center);
+      }
     } else {
       if (goalChanged) reframe(d, controls, target, goalPose, reducedMotion);
       if (reducedMotion) {
@@ -507,6 +524,7 @@ function startFlight(
   aspect: number,
 ) {
   d.flight?.timeline.kill();
+  endIntro();
   d.cut = null;
   const kind = classifyFlight(from, to);
   const profile = FLIGHT_PROFILES[kind];
@@ -594,7 +612,7 @@ function createIntro(goalPose: OrbitPose, fov: number, center: { x: number; y: n
   const timeline = gsap.timeline({ paused: true });
   timeline.to(
     channels,
-    { look: 1, dolly: 1, orbit: 1, duration: INTRO.duration, ease: 'power2.out' },
+    { look: 1, dolly: 1, orbit: 1, duration: INTRO.duration, ease: 'power3.out' },
     0,
   );
   return {
@@ -711,7 +729,22 @@ function interruptFlight(
   finishMotion(d, shared, target);
 }
 
+/** The first-visit intro plays on reveal: home route, eligible, motion allowed (D94). */
+function introWanted(target: SceneTarget, reducedMotion: boolean): boolean {
+  const store = useSceneStore.getState();
+  return (
+    !reducedMotion && target.mode === 'universe' && store.introEligible === true && !store.introSkip
+  );
+}
+
+/** The intro ended (settled, skipped, interrupted or replaced by a navigation). */
+function endIntro() {
+  const store = useSceneStore.getState();
+  if (store.introActive) store.setIntroActive(false);
+}
+
 function finishMotion(d: DirectorState, shared: SceneBus, target: SceneTarget) {
+  endIntro();
   shared.flying = false;
   shared.focusDriven = false;
   shared.interactive = isOverview(target) && d.revealed;
@@ -738,6 +771,7 @@ function startCut(
   path: string,
 ) {
   d.flight?.timeline.kill();
+  endIntro();
   d.flight = null;
   d.cut = {
     elapsed: 0,
@@ -833,12 +867,18 @@ function idleMotion(
   // Hover (3D or HTML highlight) pauses the motion without resetting its phase.
   if (shared.hovering) return;
   d.idleClock += dt;
-  if (target.mode === 'system' || target.mode === 'planet') {
+  if ((target.mode === 'system' || target.mode === 'planet') && !usesSystemSway(d.frame)) {
     const ramp = Math.min(d.idleClock / IDLE.rampIn, 1);
     void controls.rotate(IDLE.systemSpin * ramp * ramp * dt, 0, false);
     return;
   }
-  const { amplitude, period } = isOverview(target) ? IDLE.overview : IDLE.anchor;
+  // Short free areas (phone band): systems sway instead of spinning (their fit covers it).
+  const { amplitude, period } =
+    target.mode === 'system' || target.mode === 'planet'
+      ? { amplitude: SYSTEM_SWAY, period: IDLE.anchor.period }
+      : isOverview(target)
+        ? IDLE.overview
+        : IDLE.anchor;
   const sway = idleSway(d.idleClock, amplitude, period, IDLE.rampIn);
   void controls.rotate(sway - d.swayApplied, 0, false);
   d.swayApplied = sway;
@@ -951,6 +991,7 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     goalAspect: 0,
     goalPlanetAngle: undefined,
     goalEmphasis: undefined,
+    planetView: {},
     azimuthOffset: 0,
     settledRadius: 1,
     safeRect: undefined,

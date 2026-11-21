@@ -11,7 +11,9 @@ export type AnalyticsEvent =
   | 'request_add_service'
   | 'configurator_step'
   | 'lead_submit'
-  | 'lead_copy';
+  | 'lead_copy'
+  | 'simple_mode'
+  | 'intro_skip';
 
 export type AnalyticsProps = Record<string, string | number | boolean | undefined>;
 

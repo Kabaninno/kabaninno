@@ -136,3 +136,45 @@ export async function withoutWebGL(page: Page): Promise<void> {
     } as typeof original;
   });
 }
+
+/**
+ * Removes the WebGL 2 API before the page loads, as in browsers without it:
+ * the UI then switches to simple (2D) mode automatically (D94), before the
+ * first paint. (`withoutWebGL` keeps the API and only fails the context,
+ * like a blocklisted GPU: the scene chunk loads and gives up silently.)
+ */
+export async function withoutWebGL2Api(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    delete (window as Window & { WebGL2RenderingContext?: unknown }).WebGL2RenderingContext;
+  });
+}
+
+/** Stores the visitor's simple-mode choice before the page loads (`kabaninno.simpleMode.v1`). */
+export async function withSimpleMode(page: Page, simple = true): Promise<void> {
+  await page.addInitScript((value) => {
+    localStorage.setItem('kabaninno.simpleMode.v1', JSON.stringify(value));
+  }, simple);
+}
+
+/**
+ * Waits for `html[data-scene-ready="<locale-less path>"]` (scene-engineer,
+ * F1): the camera has settled on the URL and the focused content (e.g. the
+ * portfolio archive cards) is compiled and visible. Removed during flights
+ * and the intro. Returns false on timeout.
+ */
+export async function waitForSceneReady(
+  page: Page,
+  path: string,
+  timeout = 30_000,
+): Promise<boolean> {
+  try {
+    await page.waitForFunction(
+      (expected) => document.documentElement.dataset.sceneReady === expected,
+      path,
+      { timeout, polling: 100 },
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}

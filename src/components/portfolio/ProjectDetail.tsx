@@ -168,7 +168,7 @@ export async function ProjectDetail({ locale, project }: { locale: Locale; proje
                 highlightId={sceneNodeId.project(slug)}
                 replace
                 rel={rel}
-                className={`flex min-h-14 flex-col justify-start rounded-xl border border-white/[0.07] px-3 py-2 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07] ${rel === 'next' ? 'items-end text-right' : ''}`}
+                className={`flex min-h-14 flex-col justify-start rounded-xl border border-white/[0.07] px-3 py-2 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] focus-visible:outline-offset-[-1px] active:bg-white/[0.07] ${rel === 'next' ? 'items-end text-right' : ''}`}
               >
                 <span className="text-xs text-muted">
                   {rel === 'prev' ? <span aria-hidden="true">← </span> : null}

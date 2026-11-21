@@ -45,6 +45,22 @@
 @custom-variant shorter (@media (max-height: 22.5rem));
 
 /*
+ * `side:` = content panels are a side column instead of a bottom sheet:
+ * md+ windows, and landscape phones (height up to 30rem, width from 34rem),
+ * where a sheet of 60 % of a 375 px height would leave the scene a sliver
+ * (D40, QA N2). Portrait phones keep the bottom sheet (BRIEF). Declared last,
+ * so `side:` utilities win over `md:`/`max-md:` and the height variants.
+ */
+@custom-variant side {
+  @media (min-width: 48rem) {
+    @slot;
+  }
+  @media (max-height: 30rem) and (min-width: 34rem) {
+    @slot;
+  }
+}
+
+/*
  * Font families point at the CSS variables set by next/font on <html>
  * (src/app/fonts.ts). `inline` makes utilities use the value directly, so the
  * variables resolve wherever the utility is applied.
@@ -192,6 +208,17 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--color-muted);
+  /* Dark halo: a star or bloom right behind a micro-label must not read as a diacritic (L-01). */
+  text-shadow:
+    0 0 6px rgb(5 7 13 / 0.9),
+    0 0 14px rgb(5 7 13 / 0.5);
+}
+
+/* The same halo for text that sits directly over the scene (home index on md+). */
+@utility text-halo {
+  text-shadow:
+    0 0 6px rgb(5 7 13 / 0.9),
+    0 0 14px rgb(5 7 13 / 0.5);
 }
 
 /* Mono index such as "01 / 05" (digits and latin codes only). */
@@ -322,6 +349,97 @@
   .ui-enter-pending,
   .ui-enter-pending * {
     pointer-events: none !important;
+  }
+
+  /*
+   * First-visit intro (IntroControl, D94): the home hero steps aside while
+   * the intro flight plays and comes back with `.ui-enter` when it ends.
+   */
+  [data-intro-active] [data-intro-hide] {
+    animation: ui-exit 300ms ease-out both;
+    pointer-events: none;
+  }
+
+  /*
+   * Simple (2D) mode backdrop (SimpleBackdrop, D94): painted only while
+   * `html[data-simple]` is set, so 3D visitors never fetch the star tiles.
+   * Above the radial `.backdrop-cosmos` (same layer, later in the DOM). The
+   * constellation fills the band the 3D network would use: under the HUD,
+   * above the home hero (portrait phones: the upper half).
+   */
+  .simple-sky {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-repeat: repeat;
+  }
+
+  [data-simple] .simple-sky {
+    display: block;
+  }
+
+  .simple-constellation {
+    position: absolute;
+    top: calc(var(--hud-offset) + 0.5rem);
+    left: 1rem;
+    width: calc(100% - 2rem);
+    height: calc(50% - var(--hud-offset));
+    opacity: 0.9;
+
+    @variant md {
+      left: 2.5rem;
+      width: calc(100% - 5rem);
+      height: calc(62% - var(--hud-offset));
+    }
+
+    @variant short {
+      height: calc(100% - var(--hud-offset) - 1rem);
+      left: 45%;
+      width: 52%;
+    }
+  }
+
+  /*
+   * Simple-mode switch (SimpleModeToggle). The visual state follows
+   * `html[data-simple]`, so it is right from the first paint.
+   */
+  .simple-switch {
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: 1.75rem;
+    height: 1rem;
+    border: 1px solid rgb(255 255 255 / 0.24);
+    border-radius: 9999px;
+    background-color: rgb(255 255 255 / 0.04);
+    transition:
+      background-color 200ms var(--ease-calm),
+      border-color 200ms var(--ease-calm);
+  }
+
+  .simple-switch-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    background-color: var(--color-muted);
+    transition:
+      translate 200ms var(--ease-calm),
+      background-color 200ms var(--ease-calm);
+  }
+
+  [data-simple] .simple-switch {
+    border-color: color-mix(in srgb, var(--color-brand) 70%, transparent);
+    background-color: color-mix(in srgb, var(--color-brand) 18%, transparent);
+  }
+
+  [data-simple] .simple-switch-knob {
+    translate: 0.75rem 0;
+    background-color: var(--color-brand);
   }
 
   /*

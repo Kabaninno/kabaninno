@@ -141,11 +141,18 @@ test('a panel waits for the flight to its system, then reveals (V2-06)', async (
   await expect(panel).toHaveCSS('opacity', '1');
 });
 
+/*
+ * D55 (updated in F1): with the WebGL 2 API present but no context (a
+ * blocklisted GPU), the scene chunk may load; the renderer then gives up
+ * silently. What matters: no canvas remains and the console stays clean
+ * (the fixture's guard fails the test on any console error).
+ */
 test('without WebGL the site works and the hero returns at once', async ({ page }) => {
   await withoutWebGL(page);
   await page.goto(sitePath(localized(locale, web.path)));
   await expect(page.locator('main h1')).toHaveText(categoryName(locale, web.id));
-  await page.waitForTimeout(500);
+  await expect(page.locator('canvas')).toHaveCount(0, { timeout: 10_000 });
+  await page.waitForTimeout(1500);
   await expect(page.locator('canvas')).toHaveCount(0);
 
   await page.locator('main nav a').first().click();

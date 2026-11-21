@@ -32,7 +32,7 @@ import {
   inputClass,
 } from './fields';
 import { ProgressNav } from './ProgressNav';
-import { SummaryStep } from './SummaryStep';
+import { SummaryActions, SummaryStep, useLeadHandoff } from './SummaryStep';
 
 interface ConfiguratorWizardProps {
   model: ConfiguratorModel;
@@ -40,7 +40,12 @@ interface ConfiguratorWizardProps {
   locale: string;
   /** `siteConfig.telegramUsername` (the placeholder means "not configured"). */
   telegramUsername: string;
+  /** Panel header, formatted on the server; the lead is shown on the first step only (MJ-1). */
+  header: { eyebrow: string; title: string; lead: string };
 }
+
+/** The step form; the sticky footer's "Next" submits it from outside (`form` attribute). */
+const FORM_ID = 'cfg-form';
 
 /** Debounce of draft persistence while answering. */
 const SAVE_DELAY_MS = 300;
@@ -74,6 +79,11 @@ function whenRequestHydrated(callback: () => void): () => void {
  *   service choices from then on (deselecting removes it there too).
  * - Scene (D81): the selected solution types are emphasised while the
  *   configurator is open; cleared on unmount.
+ * - Compact chrome (visual MJ-1): the panel header (h1 `configurator-title`)
+ *   shows its lead on the first step only, the steps are one scrollable row
+ *   of chips, and Back / Next (on the summary: Send / Copy) sit in a sticky
+ *   glass footer at the bottom of the panel, so the step content and the
+ *   actions share the first screen.
  * - All texts arrive pre-formatted in `labels` (server).
  */
 export function ConfiguratorWizard({
@@ -81,6 +91,7 @@ export function ConfiguratorWizard({
   labels,
   locale,
   telegramUsername,
+  header,
 }: ConfiguratorWizardProps) {
   const [draft, setDraft] = useState<ConfiguratorDraft>(emptyDraft);
   const [step, setStep] = useState<ConfiguratorStepId>('type');
@@ -172,6 +183,15 @@ export function ConfiguratorWizard({
     setStep(target);
   };
 
+  const handoff = useLeadHandoff({
+    draft,
+    labels,
+    submitter,
+    locale,
+    username: submitter.username,
+    edited: message,
+  });
+
   const errors: StepErrors = attempted[step] ? validateStep(step, draft, model) : {};
   const errorFor = (field: string) => {
     const code = errors[field];
@@ -215,9 +235,19 @@ export function ConfiguratorWizard({
   const option = (value: string, label: string) => ({ value, label });
 
   return (
-    <div className="mt-2">
+    <div>
+      <p className="eyebrow">{header.eyebrow}</p>
+      <h1
+        id="configurator-title"
+        className="mt-2 font-display text-[1.625rem] leading-tight font-medium text-ink md:text-[1.75rem]"
+      >
+        {header.title}
+      </h1>
+      {step === 'type' ? (
+        <p className="mt-2 text-[0.9375rem] leading-relaxed text-muted">{header.lead}</p>
+      ) : null}
       {/* Always rendered, so screen readers announce the notice when it appears. */}
-      <p role="status" className="text-sm text-muted">
+      <p role="status" className="text-sm text-muted [&:not(:empty)]:mt-2">
         {notice}
       </p>
 
@@ -231,12 +261,13 @@ export function ConfiguratorWizard({
       />
 
       <form
+        id={FORM_ID}
         noValidate
         onSubmit={(event) => {
           event.preventDefault();
           if (!isLast) next();
         }}
-        className="mt-6"
+        className="mt-5"
         aria-labelledby="cfg-step-title"
       >
         <h2
@@ -422,36 +453,46 @@ export function ConfiguratorWizard({
           <SummaryStep
             draft={draft}
             labels={labels}
-            submitter={submitter}
-            locale={locale}
-            username={submitter.username}
+            handoff={handoff}
             onEdit={goTo}
             edited={message}
             onEditedChange={setMessage}
           />
         ) : null}
-
-        <div className="mt-8 flex flex-wrap items-center gap-2">
-          {index > 0 ? (
-            <button
-              type="button"
-              onClick={back}
-              className={`${secondaryButton} min-h-12 px-5 text-sm`}
-            >
-              <span aria-hidden="true">←</span>
-              {labels.nav.back}
-            </button>
-          ) : null}
-          {!isLast ? (
-            <button type="submit" className={`${primaryButton} min-h-12 px-6 text-sm`}>
-              {index === CONFIGURATOR_STEPS.length - 2 ? labels.nav.toSummary : labels.nav.next}
-              <span aria-hidden="true">→</span>
-            </button>
-          ) : null}
-        </div>
       </form>
 
-      <div className="mt-8 border-t border-white/[0.07] pt-5">
+      {/*
+        Sticky glass footer (MJ-1): stays at the bottom of the panel while the
+        step scrolls, full-bleed (cancels the panel paddings), above the
+        panel's bottom scroll fade.
+      */}
+      <div className="sticky bottom-0 z-[2] -mx-[var(--panel-px)] mt-8 flex flex-wrap items-center gap-2 border-t border-white/[0.08] bg-[rgb(8_11_22/0.92)] px-[var(--panel-px)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+        {index > 0 ? (
+          <button
+            type="button"
+            onClick={back}
+            className={`${secondaryButton} min-h-12 min-w-12 shrink-0 px-4 text-sm sm:px-5`}
+          >
+            <span aria-hidden="true">←</span>
+            {/* Icon-only on narrow summary footers, where three buttons share the row. */}
+            <span className={isLast ? 'max-sm:sr-only' : undefined}>{labels.nav.back}</span>
+          </button>
+        ) : null}
+        {!isLast ? (
+          <button
+            type="submit"
+            form={FORM_ID}
+            className={`${primaryButton} min-h-12 flex-1 px-6 text-sm sm:flex-none`}
+          >
+            {index === CONFIGURATOR_STEPS.length - 2 ? labels.nav.toSummary : labels.nav.next}
+            <span aria-hidden="true">→</span>
+          </button>
+        ) : (
+          <SummaryActions handoff={handoff} labels={labels} />
+        )}
+      </div>
+
+      <div className="mt-6 pt-1">
         {confirmReset ? (
           <div
             role="group"

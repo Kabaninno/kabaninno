@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { routeFlightGate } from '@/components/motion/flight-gate';
-import { useEnterAnimation } from '@/components/motion/use-enter-animation';
+import { useEnterAnimation, useIsHydrating } from '@/components/motion/use-enter-animation';
 import { usePathname } from '@/i18n/navigation';
 import { useUiStore } from '@/store/ui';
 import { PanelShell } from './PanelShell';
@@ -20,6 +20,14 @@ interface ContentPanelProps {
    * horizontal swipe switch to them with `router.replace` (D16).
    */
   siblings?: PanelSiblings;
+  /**
+   * Portrait phones: when the page is opened directly (deep link, reload),
+   * the sheet starts tall (~88 % of the height) — for task pages like the
+   * configurator, where the content matters more than the scene (MJ-1).
+   * Client-side arrivals keep the 60 % sheet, so the scene's reaction stays
+   * visible.
+   */
+  tallOnLoad?: boolean;
 }
 
 /** Scroll distance (px) below which an edge counts as reached. */
@@ -41,7 +49,13 @@ const EDGE_TOLERANCE = 4;
  *   navigation (not `:focus-visible`) leaves a collapsed sheet collapsed.
  * - `siblings`: planet switching by keys and swipe (`usePanelSiblings`).
  */
-export function ContentPanel({ labelledBy, children, style, siblings }: ContentPanelProps) {
+export function ContentPanel({
+  labelledBy,
+  children,
+  style,
+  siblings,
+  tallOnLoad = false,
+}: ContentPanelProps) {
   const t = useTranslations('panel');
   const frameRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLElement>(null);
@@ -51,6 +65,9 @@ export function ContentPanel({ labelledBy, children, style, siblings }: ContentP
   const collapsed = useUiStore((state) => state.sheetCollapsed);
   // One gate per mounted panel (a stable reference, see EnterGate).
   const [gate] = useState(() => routeFlightGate(pathname));
+  // Decided by the first render: true in the server HTML and while hydrating it.
+  const hydrating = useIsHydrating();
+  const [tall] = useState(() => tallOnLoad && hydrating);
   useEnterAnimation(frameRef, { gate });
   usePanelSiblings(frameRef, siblings);
 
@@ -98,6 +115,7 @@ export function ContentPanel({ labelledBy, children, style, siblings }: ContentP
       contentRef={contentRef}
       scrollId={scrollId}
       collapsed={collapsed}
+      tall={tall}
       handle={<SheetHandle label={t('sheetToggle')} controls={scrollId} />}
     >
       {children}

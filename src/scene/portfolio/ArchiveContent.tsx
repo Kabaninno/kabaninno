@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Quaternion, Vector3, type BufferGeometry, type Group } from 'three';
 import { useSceneStore } from '@/store/scene';
-import type { SceneBusRef } from '../bus';
+import { ARCHIVE_READY_KEY, keepAlive, type SceneBusRef } from '../bus';
 import { dampFactor } from '../camera/damp';
 import { MOTION } from '../config';
 import type { CompileApiRef } from '../prewarm/api';
@@ -35,6 +35,11 @@ interface ArchiveContentProps {
   /** The URL is on the portfolio or a project: the category filter (D87) applies. */
   active?: boolean;
   onNavigate?: (path: string, replace?: boolean) => void;
+  /**
+   * Compile priority of the live content: `boot` while it is the URL's focus
+   * (V5-01: ready by the end of the flight), `live` while only fading.
+   */
+  priority?: number;
 }
 
 /** Ease of the filter / focus dimming: ~300 ms ease-out (instant under reduced motion). */
@@ -61,9 +66,13 @@ export function ArchiveContent({
   focusedProject = null,
   active = false,
   onNavigate,
+  priority = COMPILE_PRIORITY.live,
 }: ArchiveContentProps) {
   const groupRef = useRef<Group>(null);
+  const invalidate = useThree((state) => state.invalidate);
   const [compiled, setCompiled] = useState(false);
+  // Read once when the compile starts (a later change must not restart it).
+  const priorityRef = useRef(priority);
   const materialsRef = useRef(materials);
   useEffect(() => {
     materialsRef.current = materials;
@@ -113,15 +122,19 @@ export function ArchiveContent({
     const group = groupRef.current;
     if (!group) return;
     let cancelled = false;
-    const ticket = compile?.current?.compile(group, COMPILE_PRIORITY.live);
+    const ticket = compile?.current?.compile(group, priorityRef.current);
     void (ticket ? ticket.promise : Promise.resolve(true)).then(() => {
-      if (!cancelled) setCompiled(true);
+      if (cancelled) return;
+      setCompiled(true);
+      // frameloop="demand" (reduced motion): draw the frames that show it.
+      if (busRef) keepAlive(busRef.current, 800);
+      invalidate();
     });
     return () => {
       cancelled = true;
       ticket?.cancel();
     };
-  }, [mode, compile, materials]);
+  }, [mode, compile, materials, busRef, invalidate]);
 
   useEffect(() => {
     if (mode !== 'live') return;
@@ -141,7 +154,10 @@ export function ArchiveContent({
   useEffect(() => {
     if (mode !== 'live' || !busRef) return;
     const bus = busRef.current;
-    return () => bus.projectTargets.clear();
+    return () => {
+      bus.projectTargets.clear();
+      bus.readyContent.delete(ARCHIVE_READY_KEY);
+    };
   }, [mode, busRef]);
 
   // After the universe runtime (-0.5), before the cards (0).
@@ -173,6 +189,8 @@ export function ArchiveContent({
     archive.animated = rt.animated;
     const fade = smoothstep(0.15, 0.85, rt.focus[i] ?? 0) * (compiled ? 1 : 0);
     group.visible = fade > 0.002;
+    if (fade > 0.5) busRef?.current.readyContent.add(ARCHIVE_READY_KEY);
+    else busRef?.current.readyContent.delete(ARCHIVE_READY_KEY);
     m.uniforms.uTime.value = rt.time;
     const { world, rel, forward, toCard } = scratch.current;
     world.set(node.position[0], node.position[1], node.position[2]);
@@ -193,21 +211,17 @@ export function ArchiveContent({
     cam.getWorldDirection(forward);
     const fov = isPerspectiveCamera(cam) ? cam.fov : 50;
     const bus = busRef?.current;
+    // Free frame in canvas px: cards mostly outside it (under the HUD, the
+    // sheet or the viewport edge) fade instead of showing clipped (V5-06).
+    const rect = useSceneStore.getState().safeRect;
+    const frameLeft = rect ? rect.x - state.size.left : 0;
+    const frameTop = rect ? rect.y - state.size.top : 0;
+    const frameRight = rect ? frameLeft + rect.width : state.size.width;
+    const frameBottom = rect ? frameTop + rect.height : state.size.height;
     node.projects.forEach((project, index) => {
       const c = archive.cards[index]!;
       const target = targets[index]!;
-      c.hover += (target.hover - c.hover) * hoverK;
-      c.dim += (Math.max(target.dim, c.hover) - c.dim) * dimK;
-      c.select += (target.select - c.select) * dimK;
-      c.fade = fade;
-      const u = m.cards[index]?.uniforms;
-      if (u) {
-        u.uHover.value = c.hover;
-        u.uFade.value = fade;
-        u.uDim.value = c.dim;
-        u.uSelect.value = c.select;
-      }
-      // Screen position for the labels (CSS px, canvas space).
+      // Screen position (CSS px, canvas space) for the labels and the presence.
       const p = rel.set(
         world.x + project.offset[0],
         world.y + project.offset[1],
@@ -217,14 +231,40 @@ export function ArchiveContent({
       c.pxPerUnit = pixelsPerUnit(state.size.height, fov, depth);
       p.project(cam);
       c.inFront = p.z < 1;
+      const sx = (p.x * 0.5 + 0.5) * state.size.width;
+      const sy = (0.5 - p.y * 0.5) * state.size.height;
+      const halfW = (ARCHIVE.cardWidth / 2) * c.pxPerUnit;
+      const halfH = (ARCHIVE.cardHeight / 2) * c.pxPerUnit;
+      const overlapW = Math.max(
+        0,
+        Math.min(sx + halfW, frameRight) - Math.max(sx - halfW, frameLeft),
+      );
+      const overlapH = Math.max(
+        0,
+        Math.min(sy + halfH, frameBottom) - Math.max(sy - halfH, frameTop),
+      );
+      const inside = halfW > 0 && halfH > 0 ? (overlapW * overlapH) / (4 * halfW * halfH) : 1;
+      const presence = project.slug === focusedProject ? 1 : smoothstep(0.55, 0.92, inside);
+
+      c.hover += (target.hover - c.hover) * hoverK;
+      c.dim += (Math.max(Math.min(target.dim, presence), c.hover) - c.dim) * dimK;
+      c.select += (target.select - c.select) * dimK;
+      c.fade = fade;
+      const u = m.cards[index]?.uniforms;
+      if (u) {
+        u.uHover.value = c.hover;
+        u.uFade.value = fade;
+        u.uDim.value = c.dim;
+        u.uSelect.value = c.select;
+      }
       bus?.projectTargets.set(project.slug, {
-        x: (p.x * 0.5 + 0.5) * state.size.width,
-        y: (0.5 - p.y * 0.5) * state.size.height,
+        x: sx,
+        y: sy,
         // The label reticle (2 × radius) hugs the card's corners.
         radiusPx: (ARCHIVE.cardHeight / 2) * 0.53 * c.pxPerUnit,
         pxPerUnit: c.pxPerUnit,
         inFront: c.inFront,
-        visible: fade > 0.5,
+        visible: fade > 0.5 && c.dim > 0.15,
         label: project.label,
         sub: project.categoryLabels.join(' · ') || null,
         color: project.color,

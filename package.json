@@ -22,7 +22,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "npm run lint && npm run typecheck && npm run test",
-    "fonts:report": "node scripts/font-report.mjs"
+    "fonts:report": "node scripts/font-report.mjs",
+    "og:images": "node --no-warnings scripts/og-images.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

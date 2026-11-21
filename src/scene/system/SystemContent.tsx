@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Vector3, type Group, type Mesh, type ShaderMaterial } from 'three';
 import { useSceneStore } from '@/store/scene';
-import type { SceneBusRef } from '../bus';
+import { keepAlive, systemReadyKey, type SceneBusRef } from '../bus';
 import { dampFactor } from '../camera/damp';
 import { MOTION, SYSTEM_BASE_TILT } from '../config';
 import { sceneNodeId } from '../node-ids';
@@ -20,7 +20,12 @@ import { pixelsPerUnit } from '../universe/screen-size';
 import { CORONA_SCALE, NODE_CORE_RADIUS, SYSTEM_DETAIL_EPSILON, systemDetail } from './constants';
 import { CoreExtraMesh } from './CoreExtras';
 import { Planet, type SystemRuntime } from './Planet';
-import { freeOrbitAngle, planetLocalPosition, planetSpeedTarget } from './planet-math';
+import {
+  freeOrbitAngle,
+  planetLocalPosition,
+  planetSpeedTarget,
+  planetScreenBoost,
+} from './planet-math';
 
 export { NODE_CORE_RADIUS, SYSTEM_DETAIL_EPSILON, systemDetail };
 
@@ -28,6 +33,8 @@ export { NODE_CORE_RADIUS, SYSTEM_DETAIL_EPSILON, systemDetail };
 const SPEED_RATE = 2.2;
 /** Brightness of a focused planet's siblings. */
 const SIBLING_DIM = 0.32;
+/** Brightness of the core (and its corona) while a planet is focused (visual MJ1). */
+const FOCUS_CORE_DIM = 0.5;
 /** Comet tail length, world units. */
 const COMET_TAIL_LENGTH = 1.5;
 
@@ -48,6 +55,11 @@ interface SystemContentProps {
    * core hides when this is set and `systemDetail(...)` > 0 for the same frame.
    */
   readyRef?: RefObject<boolean>;
+  /**
+   * Compile priority of the live content: `boot` while it is the URL's focus
+   * (V5-01: ready by the end of the flight), `live` while only fading.
+   */
+  priority?: number;
 }
 
 /**
@@ -73,6 +85,7 @@ export function SystemContent({
   focusedService = null,
   onNavigate,
   readyRef,
+  priority = COMPILE_PRIORITY.live,
 }: SystemContentProps) {
   const groupRef = useRef<Group>(null);
   const coreRef = useRef<Mesh>(null);
@@ -86,7 +99,11 @@ export function SystemContent({
     rel: new Vector3(),
     forward: new Vector3(),
   });
+  const invalidate = useThree((state) => state.invalidate);
   const [compiled, setCompiled] = useState(false);
+  const coreDimRef = useRef(1);
+  // Read once when the compile starts (a later change must not restart it).
+  const priorityRef = useRef(priority);
   const style = CORE_STYLES[node.core];
   // Uniform writes go through a ref (the cached materials are shared objects).
   const materialsRef = useRef(materials);
@@ -101,15 +118,19 @@ export function SystemContent({
     const group = groupRef.current;
     if (!group) return;
     let cancelled = false;
-    const ticket = compile?.current?.compile(group, COMPILE_PRIORITY.live);
+    const ticket = compile?.current?.compile(group, priorityRef.current);
     void (ticket ? ticket.promise : Promise.resolve(true)).then(() => {
-      if (!cancelled) setCompiled(true);
+      if (cancelled) return;
+      setCompiled(true);
+      // frameloop="demand" (reduced motion): draw the frames that show it.
+      if (busRef) keepAlive(busRef.current, 800);
+      invalidate();
     });
     return () => {
       cancelled = true;
       ticket?.cancel();
     };
-  }, [mode, compile, materials]);
+  }, [mode, compile, materials, busRef, invalidate]);
 
   useEffect(() => {
     if (readyRef) readyRef.current = compiled;
@@ -136,6 +157,7 @@ export function SystemContent({
         bus.planetAngles.delete(key);
         bus.planetTargets.delete(key);
       }
+      bus.readyContent.delete(systemReadyKey(node.categoryId));
     };
   }, [mode, busRef, node]);
 
@@ -150,6 +172,9 @@ export function SystemContent({
     const detail = systemDetail(rt.focus[i] ?? 0, rt.corePx[i] ?? 0);
     const visible = compiled && detail > SYSTEM_DETAIL_EPSILON;
     group.visible = visible;
+    const readyKey = systemReadyKey(node.categoryId);
+    if (busRef && compiled && detail > 0.5) busRef.current.readyContent.add(readyKey);
+    else busRef?.current.readyContent.delete(readyKey);
     const emphasis = rt.emphasis[i] ?? 0;
     // Same size and spin as the universe core it replaces (slightly larger: no depth fight).
     const scale =
@@ -161,6 +186,11 @@ export function SystemContent({
     s.center.set(node.position[0], node.position[1], node.position[2]).add(rt.offsets[i]!);
     shared.uCorePos.value.copy(s.center);
 
+    // A focused planet takes the stage: the core steps back.
+    const coreDimTarget = focusedService ? FOCUS_CORE_DIM : 1;
+    coreDimRef.current +=
+      (coreDimTarget - coreDimRef.current) * (rt.animated ? dampFactor(2.5, dt) : 1);
+    const coreDim = coreDimRef.current;
     const core = coreRef.current;
     if (core) {
       core.scale.setScalar(scale * 1.002);
@@ -169,12 +199,16 @@ export function SystemContent({
       uniforms.uEmphasis.value = emphasis;
       uniforms.uSmall.value = rt.small[i] ?? 0;
       uniforms.uDetail.value = detail;
+      uniforms.uPresence.value = coreDim;
     }
     const corona = coronaRef.current;
     if (corona) {
-      corona.scale.setScalar(scale * CORONA_SCALE);
+      // The corona also shrinks around a focused planet (MJ1: CORE_KEEP_OUT in goals.ts).
+      corona.scale.setScalar(
+        scale * CORONA_SCALE * (0.55 + 0.45 * ((coreDim - FOCUS_CORE_DIM) / (1 - FOCUS_CORE_DIM))),
+      );
       const uniforms = (corona.material as ShaderMaterial).uniforms;
-      uniforms.uIntensity.value = detail * 0.8;
+      uniforms.uIntensity.value = detail * 0.8 * coreDim;
       uniforms.uCoreRadius.value = NODE_CORE_RADIUS * scale;
     }
     const extra = extraRef.current;
@@ -186,7 +220,7 @@ export function SystemContent({
       const tail = m.tail.uniforms;
       tail.uCoreRadius.value = NODE_CORE_RADIUS * scale;
       tail.uLength.value = COMET_TAIL_LENGTH;
-      tail.uIntensity.value = detail;
+      tail.uIntensity.value = detail * coreDim;
       tail.uScale.value = pointScale(state);
       tail.uPixelRatio.value = state.viewport.dpr;
     }
@@ -244,7 +278,7 @@ export function SystemContent({
       bus.planetTargets.set(key, {
         x: (ndc.x * 0.5 + 0.5) * width,
         y: (0.5 - ndc.y * 0.5) * height,
-        radiusPx: orbit.size * fade * st.pxPerUnit,
+        radiusPx: orbit.size * fade * st.pxPerUnit * planetScreenBoost(orbit.size, st.pxPerUnit),
         pxPerUnit: st.pxPerUnit,
         inFront: ndc.z < 1,
         visible: fade > 0.5,

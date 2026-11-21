@@ -5,7 +5,11 @@
  * program cannot be split. So work is cut into one task per material and run
  * in idle callbacks:
  * - each idle callback runs at least one task, and more only while the
- *   deadline leaves time (`timeRemaining()`);
+ *   deadline leaves time (`timeRemaining()`) — urgent jobs (live content,
+ *   boot) instead keep going for up to URGENT_SLICE_MS: an urgent callback
+ *   usually fires on its short timeout with no idle time left, and one task
+ *   per frame starved the archive and systems on slow devices (V5-01) even
+ *   though most of their materials reuse already compiled programs;
  * - an asynchronous task (compileAsync where the extension exists) ends the
  *   slice; the next slice starts when it settled;
  * - jobs run by priority (boot reveal > live system > hovered/touched/
@@ -21,6 +25,8 @@ export interface CompileQueueHost {
   /** `urgent` jobs ask for a short idle timeout. */
   requestIdle(callback: (deadline: IdleDeadlineLike) => void, urgent: boolean): number;
   cancelIdle(handle: number): void;
+  /** Clock for the urgent slice budget, ms (default `performance.now`). */
+  now?: () => number;
 }
 
 export type CompileTask = () => void | PromiseLike<unknown>;
@@ -46,6 +52,8 @@ export const COMPILE_PRIORITY = {
 const URGENT_PRIORITY = COMPILE_PRIORITY.live;
 /** With less idle time left than this, the next task waits for the next callback. */
 export const MIN_REMAINING_MS = 8;
+/** Urgent jobs keep running tasks in one callback for up to this long. */
+export const URGENT_SLICE_MS = 12;
 
 export interface CompileQueue {
   push(tasks: readonly CompileTask[], priority: number): CompileTicket;
@@ -62,6 +70,7 @@ interface Job {
 }
 
 export function createCompileQueue(host: CompileQueueHost): CompileQueue {
+  const now = host.now ?? (() => performance.now());
   const jobs: Job[] = [];
   let handle: number | null = null;
   let busy = false;
@@ -101,6 +110,7 @@ export function createCompileQueue(host: CompileQueueHost): CompileQueue {
     handle = null;
     busy = true;
     let ran = 0;
+    const start = now();
     try {
       while (!disposed) {
         const job = nextJob();
@@ -109,7 +119,10 @@ export function createCompileQueue(host: CompileQueueHost): CompileQueue {
           remove(job, true);
           continue;
         }
-        if (ran > 0 && deadline.timeRemaining() < MIN_REMAINING_MS) break;
+        if (ran > 0) {
+          const withinBudget = job.priority >= URGENT_PRIORITY && now() - start < URGENT_SLICE_MS;
+          if (!withinBudget && deadline.timeRemaining() < MIN_REMAINING_MS) break;
+        }
         const task = job.tasks.shift()!;
         ran += 1;
         let result: void | PromiseLike<unknown>;

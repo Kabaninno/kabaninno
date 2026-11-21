@@ -5,7 +5,8 @@
     "portfolioTitle": "Portfolio",
     "portfolioDescription": "Realizacje studia {studio}: zadanie, rozwiązanie, efekt i użyte technologie.",
     "configuratorTitle": "Utwórz zapytanie",
-    "configuratorDescription": "Wybierz rodzaj rozwiązania, funkcje, budżet i termin, a na koniec wyślij gotową wiadomość przez Telegram."
+    "configuratorDescription": "Wybierz rodzaj rozwiązania, funkcje, budżet i termin, a na koniec wyślij gotową wiadomość przez Telegram.",
+    "ogImageAlt": "{studio} — strony WWW, CRM, automatyzacje, AI i boty Telegram"
   },
   "common": {
     "skipToContent": "Przejdź do treści",
@@ -27,7 +28,10 @@
       "en": "English",
       "uk": "Українська"
     },
-    "requestCount": "{count, plural, one {# usługa} few {# usługi} many {# usług} other {# usługi}} w zapytaniu"
+    "requestCount": "{count, plural, one {# usługa} few {# usługi} many {# usług} other {# usługi}} w zapytaniu",
+    "simpleMode": "Tryb prosty 2D",
+    "simpleModeForced": "Ta przeglądarka nie obsługuje WebGL 2, dlatego strona działa w trybie prostym 2D.",
+    "skipIntro": "Pomiń intro"
   },
   "home": {
     "eyebrow": "Studio cyfrowe dla małych firm",

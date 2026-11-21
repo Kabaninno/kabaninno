@@ -72,6 +72,33 @@ interface SceneUiState {
   /** Free area for framing; `null` means the whole viewport is free. */
   safeRect: SafeRect | null;
   setSafeRect: (rect: SafeRect | null) => void;
+  /**
+   * Simple (2D) mode (D94). `null` until the UI has decided (stored user
+   * preference, else automatic: no WebGL 2 API → true). While `true`,
+   * SceneRoot does not mount (or unmounts) the 3D layer. Set by the UI only.
+   */
+  simpleMode: boolean | null;
+  setSimpleMode: (simple: boolean) => void;
+  /**
+   * Scene boot progress 0 → 1 (D94), published by the scene at coarse steps
+   * (chunk loaded, first frame, universe compiled, revealed = 1). The UI shows
+   * a small non-blocking loading indicator from it; it never hides content.
+   */
+  bootProgress: number;
+  setBootProgress: (progress: number) => void;
+  /**
+   * First-visit intro (D94). `introEligible` is decided by the UI (home route,
+   * first visit, no reduced motion; `null` until decided). The scene plays a
+   * ≤ 3 s intro flight on reveal only when it is `true`, sets `introActive`
+   * while playing, and jumps to the end when `introSkip` becomes true (the UI
+   * "Skip intro" button calls `skipIntro`). The UI marks the visit as seen.
+   */
+  introEligible: boolean | null;
+  setIntroEligible: (eligible: boolean) => void;
+  introActive: boolean;
+  setIntroActive: (active: boolean) => void;
+  introSkip: boolean;
+  skipIntro: () => void;
 }
 
 export const useSceneStore = create<SceneUiState>()((set) => ({
@@ -92,4 +119,18 @@ export const useSceneStore = create<SceneUiState>()((set) => ({
   setQuality: (quality) => set({ quality }),
   safeRect: null,
   setSafeRect: (safeRect) => set({ safeRect }),
+  simpleMode: null,
+  setSimpleMode: (simpleMode) => set({ simpleMode }),
+  bootProgress: 0,
+  setBootProgress: (progress) =>
+    set((state) => {
+      const next = Math.min(1, Math.max(state.bootProgress, progress));
+      return next === state.bootProgress ? state : { bootProgress: next };
+    }),
+  introEligible: null,
+  setIntroEligible: (introEligible) => set({ introEligible }),
+  introActive: false,
+  setIntroActive: (introActive) => set({ introActive }),
+  introSkip: false,
+  skipIntro: () => set({ introSkip: true }),
 }));

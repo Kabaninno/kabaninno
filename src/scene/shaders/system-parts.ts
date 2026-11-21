@@ -53,11 +53,13 @@ void main() {
  * multi-band rings carry data segments that run around at their own speed.
  */
 export const ringVertex = /* glsl */ `
-varying vec2 vPolar;
+varying vec2 vRingPos;
 varying float vDepth;
 
 void main() {
-  vPolar = vec2(length(position.xy), atan(position.y, position.x));
+  // Polar coordinates are taken per fragment: interpolating the angle across
+  // its ±π wrap drew a seam (visual mn3).
+  vRingPos = position.xy;
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vDepth = -mv.z;
   gl_Position = projectionMatrix * mv;
@@ -77,13 +79,14 @@ uniform float uHover;
 uniform float uFade;
 uniform float uDim;
 
-varying vec2 vPolar;
+varying vec2 vRingPos;
 varying float vDepth;
 
 ${fogChunk}
 ${hashChunk}
 
 void main() {
+  vec2 vPolar = vec2(length(vRingPos), atan(vRingPos.y, vRingPos.x));
   float t = clamp((vPolar.x - uInner) / (uOuter - uInner), 0.0, 1.0);
   float band = t * uBands;
   float id = floor(band);

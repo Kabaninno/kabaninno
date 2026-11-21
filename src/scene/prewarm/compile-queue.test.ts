@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   COMPILE_PRIORITY,
   MIN_REMAINING_MS,
+  URGENT_SLICE_MS,
   createCompileQueue,
   type CompileQueueHost,
 } from './compile-queue';
@@ -63,6 +64,27 @@ describe('createCompileQueue', () => {
     );
     await flush(MIN_REMAINING_MS + 20);
     expect(ran).toEqual([1, 2, 3]);
+  });
+
+  it('runs urgent tasks for up to the slice budget even with no idle time left (V5-01)', async () => {
+    const { host, flush } = fakeHost();
+    let clock = 0;
+    host.now = () => clock;
+    const queue = createCompileQueue(host);
+    const ran: number[] = [];
+    // Each task "takes" 5 ms: three fit the budget before the slice yields.
+    const ticket = queue.push(
+      [1, 2, 3, 4, 5].map((n) => () => {
+        ran.push(n);
+        clock += 5;
+      }),
+      COMPILE_PRIORITY.live,
+    );
+    await flush(0);
+    expect(ran.length).toBe(Math.ceil(URGENT_SLICE_MS / 5));
+    await flush(0);
+    expect(ran).toEqual([1, 2, 3, 4, 5]);
+    expect(await ticket.promise).toBe(true);
   });
 
   it('serves higher priorities first and asks for a short timeout for urgent work', async () => {

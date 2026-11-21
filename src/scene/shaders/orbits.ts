@@ -54,10 +54,20 @@ void main() {
   float direction = vSpeed < 0.0 ? -1.0 : 1.0;
   float behind = mod((head - vAngle) * direction, TAU);
   float tail = exp(-behind * 1.8);
-  float hot = abs(vOrbit - uHot) < 0.5 ? uHotAmount : 0.0;
-  float a = (0.11 + 0.2 * uEmphasis + 0.6 * hot) + tail * (0.5 + 0.4 * uEmphasis) * uTail;
+  // The lit orbit (hovered / focused planet) stands out (visual mn2): brighter,
+  // whiter, a slow signal running along it, and the other orbits recede.
+  float isHot = abs(vOrbit - uHot) < 0.5 ? 1.0 : 0.0;
+  float hot = isHot * uHotAmount;
+  float others = (1.0 - isHot) * uHotAmount;
+#ifdef LOW_QUALITY
+  float pulse = 1.0;
+#else
+  float pulse = 0.72 + 0.28 * sin(vAngle * 4.0 - uTime * 2.4);
+#endif
+  float a = (0.11 + 0.2 * uEmphasis) * (1.0 - 0.55 * others) + hot * 1.05 * pulse;
+  a += tail * (0.5 + 0.4 * uEmphasis) * uTail;
   a *= uOpacity * fogFactor(vDepth);
-  gl_FragColor = vec4(mix(uColor, vec3(1.0), hot * 0.35), clamp(a, 0.0, 1.0));
+  gl_FragColor = vec4(mix(uColor, vec3(1.0), hot * 0.5), clamp(a, 0.0, 1.0));
   #include <colorspace_fragment>
 }
 `;

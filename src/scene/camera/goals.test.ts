@@ -16,6 +16,8 @@ import {
   frameTangents,
   overviewGoal,
   minCoreDiameterPx,
+  CORE_KEEP_OUT,
+  SYSTEM_FIT,
   resolveSafeFrame,
   selectionGoal,
   usesPortraitOverview,
@@ -153,7 +155,9 @@ describe('computeCameraGoal', () => {
       dist(portfolio.position, model.portfolio.position),
     );
     const configurator = computeCameraGoal({ mode: 'configurator' }, model, DESKTOP);
-    expect(configurator.lookAt).toEqual(model.configurator.position);
+    // The beacon sits a little above the frame centre (MN-4: the framing is lifted).
+    expect(dist(configurator.lookAt, model.configurator.position)).toBeLessThan(2);
+    expect(configurator.lookAt[1]).toBeLessThan(model.configurator.position[1]);
   });
 
   it('keeps every goal inside the far plane with room for the star layers', () => {
@@ -657,5 +661,110 @@ describe('configurator selection framing (D81)', () => {
     expect(sphereInRect(goal, crm.position, 1, view, frame, rect)).toBe(true);
     // Nothing fits under the cap: the plain beacon focus.
     expect(selectionGoal(model, focus, [telegram], aspect, frame, focusDistance)).toEqual(focus);
+  });
+});
+
+describe('planet focus keeps the core clear (MJ1)', () => {
+  it('puts the core out of frame or 1.5 planet radii clear of the planet', () => {
+    for (const [view, rect] of [
+      [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+      [PHONE_VIEW, PHONE_SHEET_RECT],
+    ] as const) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      for (const node of model.categories) {
+        for (const orbit of node.orbits) {
+          for (const angle of [0, 1.3, 2.6, 4.1, 5.5]) {
+            const goal = computeCameraGoal(
+              { mode: 'planet', category: node.categoryId, service: orbit.serviceSlug },
+              model,
+              view.width / view.height,
+              frame,
+              { planetAngle: angle },
+            );
+            const planet = planetWorldPosition(node.position, orbit, angle);
+            // Inner orbits cannot clear the core from any side (the core's keep-out plus
+            // the planet's reach exceed the orbit radius): the core dims and shrinks there.
+            const feasible =
+              dist(planet, node.position) >= CORE_KEEP_OUT + planetReach(orbit) + 1.5 * orbit.size;
+            if (!feasible) continue;
+            const core = projectPx(goal, node.position, view, frame, CORE_KEEP_OUT);
+            if (core.z <= 0) continue; // behind the camera
+            const outside =
+              core.x + core.r < rect.x ||
+              core.x - core.r > rect.x + rect.width ||
+              core.y + core.r < rect.y ||
+              core.y - core.r > rect.y + rect.height;
+            if (outside) continue;
+            const p = projectPx(goal, planet, view, frame, planetReach(orbit));
+            const body = projectPx(goal, planet, view, frame, orbit.size);
+            const gap = Math.hypot(core.x - p.x, core.y - p.y) - core.r - p.r;
+            expect(gap).toBeGreaterThanOrEqual(1.5 * body.r - 1);
+          }
+        }
+      }
+    }
+  });
+});
+
+describe('system view fit (MJ2)', () => {
+  it('spans most of the free width with every orbit inside the rect', () => {
+    for (const [view, rect] of [
+      [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+      [PHONE_VIEW, PHONE_SHEET_RECT],
+    ] as const) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      for (const node of model.categories) {
+        const { goal } = goalFor({ mode: 'system', category: node.categoryId }, view, rect);
+        let minX = Infinity;
+        let maxX = -Infinity;
+        for (const orbit of node.orbits) {
+          for (let k = 0; k < 24; k++) {
+            const planet = planetWorldPosition(node.position, orbit, (k / 24) * Math.PI * 2);
+            const reach = planetReach(orbit) * SYSTEM_FIT.reachMargin;
+            expect(sphereInRect(goal, planet, reach, view, frame, rect)).toBe(true);
+            const p = projectPx(goal, planet, view, frame);
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+          }
+        }
+        // Closer than the old bounding-sphere fit (phone systems were tiny).
+        const radius = Math.max(node.systemRadius * 1.2, 0.8);
+        const sphere = fitDistance(radius, radius, goal.fov, view.width / view.height, frame);
+        // Closer on the phone band; about the same on desktop.
+        const limit = view === PHONE_VIEW ? sphere * 0.95 : sphere * 1.05;
+        expect(dist(goal.position, goal.lookAt)).toBeLessThan(limit);
+        expect(maxX - minX).toBeGreaterThan(rect.width * 0.45);
+      }
+    }
+  });
+});
+
+describe('configurator framing lift (MN-4)', () => {
+  it('raises the beacon and the selection above the frame centre, inside the rect', () => {
+    for (const [view, rect] of [
+      [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+      [PHONE_VIEW, PHONE_SHEET_RECT],
+    ] as const) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      for (const emphasis of [[], ['category:crm', 'category:web']]) {
+        const goal = computeCameraGoal(
+          { mode: 'configurator' },
+          model,
+          view.width / view.height,
+          frame,
+          { emphasis },
+        );
+        if (emphasis.length === 0) {
+          const beacon = projectPx(goal, model.configurator.position, view, frame);
+          expect(beacon.y).toBeLessThan(rect.y + rect.height / 2 - rect.height * 0.05);
+        }
+        expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(true);
+        for (const id of emphasis) {
+          expect(sphereInRect(goal, model.byKey.get(id)!.position, 1, view, frame, rect)).toBe(
+            true,
+          );
+        }
+      }
+    }
   });
 });

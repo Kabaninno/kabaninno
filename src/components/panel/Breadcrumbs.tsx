@@ -9,9 +9,11 @@ export interface BreadcrumbItem {
 /**
  * Breadcrumb trail. The first item is the explicit «← Universe» button of
  * system and planet panels (BRIEF scene 2: an outlined pill, not just a
- * crumb). The trail stays on one line: ancestors keep their width and the
- * current page (repeated by the h1 right below) truncates with an ellipsis,
- * so a wrapped line never starts with a bare "/".
+ * crumb). The trail stays on one line, so a wrapped line never starts with
+ * a bare "/": the pill keeps its width, other ancestors and the current page
+ * (repeated by the h1 right below) truncate with an ellipsis. In the narrow
+ * bottom sheet the current page is left to screen readers only, so a
+ * collapsed sheet never shows a clipped "Strony fi…" crumb (visual mn6).
  */
 export function Breadcrumbs({ label, items }: { label: string; items: readonly BreadcrumbItem[] }) {
   return (
@@ -20,7 +22,9 @@ export function Breadcrumbs({ label, items }: { label: string; items: readonly B
         {items.map((item, index) => (
           <li
             key={`${index}-${item.label}`}
-            className={`flex items-center gap-1 ${item.href ? 'shrink-0' : 'min-w-0'}`}
+            className={`flex items-center gap-1 ${
+              index === 0 ? 'shrink-0' : item.href ? 'min-w-0' : 'sr-only min-w-0 side:not-sr-only'
+            }`}
           >
             {index > 0 ? (
               <span aria-hidden="true" className="px-1 text-faint">
@@ -38,9 +42,9 @@ export function Breadcrumbs({ label, items }: { label: string; items: readonly B
             ) : item.href ? (
               <Link
                 href={item.href}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-1 whitespace-nowrap transition-colors duration-150 hover:text-ink active:text-white md:min-h-8"
+                className="inline-flex min-h-11 min-w-0 items-center rounded-full px-1 transition-colors duration-150 hover:text-ink active:text-white md:min-h-8"
               >
-                {item.label}
+                <span className="truncate">{item.label}</span>
               </Link>
             ) : (
               <span aria-current="page" className="min-w-0 truncate px-1 text-ink">

@@ -3,7 +3,13 @@ import { join } from 'node:path';
 import { test } from '@playwright/test';
 import { sitePath, type ViewportName } from '../support/env';
 import { formatIssues, IssueCollector } from '../support/issues';
-import { sceneFocusFor, waitForFlightSettled, waitForFonts, waitForScene } from '../support/scene';
+import {
+  sceneFocusFor,
+  waitForFlightSettled,
+  waitForFonts,
+  waitForScene,
+  waitForSceneReady,
+} from '../support/scene';
 import { STATES } from './states';
 import { META_DIR, SCREENSHOT_DIR } from './output';
 
@@ -58,6 +64,16 @@ for (const state of STATES) {
 
     const url = withQuality(sitePath(state.path));
     if (state.clock) await page.clock.install();
+    if (!state.intro) {
+      // A returning visitor: the first-visit intro (D94) does not play.
+      await page.addInitScript(() => {
+        try {
+          localStorage.setItem('kabaninno.intro.v1', 'true');
+        } catch {
+          // ignore
+        }
+      });
+    }
     await state.init?.(page);
     const response = await page.goto(url);
     const status = response?.status() ?? 0;
@@ -67,6 +83,10 @@ for (const state of STATES) {
       state.scene === false
         ? null
         : await waitForFlightSettled(page, { focus: sceneFocusFor(state.path) });
+    // The focused content is compiled and visible (scene-engineer's
+    // `html[data-scene-ready]`, e.g. the portfolio archive cards, V5-01).
+    const contentReady =
+      state.scene === false ? null : await waitForSceneReady(page, sceneFocusFor(state.path));
     await page.waitForTimeout(SETTLE_MS);
 
     const context2 = { viewport, frame: (suffix: string) => frame(suffix), mark };
@@ -92,6 +112,9 @@ for (const state of STATES) {
     if (sceneReady === false) {
       console.warn(`[screenshots] ${viewport} ${state.name}: the scene canvas never faded in`);
     }
+    if (contentReady === false) {
+      console.warn(`[screenshots] ${viewport} ${state.name}: html[data-scene-ready] never matched`);
+    }
 
     mkdirSync(META_DIR, { recursive: true });
     writeFileSync(
@@ -107,6 +130,7 @@ for (const state of STATES) {
           timeline,
           sceneReady,
           flightSettled: settled,
+          sceneContentReady: contentReady,
           issues: problems,
           warnings: issues.warnings.slice(0, 20),
           capturedAt: new Date().toISOString(),

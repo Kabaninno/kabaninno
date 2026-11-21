@@ -26,7 +26,7 @@ import { HitZone } from '../universe/HitZone';
 import type { CategoryNodeModel, OrbitPreview } from '../universe/model';
 import { createMoonPose, moonPose } from './moon-layout';
 import { MOON_SHAPES, PLANET_SHAPES } from './planet-geometry';
-import { SHELL_SCALE, planetReach } from './planet-math';
+import { SHELL_SCALE, planetReach, planetScreenBoost } from './planet-math';
 import type { PlanetMaterials } from './planet-materials';
 
 /** Per-planet motion state, written by SystemContent before the planets read it. */
@@ -49,6 +49,8 @@ export interface SystemRuntime {
 
 /** Minimum hit-zone diameter on screen (touch target), CSS px. */
 const MIN_HIT_PX = 44;
+/** Planet glow half size relative to the planet radius (smaller halos: MJ2). */
+const GLOW_SIZE = 2.4;
 const TRAIL_POINTS = 48;
 
 interface PlanetProps {
@@ -201,7 +203,9 @@ export function Planet({
 
     orbitPosition(orbit, st.angle, s.point);
     group.position.set(s.point.x, s.point.y, s.point.z);
-    group.scale.setScalar(orbit.size * st.fade);
+    // Small on screen (phone system views): the planet grows, its glow does not (MJ2).
+    const boost = planetScreenBoost(orbit.size, st.pxPerUnit);
+    group.scale.setScalar(orbit.size * st.fade * boost);
     if (isDart) {
       // Point along the direction of travel.
       orbitPosition(orbit, st.angle + Math.sign(orbit.speed || 1) * 0.01, s.next);
@@ -239,12 +243,15 @@ export function Planet({
       trail.uniforms.uPixelRatio.value = state.viewport.dpr;
     }
     const m = materialsRef.current;
-    m.glow.uniforms.uIntensity.value = 0.55 * st.fade * m.uniforms.uDim.value;
+    m.glow.uniforms.uIntensity.value = (0.55 / boost) * st.fade * m.uniforms.uDim.value;
+    m.glow.uniforms.uSize.value = orbit.size * GLOW_SIZE * Math.sqrt(boost);
 
     const hit = hitRef.current;
     if (hit) {
       hit.position.copy(group.position);
-      hit.scale.setScalar(Math.max(reach * 1.15, MIN_HIT_PX / 2 / Math.max(st.pxPerUnit, 1e-3)));
+      hit.scale.setScalar(
+        Math.max(reach * boost * 1.15, MIN_HIT_PX / 2 / Math.max(st.pxPerUnit, 1e-3)),
+      );
     }
     void delta;
   }, 0);

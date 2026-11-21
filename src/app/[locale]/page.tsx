@@ -11,6 +11,7 @@ import { buildPageMetadata } from '@/lib/metadata';
 import { UI_MOTION } from '@/lib/motion';
 import { buildNavCategories } from '@/lib/nav-data';
 import { paths } from '@/lib/routes';
+import { homeJsonLd, serializeJsonLd } from '@/lib/structured-data';
 import { bindShortWords } from '@/lib/typography';
 import { sceneNodeId } from '@/scene/node-ids';
 
@@ -74,58 +75,67 @@ export default async function HomePage({ params }: HomePageProps) {
   // camera flight to reach ~60 % (never on the initial load, D29); it fades
   // out when leaving (RouteExit).
   return (
-    <Reveal
-      gate="universe-flight"
-      reducedDelayMs={UI_MOTION.homeRevealDelayReducedMs}
-      data-route-ui=""
-      className={HERO_FRAME}
-    >
-      <section
-        aria-labelledby="home-title"
-        data-scene-overlay=""
-        className="relative isolate max-w-xl compact:max-w-[48rem] short:pointer-events-auto short:max-w-[min(26rem,56vw)]"
+    <>
+      {/* Studio and service catalogue for search engines (outside the route UI, so exit ghosts never clone it). */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(homeJsonLd(locale)) }}
+      />
+      <Reveal
+        gate="universe-flight"
+        reducedDelayMs={UI_MOTION.homeRevealDelayReducedMs}
+        data-route-ui=""
+        // Steps aside while the first-visit intro plays (IntroControl, D94).
+        data-intro-hide=""
+        className={HERO_FRAME}
       >
-        {/*
+        <section
+          aria-labelledby="home-title"
+          data-scene-overlay=""
+          className="relative isolate max-w-xl compact:max-w-[48rem] short:pointer-events-auto short:max-w-[min(26rem,56vw)]"
+        >
+          {/*
           Offsets stay inside the frame padding, so the scroll frame never
           overflows by itself: on phones the copy spans the frame width, so the
           scrim only reaches 1rem (the side padding) past it; from md up the
           hero sits in a narrower column and the scrim can spread wider.
         */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-16 -right-4 -bottom-12 -left-4 -z-10 hero-scrim md:-top-20 md:-right-28 md:-bottom-10 md:-left-24 short:-top-8 short:-right-12 short:-left-4 shorter:-top-4"
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-16 -right-4 -bottom-12 -left-4 -z-10 hero-scrim md:-top-20 md:-right-28 md:-bottom-10 md:-left-24 short:-top-8 short:-right-12 short:-left-4 shorter:-top-4"
+          />
+          <p className="mb-3 eyebrow md:mb-4 compact:mb-3 short:mb-1.5 shorter:mb-1">
+            {t('eyebrow')}
+          </p>
+          <h1
+            id="home-title"
+            className="font-display text-[1.625rem] leading-[1.15] font-medium tracking-[-0.01em] text-balance text-ink xs:text-[1.875rem] md:text-[2.75rem] lg:text-[3.25rem] compact:text-[clamp(2.25rem,6.2vh,3.25rem)] short:text-[1.375rem] short:leading-[1.18] shorter:text-[1.1875rem]"
+          >
+            {bindShortWords(t('title'), locale)}
+          </h1>
+          <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only">
+            {bindShortWords(t('lead'), locale)}
+          </p>
+          {/* The CTA leads to the configurator beacon and lights it up on hover/focus. */}
+          <HighlightLink
+            href={paths.configurator()}
+            highlightId={sceneNodeId.configurator}
+            className={`${primaryButton} pointer-events-auto mt-5 min-h-12 px-6 text-sm md:mt-7 compact:mt-5 short:mt-3 short:min-h-11 short:px-5 shorter:mt-2.5`}
+          >
+            {t('cta')}
+            <span aria-hidden="true" className={ctaArrow}>
+              →
+            </span>
+          </HighlightLink>
+        </section>
+        <CategoryIndex
+          hint={t('explore')}
+          categoriesLabel={t('servicesNav')}
+          categories={buildNavCategories(locale)}
+          portfolioLabel={tHud('portfolio')}
+          configuratorLabel={tHud('configurator')}
         />
-        <p className="mb-3 eyebrow md:mb-4 compact:mb-3 short:mb-1.5 shorter:mb-1">
-          {t('eyebrow')}
-        </p>
-        <h1
-          id="home-title"
-          className="font-display text-[1.625rem] leading-[1.15] font-medium tracking-[-0.01em] text-balance text-ink xs:text-[1.875rem] md:text-[2.75rem] lg:text-[3.25rem] compact:text-[clamp(2.25rem,6.2vh,3.25rem)] short:text-[1.375rem] short:leading-[1.18] shorter:text-[1.1875rem]"
-        >
-          {bindShortWords(t('title'), locale)}
-        </h1>
-        <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only">
-          {bindShortWords(t('lead'), locale)}
-        </p>
-        {/* The CTA leads to the configurator beacon and lights it up on hover/focus. */}
-        <HighlightLink
-          href={paths.configurator()}
-          highlightId={sceneNodeId.configurator}
-          className={`${primaryButton} pointer-events-auto mt-5 min-h-12 px-6 text-sm md:mt-7 compact:mt-5 short:mt-3 short:min-h-11 short:px-5 shorter:mt-2.5`}
-        >
-          {t('cta')}
-          <span aria-hidden="true" className={ctaArrow}>
-            →
-          </span>
-        </HighlightLink>
-      </section>
-      <CategoryIndex
-        hint={t('explore')}
-        categoriesLabel={t('servicesNav')}
-        categories={buildNavCategories(locale)}
-        portfolioLabel={tHud('portfolio')}
-        configuratorLabel={tHud('configurator')}
-      />
-    </Reveal>
+      </Reveal>
+    </>
   );
 }
