@@ -1,14 +1,27 @@
 import { getTranslations } from 'next-intl/server';
-import { getCategory, type Project } from '~/content';
+import { getCategory, getProjects, type Project } from '~/content';
+import { HighlightLink } from '@/components/nav/HighlightLink';
 import { Breadcrumbs } from '@/components/panel/Breadcrumbs';
 import { ContentPanel } from '@/components/panel/ContentPanel';
 import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { getCategoryText, getProjectText, getServiceText } from '@/lib/content-text';
+import { projectSiblings } from '@/lib/portfolio';
 import { paths } from '@/lib/routes';
 import { accentStyle } from '@/lib/style';
+import { sceneNodeId } from '@/scene/node-ids';
+import { ProjectDemo } from './demo/ProjectDemo';
+import { ProjectGallery } from './ProjectGallery';
 
-/** Case study: facts, task / solution / result, stack and linked services. */
+/**
+ * Case study: facts, task / solution / result, the interactive demo, the
+ * gallery, stack and linked services, then the previous / next case.
+ * - «← Portfolio» is the panel's explicit back button (first breadcrumb);
+ *   Esc leads there too (D42).
+ * - Previous / next wrap around the visible cases and replace the history
+ *   entry, like ←/→ and a swipe on the panel (siblings, D16), so Back returns
+ *   to the portfolio list.
+ */
 export async function ProjectDetail({ locale, project }: { locale: Locale; project: Project }) {
   const t = await getTranslations('portfolio');
   const tCommon = await getTranslations('common');
@@ -27,15 +40,23 @@ export async function ProjectDetail({ locale, project }: { locale: Locale; proje
     ['result', t('result'), text.result],
   ] as const;
 
+  const neighbours = projectSiblings(
+    getProjects().map((item) => item.slug),
+    project.slug,
+  );
+  const siblings = neighbours
+    ? { previous: paths.project(neighbours.previous), next: paths.project(neighbours.next) }
+    : undefined;
+
   return (
-    <ContentPanel labelledBy="project-title" style={accentStyle(colorOf(project.categories[0]!))}>
+    <ContentPanel
+      labelledBy="project-title"
+      style={accentStyle(colorOf(project.categories[0]!))}
+      siblings={siblings}
+    >
       <Breadcrumbs
         label={tCommon('breadcrumbs')}
-        items={[
-          { label: tCommon('backToUniverse'), href: paths.home() },
-          { label: t('title'), href: paths.portfolio() },
-          { label: text.title },
-        ]}
+        items={[{ label: t('title'), href: paths.portfolio() }, { label: text.title }]}
       />
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 eyebrow">
         {project.categories.map((id) => (
@@ -78,6 +99,12 @@ export async function ProjectDetail({ locale, project }: { locale: Locale; proje
             <p className="text-[0.9375rem] leading-relaxed text-muted">{value}</p>
           </section>
         ))}
+
+        {project.demo ? (
+          <ProjectDemo demo={project.demo} title={text.title} locale={locale} />
+        ) : null}
+
+        <ProjectGallery gallery={project.gallery} title={text.title} />
 
         <section>
           <h2 className="mb-2 eyebrow">{t('stack')}</h2>
@@ -126,13 +153,36 @@ export async function ProjectDetail({ locale, project }: { locale: Locale; proje
         ) : null}
       </div>
 
-      <Link
-        href={paths.portfolio()}
-        className="mt-8 inline-flex min-h-11 items-center gap-2 rounded-full px-1 text-sm text-muted transition-colors duration-150 hover:text-ink active:text-white"
-      >
-        <span aria-hidden="true">←</span>
-        {t('allProjects')}
-      </Link>
+      {neighbours ? (
+        <nav aria-label={t('siblingsNav')} className="mt-8 border-t border-white/[0.07] pt-6">
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ['prev', neighbours.previous, t('previous')],
+                ['next', neighbours.next, t('next')],
+              ] as const
+            ).map(([rel, slug, label]) => (
+              <HighlightLink
+                key={rel}
+                href={paths.project(slug)}
+                highlightId={sceneNodeId.project(slug)}
+                replace
+                rel={rel}
+                className={`flex min-h-14 flex-col justify-start rounded-xl border border-white/[0.07] px-3 py-2 transition-colors duration-150 hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07] ${rel === 'next' ? 'items-end text-right' : ''}`}
+              >
+                <span className="text-xs text-muted">
+                  {rel === 'prev' ? <span aria-hidden="true">← </span> : null}
+                  {label}
+                  {rel === 'next' ? <span aria-hidden="true"> →</span> : null}
+                </span>
+                <span className="line-clamp-2 max-w-full text-sm leading-snug text-ink">
+                  {getProjectText(locale, slug).title}
+                </span>
+              </HighlightLink>
+            ))}
+          </div>
+        </nav>
+      ) : null}
     </ContentPanel>
   );
 }

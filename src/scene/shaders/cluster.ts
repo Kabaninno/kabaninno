@@ -10,6 +10,11 @@ uniform float uScale;
 uniform float uPixelRatio;
 uniform float uEmphasis;
 uniform float uBrightness;
+/**
+ * View depth of a focused archive card (0 = none): stars in front of it
+ * fade out so they never sprinkle over the card's face.
+ */
+uniform float uNearCut;
 
 attribute float aSize;
 attribute float aKind;
@@ -36,7 +41,8 @@ void main() {
 #endif
   vColor = aColor;
   vKind = aKind;
-  vAlpha = energy * shimmer * uBrightness * (0.75 + 0.45 * uEmphasis) * fogFactor(-mv.z);
+  float cut = uNearCut > 0.0 ? smoothstep(uNearCut - 0.9, uNearCut + 0.15, -mv.z) : 1.0;
+  vAlpha = energy * shimmer * uBrightness * cut * (0.75 + 0.45 * uEmphasis) * fogFactor(-mv.z);
 }
 `;
 

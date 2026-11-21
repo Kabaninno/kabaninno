@@ -58,6 +58,7 @@ interface SceneUiState {
    * Node ids (see `scene/node-ids.ts`, e.g. "category:web") the scene should
    * show as "selected" — set by the configurator from the draft's solution
    * types while its route is active, cleared (empty array) when leaving it.
+   * On the portfolio route the filter sets `project:<slug>` ids (D87).
    * Unlike `highlighted` (a transient hover/focus), emphasis is a steady
    * state; the scene renders both, highlight on top.
    */

@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server';
-import { getCategory, type Project } from '~/content';
+import { getCategories, getCategory, type Project } from '~/content';
 import { HighlightLink } from '@/components/nav/HighlightLink';
 import { ContentPanel } from '@/components/panel/ContentPanel';
 import { ctaArrow, primaryButton } from '@/components/ui/styles';
@@ -7,12 +7,14 @@ import { Link } from '@/i18n/navigation';
 import type { Locale } from '@/i18n/routing';
 import { getCategoryText, getProjectText } from '@/lib/content-text';
 import { buildNavCategories } from '@/lib/nav-data';
+import { filterOptions } from '@/lib/portfolio';
 import { paths } from '@/lib/routes';
 import { accentStyle, formatIndex } from '@/lib/style';
 import { bindShortWords } from '@/lib/typography';
 import { sceneNodeId } from '@/scene/node-ids';
 // Single source of the portfolio cluster color (shared with the 3D scene).
 import { PALETTE } from '@/scene/config';
+import { PortfolioBrowser } from './PortfolioBrowser';
 
 interface PortfolioIndexProps {
   locale: Locale;
@@ -21,9 +23,11 @@ interface PortfolioIndexProps {
 }
 
 /**
- * Portfolio list, or the "coming soon" state when no case is visible. The
- * empty state (what production ships until cases are published) always offers
- * a next step: the configurator and the service systems (from content data).
+ * Portfolio list (category filter + object-cards, `PortfolioBrowser`), or the
+ * "coming soon" state when no case is visible. The empty state (what
+ * production ships until cases are published) always offers a next step: the
+ * configurator and the service systems (from content data). Card data, filter
+ * names and count texts are prepared here, on the server.
  */
 export async function PortfolioIndex({ locale, projects }: PortfolioIndexProps) {
   const t = await getTranslations('portfolio');
@@ -44,43 +48,40 @@ export async function PortfolioIndex({ locale, projects }: PortfolioIndexProps) 
       {projects.length === 0 ? (
         <EmptyState locale={locale} />
       ) : (
-        <ul className="mt-8 flex flex-col gap-3">
-          {projects.map((project) => {
+        <PortfolioBrowser
+          cards={projects.map((project) => {
             const text = getProjectText(locale, project.slug);
-            const categoryNames = project.categories.map((id) => getCategoryText(locale, id).name);
-            return (
-              <li key={project.slug}>
-                <Link
-                  href={paths.project(project.slug)}
-                  className="group flex flex-col gap-2 rounded-2xl border border-white/[0.07] p-4 transition-colors duration-200 ease-calm hover:border-white/20 hover:bg-white/[0.04] active:bg-white/[0.07]"
-                >
-                  <span className="flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-1.5" aria-hidden="true">
-                      {project.categories.map((id) => (
-                        <span
-                          key={id}
-                          style={accentStyle(getCategory(id)?.dna.color ?? 'transparent')}
-                          className="size-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
-                        />
-                      ))}
-                    </span>
-                    <span className="sr-only">{categoryNames.join(', ')}</span>
-                    <span className="flex items-center gap-2">
-                      {project.status === 'draft' ? (
-                        <span className="rounded-full border border-white/15 px-2 py-0.5 text-[0.6875rem] text-muted">
-                          {t('draftBadge')}
-                        </span>
-                      ) : null}
-                      <span className="mono-index text-muted">{project.year}</span>
-                    </span>
-                  </span>
-                  <span className="font-display text-base font-medium text-ink">{text.title}</span>
-                  <span className="text-sm text-muted">{text.industry}</span>
-                </Link>
-              </li>
-            );
+            return {
+              slug: project.slug,
+              title: text.title,
+              summary: text.summary,
+              year: project.year,
+              stack: [...project.stack],
+              categories: [...project.categories],
+              categoryNames: project.categories
+                .map((id) => getCategoryText(locale, id).name)
+                .join(', '),
+              colors: project.categories.map((id) => getCategory(id)?.dna.color ?? '#E8ECF5'),
+              draft: project.status === 'draft',
+            };
           })}
-        </ul>
+          filters={filterOptions(
+            projects,
+            getCategories().map((category) => category.id),
+          ).map((option) => ({
+            id: option.id,
+            name: getCategoryText(locale, option.id).name,
+            color: getCategory(option.id)?.dna.color ?? '#E8ECF5',
+          }))}
+          labels={{
+            filterLabel: t('filterLabel'),
+            all: t('filterAll'),
+            draft: t('draftBadge'),
+            counts: Array.from({ length: projects.length + 1 }, (_, count) =>
+              t('resultCount', { count }),
+            ),
+          }}
+        />
       )}
     </ContentPanel>
   );

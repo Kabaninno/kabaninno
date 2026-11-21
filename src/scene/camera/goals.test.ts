@@ -146,7 +146,8 @@ describe('computeCameraGoal', () => {
 
   it('heads to the portfolio cluster and the configurator beacon', () => {
     const portfolio = computeCameraGoal({ mode: 'portfolio' }, model, DESKTOP);
-    expect(portfolio.lookAt).toEqual(model.portfolio.position);
+    // The archive wall stands in front of the cluster centre.
+    expect(dist(portfolio.lookAt, model.portfolio.position)).toBeLessThan(2);
     const project = computeCameraGoal({ mode: 'project', project: 'demo' }, model, DESKTOP);
     expect(dist(project.position, model.portfolio.position)).toBeLessThan(
       dist(portfolio.position, model.portfolio.position),

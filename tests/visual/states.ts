@@ -1,7 +1,8 @@
 import type { Page } from '@playwright/test';
 import { sitePath, type ViewportName } from '../support/env';
 import { withoutWebGL } from '../support/scene';
-import { categories, localized, paths, type TestLocale } from '../support/site';
+import { getAllProjects } from '~/content';
+import { builtProjects, categories, localized, paths, type TestLocale } from '../support/site';
 
 /**
  * Key states captured by `npm run screenshots` (BRIEF B2.7, C3). Data-driven:
@@ -76,6 +77,23 @@ function seedConfigurator(step: string) {
     );
   };
 }
+
+/**
+ * Portfolio states need visible cases, i.e. a preview built with drafts:
+ *   SHOW_DRAFTS=true npm run build:preview      (PowerShell: $env:SHOW_DRAFTS='true'; npm run build:preview)
+ * On a production build (no published cases) these states are simply not
+ * generated; the plain `portfolio-pl` state then shows the "coming soon" panel.
+ */
+const built = builtProjects().map((project) => project.slug);
+const builtCases = getAllProjects().filter((project) => built.includes(project.slug));
+const filterCategory = categories.find((category) =>
+  builtCases.some((project) => project.categories.includes(category.id)),
+)?.id;
+/** The first built case of each demo type (iframe facade, video, mockup). */
+const demoCases = ['iframe', 'video', 'mockup'].flatMap((type) => {
+  const project = builtCases.find((item) => item.demo?.type === type);
+  return project ? [{ type, slug: project.slug }] : [];
+});
 
 const CONFIGURATOR_STEP_IDS = [
   'type',
@@ -250,6 +268,26 @@ export const STATES: CaptureState[] = [
     tags: ['configurator', 'wizard', 'sheet'],
     init: seedConfigurator('summary'),
   },
+  // Portfolio with cases (SHOW_DRAFTS builds only, see above).
+  ...(filterCategory
+    ? [
+        {
+          name: `portfolio-filter-${filterCategory}-pl`,
+          path: `${pl(paths.portfolio())}?category=${filterCategory}`,
+          tags: ['portfolio', 'drafts'],
+        } satisfies CaptureState,
+      ]
+    : []),
+  ...demoCases.map(({ type, slug }): CaptureState => ({
+    name: `case-${type}-${slug}-pl`,
+    path: pl(paths.project(slug)),
+    tags: ['portfolio', 'case', 'drafts'],
+    prepare: async (page) => {
+      // Bring the demo into view inside the panel.
+      await page.locator('#project-demo').scrollIntoViewIfNeeded();
+    },
+  })),
+
   { name: '404', path: '/pl/this-sector-is-empty/', scene: false, status: 404, tags: ['404'] },
 
   // Transition: home → first system (index link), then Back.

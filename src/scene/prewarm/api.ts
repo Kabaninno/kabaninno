@@ -26,3 +26,6 @@ export type PrewarmApiRef = RefObject<PrewarmApi | null>;
 export function systemPrewarmKey(categoryId: string): string {
   return `system:${categoryId}`;
 }
+
+/** Prewarm key of the portfolio archive (project card-objects, observatory rings). */
+export const ARCHIVE_PREWARM_KEY = 'archive';

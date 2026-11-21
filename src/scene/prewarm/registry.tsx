@@ -1,24 +1,38 @@
 'use client';
 
+import { ArchiveContent } from '../portfolio/ArchiveContent';
+import type { ArchiveMaterialCache } from '../portfolio/archive-materials';
 import type { QualityPreset } from '../quality';
 import { SystemContent } from '../system/SystemContent';
 import type { UniverseModel } from '../universe/model';
-import { systemPrewarmKey } from './api';
+import { ARCHIVE_PREWARM_KEY, systemPrewarmKey } from './api';
 import type { PrewarmEntry } from './Prewarm';
 import type { SystemMaterialCache } from './system-materials';
 
 /**
  * Prewarm registry: every piece of content that is hidden at first and may
  * appear later. Data-driven — one entry per category system, in content
- * order, so a new category is prewarmed with no scene changes. M3 extends
- * `SystemContent` (planets, rings, moons) and keeps these keys.
+ * order, then the portfolio archive, so a new category or case is prewarmed
+ * with no scene changes.
  */
 export function buildPrewarmEntries(
   model: UniverseModel,
   preset: QualityPreset,
   materials: SystemMaterialCache,
+  archiveMaterials: ArchiveMaterialCache,
 ): PrewarmEntry[] {
-  return model.categories.map((node) => ({
+  const archive: PrewarmEntry = {
+    key: ARCHIVE_PREWARM_KEY,
+    render: () => (
+      <ArchiveContent
+        node={model.portfolio}
+        preset={preset}
+        materials={archiveMaterials.get(model.portfolio, preset.lowQualityShaders)}
+        mode="prewarm"
+      />
+    ),
+  };
+  const systems = model.categories.map((node) => ({
     key: systemPrewarmKey(node.categoryId),
     render: () => (
       <SystemContent
@@ -29,4 +43,5 @@ export function buildPrewarmEntries(
       />
     ),
   }));
+  return [...systems, archive];
 }

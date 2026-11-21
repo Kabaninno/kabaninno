@@ -8,7 +8,13 @@ import { keepAlive, type SceneBusRef } from '../bus';
 import { MOTION } from '../config';
 import { dampFactor } from '../camera/damp';
 import { sceneNodeId, universeKeyForHighlight } from '../node-ids';
-import { systemPrewarmKey, type CompileApiRef, type PrewarmApiRef } from '../prewarm/api';
+import {
+  ARCHIVE_PREWARM_KEY,
+  systemPrewarmKey,
+  type CompileApiRef,
+  type PrewarmApiRef,
+} from '../prewarm/api';
+import type { ArchiveMaterialCache } from '../portfolio/archive-materials';
 import type { SystemMaterialCache } from '../prewarm/system-materials';
 import type { QualityPreset } from '../quality';
 import { NODE_CORE_RADIUS } from '../system/SystemContent';
@@ -56,6 +62,8 @@ interface UniverseProps {
   focusKey: string | null;
   /** Planet the URL focuses ("<category>/<slug>" route), else null. */
   focusedPlanet: { category: string; service: string } | null;
+  /** Project the URL focuses (case route), else null. */
+  focusedProject: string | null;
   preset: QualityPreset;
   reducedMotion: boolean;
   onNavigate: (path: string, replace?: boolean) => void;
@@ -63,6 +71,7 @@ interface UniverseProps {
   prewarm: PrewarmApiRef;
   compile: CompileApiRef;
   systemMaterials: SystemMaterialCache;
+  archiveMaterials: ArchiveMaterialCache;
 }
 
 /**
@@ -76,6 +85,7 @@ export function Universe({
   model,
   focusKey,
   focusedPlanet,
+  focusedProject,
   preset,
   reducedMotion,
   onNavigate,
@@ -83,6 +93,7 @@ export function Universe({
   prewarm,
   compile,
   systemMaterials,
+  archiveMaterials,
 }: UniverseProps) {
   const runtime = useRef<UniverseRuntime | null>(null);
   // Highlight id from the shared store (3D hover or HTML nav focus), kept in a ref.
@@ -104,6 +115,7 @@ export function Universe({
       // Desktop hover / keyboard focus on an HTML link warms that system up.
       const node = key ? model.byKey.get(key) : undefined;
       if (node?.kind === 'category') prewarm.current?.prioritize(systemPrewarmKey(node.categoryId));
+      if (node?.kind === 'portfolio') prewarm.current?.prioritize(ARCHIVE_PREWARM_KEY);
     };
     apply(useSceneStore.getState().highlighted);
     return useSceneStore.subscribe((state, previous) => {
@@ -254,8 +266,13 @@ export function Universe({
         node={model.portfolio}
         runtime={runtime}
         preset={preset}
+        focused={focusKey === model.portfolio.key}
+        focusedProject={focusedProject}
         onNavigate={onNavigate}
         busRef={busRef}
+        prewarm={prewarm}
+        compile={compile}
+        archiveMaterials={archiveMaterials}
       />
       <ConfiguratorBeacon
         node={model.configurator}

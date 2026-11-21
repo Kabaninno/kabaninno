@@ -28,6 +28,7 @@ import { CompileService } from './prewarm/CompileService';
 import { Prewarm } from './prewarm/Prewarm';
 import { buildPrewarmEntries } from './prewarm/registry';
 import { SystemMaterialCache } from './prewarm/system-materials';
+import { ArchiveMaterialCache } from './portfolio/archive-materials';
 import {
   QUALITY_PRESETS,
   initialQualityTier,
@@ -153,6 +154,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
   const prewarmRef = useRef<PrewarmApi | null>(null);
   const compileRef = useRef<CompileApi | null>(null);
   const [systemMaterials] = useState(() => new SystemMaterialCache());
+  const [archiveMaterials] = useState(() => new ArchiveMaterialCache());
 
   const model = useMemo(() => buildUniverseModel(manifest), [manifest]);
   const preset = QUALITY_PRESETS[tier];
@@ -163,12 +165,13 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
       target.mode === 'planet' ? { category: target.category, service: target.service } : null,
     [target],
   );
+  const focusedProject = target.mode === 'project' ? target.project : null;
   // The tier's DPR is the Canvas prop itself: R3F re-applies this prop on
   // every render, so anything else (AdaptiveDpr) was reset (P-02).
   const dpr = sceneDpr(deviceDpr, preset);
   const prewarmEntries = useMemo(
-    () => buildPrewarmEntries(model, preset, systemMaterials),
-    [model, preset, systemMaterials],
+    () => buildPrewarmEntries(model, preset, systemMaterials, archiveMaterials),
+    [model, preset, systemMaterials, archiveMaterials],
   );
   const glFactory = useCallback<RendererFactory>(
     (defaults) => createSceneRenderer(defaults, onUnavailable),
@@ -177,6 +180,8 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
 
   useEffect(() => () => systemMaterials.dispose(), [systemMaterials]);
   useEffect(() => systemMaterials.retain(preset.lowQualityShaders), [preset, systemMaterials]);
+  useEffect(() => () => archiveMaterials.dispose(), [archiveMaterials]);
+  useEffect(() => archiveMaterials.retain(preset.lowQualityShaders), [preset, archiveMaterials]);
   useEffect(() => useSceneStore.getState().setQuality(tier), [tier]);
 
   const advance = useCallback((next: BootStage) => {
@@ -257,6 +262,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
             model={model}
             focusKey={focusKey}
             focusedPlanet={focusedPlanet}
+            focusedProject={focusedProject}
             preset={preset}
             reducedMotion={reducedMotion}
             onNavigate={navigate}
@@ -264,6 +270,7 @@ export default function Experience({ manifest, onUnavailable }: ExperienceProps)
             prewarm={prewarmRef}
             compile={compileRef}
             systemMaterials={systemMaterials}
+            archiveMaterials={archiveMaterials}
           />
         </Reveal>
       ) : null}

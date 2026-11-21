@@ -2,6 +2,7 @@ import type { CategoryDna, Planet } from '~/content/schema';
 import { paths } from '@/lib/routes';
 import { MAX_CATEGORY_NODES, MAX_UNIVERSE_NODES, PALETTE, SYSTEM_SCALE } from '../config';
 import { CONFIGURATOR_POSITION, PORTFOLIO_POSITION, layoutCategoryNodes } from '../layout';
+import { archiveOffsets } from '../portfolio/archive-layout';
 import { sceneNodeId } from '../node-ids';
 import { GOLDEN_ANGLE, degToRad, type OrbitShape } from '../orbit-math';
 import type { SceneManifest, Vec3 } from '../types';
@@ -55,9 +56,37 @@ export interface CategoryNodeModel extends UniverseNodeBase {
   systemRadius: number;
 }
 
+/**
+ * A project card-object of the portfolio archive, derived from the project's
+ * categories: the first (main) category gives the accent and the emblem
+ * (by its core style), every category adds a colour chip.
+ */
+export interface ArchiveProjectModel {
+  slug: string;
+  /** Highlight id (`project:<slug>`). */
+  key: string;
+  label: string;
+  /** Locale-less route of the case page. */
+  path: string;
+  /** 1-based position among the projects (label index "02 / 04"). */
+  ordinal: number;
+  color: string;
+  glow: string;
+  /** Emblem key: the main category's core style (null: unknown category). */
+  emblem: CategoryDna['core'] | null;
+  /** Accent of each of the project's categories (card chips), at most 4. */
+  chips: string[];
+  /** Localized names of the project's categories (label subline). */
+  categoryLabels: string[];
+  /** Card centre relative to the portfolio node centre (archive layout). */
+  offset: Vec3;
+}
+
 export interface PortfolioNodeModel extends UniverseNodeBase {
   kind: 'portfolio';
   projectSlugs: string[];
+  /** Card-objects of the archive view, in project order. */
+  projects: ArchiveProjectModel[];
   /** No visible project yet: dimmer cluster and a "coming soon" label (BRIEF B2.3). */
   comingSoon: boolean;
   comingSoonLabel: string;
@@ -152,6 +181,7 @@ export function buildUniverseModel(manifest: SceneManifest): UniverseModel {
     path: paths.portfolio(),
     label: manifest.labels.portfolio,
     projectSlugs: manifest.projects.map((project) => project.slug),
+    projects: buildArchiveProjects(manifest, categoryList),
     comingSoon: manifest.projects.length === 0,
     comingSoonLabel: manifest.labels.comingSoon,
   };
@@ -178,6 +208,34 @@ export function buildUniverseModel(manifest: SceneManifest): UniverseModel {
     links: buildLinks(categories, portfolio, configurator),
     byKey: new Map(nodes.map((node) => [node.key, node])),
   };
+}
+
+/** Archive card-objects from the manifest projects and the category DNA (data-driven). */
+function buildArchiveProjects(
+  manifest: SceneManifest,
+  categories: SceneManifest['categories'],
+): ArchiveProjectModel[] {
+  const byId = new Map(categories.map((category) => [category.id, category]));
+  const offsets = archiveOffsets(manifest.projects.length);
+  return manifest.projects.map((project, index) => {
+    const own = project.categories
+      .map((id) => byId.get(id))
+      .filter((category): category is SceneManifest['categories'][number] => !!category);
+    const main = own[0];
+    return {
+      slug: project.slug,
+      key: sceneNodeId.project(project.slug),
+      label: project.label,
+      path: paths.project(project.slug),
+      ordinal: index + 1,
+      color: main?.dna.color ?? PALETTE.portfolio,
+      glow: main?.dna.glow ?? PALETTE.portfolioGlow,
+      emblem: main?.dna.core ?? null,
+      chips: own.slice(0, 4).map((category) => category.dna.color),
+      categoryLabels: own.map((category) => category.label),
+      offset: offsets[index]!,
+    };
+  });
 }
 
 function limitCategories(categories: SceneManifest['categories']): SceneManifest['categories'] {

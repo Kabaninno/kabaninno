@@ -400,6 +400,7 @@ export function CameraDirector({
       if (!d.cut && (!d.flight || d.flight.kind === 'intro')) {
         shared.interactive = isOverview(target);
         shared.systemInteractive = systemCategory(target);
+        shared.archiveInteractive = isArchive(target);
         d.refreshHover = true;
       }
     }
@@ -579,6 +580,7 @@ function startFlight(
   shared.flying = true;
   shared.interactive = false;
   shared.systemInteractive = null;
+  shared.archiveInteractive = false;
   shared.focusDriven = true;
   shared.focusFrom = d.flight.focusFrom;
   shared.focusTo = d.flight.focusTo;
@@ -714,6 +716,7 @@ function finishMotion(d: DirectorState, shared: SceneBus, target: SceneTarget) {
   shared.focusDriven = false;
   shared.interactive = isOverview(target) && d.revealed;
   shared.systemInteractive = d.revealed ? systemCategory(target) : null;
+  shared.archiveInteractive = d.revealed && isArchive(target);
   // The camera settled on the URL's state (D56).
   useSceneStore.getState().setFocus(d.targetPath);
   d.idleClock = 0;
@@ -746,6 +749,7 @@ function startCut(
   shared.flying = true;
   shared.interactive = false;
   shared.systemInteractive = null;
+  shared.archiveInteractive = false;
   shared.focusDriven = true;
   shared.focusFrom = d.cut.focusFrom;
   shared.focusTo = d.cut.focusTo;
@@ -997,4 +1001,9 @@ function lerp(a: number, b: number, t: number): number {
 /** Category whose planets take input on this route (system / planet), else null. */
 function systemCategory(target: SceneTarget): string | null {
   return target.mode === 'system' || target.mode === 'planet' ? target.category : null;
+}
+
+/** The portfolio archive takes card input on this route (portfolio / project). */
+function isArchive(target: SceneTarget): boolean {
+  return target.mode === 'portfolio' || target.mode === 'project';
 }

@@ -65,9 +65,11 @@ interface LabelState {
  * highlighted node changes; per frame only transforms and, when the layout
  * shifts, two SVG paths are written. Shown in the overview while the camera
  * is settled (`bus.interactive`) and the node is not faded out under an
- * overlay (presence), and in a settled system view for the planet of a
- * `service:<cat>/<slug>` highlight. The text box stays inside the free area,
- * clear of the other cores and planets (label-layout.ts).
+ * overlay (presence), in a settled system view for the planet of a
+ * `service:<cat>/<slug>` highlight, and in the settled portfolio archive for
+ * the card of a `project:<slug>` highlight (with no projects the cluster's
+ * "coming soon" label stays up there). The text box stays inside the free
+ * area, clear of the other cores, planets and cards (label-layout.ts).
  */
 export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabelsProps) {
   const gl = useThree((state) => state.gl);
@@ -220,6 +222,8 @@ function resolveTarget(
   target: LabelTarget,
   obstacles: LabelObstacle[],
 ): boolean {
+  if (bus.archiveInteractive)
+    return resolveArchiveTarget(model, rt, bus, highlight, target, obstacles);
   if (!highlight) return false;
   if (bus.interactive) {
     const key = universeKeyForHighlight(highlight);
@@ -265,6 +269,54 @@ function resolveTarget(
   if (node && rt.inFront[node.index]) {
     const i = node.index;
     obstacles.push({ x: rt.screenX[i] ?? 0, y: rt.screenY[i] ?? 0, r: (rt.corePx[i] ?? 0) / 2 });
+  }
+  return true;
+}
+
+/**
+ * Settled portfolio archive: the card of a `project:<slug>` highlight, clear
+ * of the other cards; with no projects, a steady "coming soon" label on the
+ * dormant cluster.
+ */
+function resolveArchiveTarget(
+  model: UniverseModel,
+  rt: UniverseRuntime,
+  bus: SceneBus,
+  highlight: string | null,
+  target: LabelTarget,
+  obstacles: LabelObstacle[],
+): boolean {
+  const portfolio = model.portfolio;
+  if (portfolio.comingSoon) {
+    const i = portfolio.index;
+    if (!rt.inFront[i]) return false;
+    target.key = portfolio.key;
+    target.x = rt.screenX[i] ?? 0;
+    target.y = rt.screenY[i] ?? 0;
+    target.radiusPx = Math.max((rt.corePx[i] ?? 16) / 2, 18);
+    target.color = portfolio.color;
+    target.label = portfolio.label;
+    target.index = null;
+    target.sub = portfolio.comingSoonLabel;
+    return true;
+  }
+  const prefix = 'project:';
+  if (!highlight?.startsWith(prefix)) return false;
+  const slug = highlight.slice(prefix.length);
+  const card = bus.projectTargets.get(slug);
+  if (!card || !card.visible || !card.inFront) return false;
+  target.key = highlight;
+  target.x = card.x;
+  target.y = card.y;
+  target.radiusPx = Math.max(card.radiusPx, 8);
+  target.color = card.color;
+  target.label = card.label;
+  target.index = formatOrdinal(card.ordinal, card.total);
+  target.sub = card.sub ?? null;
+  for (const [otherSlug, other] of bus.projectTargets) {
+    if (otherSlug === slug || !other.visible || !other.inFront) continue;
+    // About the card's half width: the text may use the gaps between cards.
+    obstacles.push({ x: other.x, y: other.y, r: other.radiusPx * 1.2 });
   }
   return true;
 }

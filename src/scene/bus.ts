@@ -42,11 +42,18 @@ export interface SceneBus {
   planetAngles: Map<string, number>;
   /** Projected planets of the mounted system ("category/slug"), for labels and hit zones. */
   planetTargets: Map<string, PlanetTarget>;
+  /**
+   * The portfolio archive accepts card input (portfolio / project route,
+   * camera settled, universe revealed).
+   */
+  archiveInteractive: boolean;
+  /** Projected project card-objects of the mounted archive (by slug), for labels. */
+  projectTargets: Map<string, PlanetTarget>;
   /** Text box of the visible canvas label, device px, GL origin (bottom-left), or null. */
   labelRect: [number, number, number, number] | null;
 }
 
-/** A planet as the labels see it (CSS px, canvas space). */
+/** A planet (or an archive card) as the labels see it (CSS px, canvas space). */
 export interface PlanetTarget {
   x: number;
   y: number;
@@ -58,6 +65,8 @@ export interface PlanetTarget {
   /** Materialized (system detail) — hidden while the dive is still far. */
   visible: boolean;
   label: string;
+  /** Optional second line (archive cards: their categories). */
+  sub?: string | null;
   color: string;
   ordinal: number;
   total: number;
@@ -82,6 +91,8 @@ export function createSceneBus(): SceneBus {
     systemInteractive: null,
     planetAngles: new Map(),
     planetTargets: new Map(),
+    archiveInteractive: false,
+    projectTargets: new Map(),
     labelRect: null,
   };
 }

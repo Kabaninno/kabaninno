@@ -76,7 +76,66 @@
     "result": "Efekt",
     "stack": "Technologie",
     "services": "Usługi",
-    "allProjects": "Wszystkie realizacje"
+    "filterLabel": "Filtruj według kategorii",
+    "filterAll": "Wszystkie",
+    "resultCount": "{count, plural, =0 {Brak realizacji w tej kategorii} one {# realizacja} few {# realizacje} many {# realizacji} other {# realizacji}}",
+    "previous": "Poprzednia realizacja",
+    "next": "Następna realizacja",
+    "siblingsNav": "Inne realizacje",
+    "gallery": "Galeria",
+    "galleryImage": "{title}: ilustracja {index} z {total}",
+    "demo": "Demo",
+    "demoLoad": "Załaduj demo na żywo",
+    "demoLoadHint": "Zewnętrzna strona ({host}) wczyta się dopiero po kliknięciu.",
+    "demoOpen": "Otwórz w nowej karcie",
+    "demoFrameTitle": "Demo na żywo: {title}",
+    "demoVideo": "Wideo: {title}",
+    "demoMockupHint": "Interaktywna makieta: wypróbuj przyciski.",
+    "newTab": "otwiera się w nowej karcie",
+    "mockups": {
+      "chat": {
+        "title": "Bot zamówień",
+        "status": "online",
+        "input": "Napisz wiadomość…",
+        "reset": "Zacznij rozmowę od nowa",
+        "greeting": "Dzień dobry! W czym mogę pomóc?",
+        "options": {
+          "order": "Złóż zamówienie",
+          "status": "Status zamówienia",
+          "hours": "Godziny otwarcia"
+        },
+        "replies": {
+          "order": "Świetnie! Wybierz produkt z menu, a potwierdzę zamówienie.",
+          "status": "Zamówienie nr 1024 jest w drodze, dotrze za około 30 minut.",
+          "hours": "Jesteśmy otwarci codziennie od 7:00 do 19:00."
+        }
+      },
+      "dashboard": {
+        "title": "Panel wyników",
+        "period": "Okres",
+        "week": "Tydzień",
+        "month": "Miesiąc",
+        "leads": "Zapytania",
+        "conversion": "Konwersja",
+        "revenue": "Przychód",
+        "chart": "Zapytania w wybranym okresie"
+      },
+      "booking": {
+        "title": "Rezerwacja zajęć",
+        "day": "Dzień",
+        "time": "Godzina",
+        "book": "Zarezerwuj",
+        "booked": "Zarezerwowano: {day}, {time}",
+        "taken": "zajęte"
+      },
+      "store": {
+        "title": "Sklep",
+        "add": "Do koszyka",
+        "remove": "Usuń",
+        "cart": "Koszyk",
+        "empty": "Koszyk jest pusty"
+      }
+    }
   },
   "configurator": {
     "eyebrow": "Konfigurator",

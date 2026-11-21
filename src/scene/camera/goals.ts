@@ -2,6 +2,12 @@ import type { SceneTarget } from '@/lib/route-state';
 import type { SafeRect } from '@/store/scene';
 import { CAMERA } from '../config';
 import { degToRad } from '../orbit-math';
+import {
+  ARCHIVE,
+  archiveBasis,
+  archiveCenterOffset,
+  archiveExtents,
+} from '../portfolio/archive-layout';
 import { planetReach, planetWorldPosition } from '../system/planet-math';
 import type { Vec3 } from '../types';
 import type { CategoryNodeModel, UniverseModel, UniverseNode } from '../universe/model';
@@ -417,16 +423,14 @@ export function computeCameraGoal(
       return system;
     }
     case 'portfolio':
-    case 'project': {
-      const anchor = model.portfolio;
-      const distance = Math.max(fitDistance(3.8, 3.4, fov, aspect, frame), 9);
-      if (target.mode === 'project') {
-        const index = Math.max(anchor.projectSlugs.indexOf(target.project), 0);
-        const goal = approach(anchor.position, overview.position, distance * 0.62, fov, 0.2);
-        return yawAround(goal, anchor.position, ((index % 5) - 2) * 0.22);
-      }
-      return approach(anchor.position, overview.position, distance, fov, 0.2);
-    }
+    case 'project':
+      return archiveGoal(
+        model,
+        target.mode === 'project' ? target.project : null,
+        aspect,
+        frame,
+        fov,
+      );
     case 'configurator': {
       const anchor = model.configurator;
       const distance = Math.max(fitDistance(4.6, 4.2, fov, aspect, frame), 8.5);
@@ -480,6 +484,69 @@ export function planetGoal(
 
 /** Planet focus: half extent of the fitted box relative to the planet's reach. */
 export const PLANET_FRAMING = 1.35;
+
+/** Project focus: half extent of the fitted box relative to the card's half size. */
+export const PROJECT_FRAMING = 1.5;
+/** Archive view: margin around the wall of cards (covers the idle sway). */
+const ARCHIVE_MARGIN = 1.1;
+
+/**
+ * Portfolio archive views, all looking at the wall head-on (along
+ * `-ARCHIVE_FACING`, so the cards — which turn to the viewer — read flat):
+ * - portfolio: the whole wall of card-objects fitted into the free frame;
+ *   with no projects, the dormant cluster itself;
+ * - project: that card fitted into the frame (its siblings dim around it),
+ *   seen slightly from the outer side so the wall keeps its depth.
+ * An unknown project slug falls back to the portfolio view.
+ */
+export function archiveGoal(
+  model: UniverseModel,
+  project: string | null,
+  aspect: number,
+  frame: SafeFrame,
+  fov: number,
+): CameraGoal {
+  const anchor = model.portfolio;
+  const { right, facing } = archiveBasis();
+  if (anchor.projects.length === 0) {
+    const distance = Math.max(fitDistance(3.8, 3.4, fov, aspect, frame), 9);
+    return {
+      position: add(anchor.position, scale(facing, distance)),
+      lookAt: [...anchor.position],
+      fov,
+    };
+  }
+  const card = project ? anchor.projects.find((entry) => entry.slug === project) : undefined;
+  if (card) {
+    const center = add(anchor.position, card.offset);
+    const distance = Math.max(
+      fitDistance(
+        (ARCHIVE.cardWidth / 2) * PROJECT_FRAMING,
+        (ARCHIVE.cardHeight / 2) * PROJECT_FRAMING,
+        fov,
+        aspect,
+        frame,
+      ),
+      2.4,
+    );
+    const side = Math.sign(dot(card.offset, right));
+    const dir = normalize(add(facing, scale(right, side * 0.16)));
+    return { position: add(center, scale(dir, distance)), lookAt: center, fov };
+  }
+  const center = add(anchor.position, archiveCenterOffset());
+  const { halfWidth, halfHeight } = archiveExtents(anchor.projects.length);
+  const distance = Math.max(
+    fitDistance(
+      halfWidth * ARCHIVE_MARGIN + 0.25,
+      halfHeight * ARCHIVE_MARGIN + 0.25,
+      fov,
+      aspect,
+      frame,
+    ),
+    5,
+  );
+  return { position: add(center, scale(facing, distance)), lookAt: center, fov };
+}
 
 /**
  * User input limits around a goal (CameraControls): the dolly range is
@@ -554,18 +621,6 @@ function approach(center: Vec3, from: Vec3, distance: number, fov: number, lift:
   const toward = normalize(sub(from, center));
   const dir = normalize([toward[0], toward[1] + lift, toward[2]]);
   return { position: add(center, scale(dir, distance)), lookAt: [...center] as Vec3, fov };
-}
-
-/** Rotates the goal position around the vertical axis through `center`. */
-function yawAround(goal: CameraGoal, center: Vec3, angle: number): CameraGoal {
-  const dx = goal.position[0] - center[0];
-  const dz = goal.position[2] - center[2];
-  const c = Math.cos(angle);
-  const s = Math.sin(angle);
-  return {
-    ...goal,
-    position: [center[0] + dx * c + dz * s, goal.position[1], center[2] - dx * s + dz * c],
-  };
 }
 
 /** Rotates `point` around the vertical axis through `center`. */

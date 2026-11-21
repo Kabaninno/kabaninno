@@ -105,6 +105,11 @@ npm run audit:a11y             # â†’ reports/perf-a11y/axe-summary.json (--out=â
 - **axe audit** (`tests/a11y/audit.spec.ts`): home, system, planet, portfolio, configurator, 404 and
   the open mobile menu in pl and uk, desktop and mobile; WCAG 2.2 A/AA + best practices.
 
+Portfolio states and the M5 e2e tests need visible cases, i.e. a preview built with drafts:
+`SHOW_DRAFTS=true npm run build:preview` (PowerShell: `$env:SHOW_DRAFTS='true'; npm run build:preview`).
+On a production build they skip themselves and only the "coming soon" panel is checked. The stub
+cases' gallery images are generated placeholders: `node scripts/portfolio-placeholders.mjs`.
+
 Automation hooks the tests rely on: `canvas[data-scene-instance]` (constant while the canvas
 lives), the canvas fade-in, `html[data-scene-flight]` while a camera flight runs,
 `html[data-scene-focus]` (the locale-less path the camera settled on), and `data-reveal-reason`

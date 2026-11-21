@@ -1,10 +1,13 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { AdditiveBlending, Color, type Group, type ShaderMaterial } from 'three';
+import { AdditiveBlending, Color, Vector3, type Group, type ShaderMaterial } from 'three';
 import type { SceneBusRef } from '../bus';
 import { PALETTE } from '../config';
+import { ArchiveContent } from '../portfolio/ArchiveContent';
+import type { ArchiveMaterialCache } from '../portfolio/archive-materials';
+import { ARCHIVE_PREWARM_KEY, type CompileApiRef, type PrewarmApiRef } from '../prewarm/api';
 import { qualityDefines, type QualityPreset } from '../quality';
 import { createRandom } from '../random';
 import { clusterFragment, clusterVertex } from '../shaders/cluster';
@@ -23,23 +26,40 @@ interface PortfolioClusterProps {
   node: PortfolioNodeModel;
   runtime: UniverseRuntimeRef;
   preset: QualityPreset;
+  /** The URL is on the portfolio or one of its projects. */
+  focused: boolean;
+  /** Slug of the project the URL focuses, else null. */
+  focusedProject: string | null;
   onNavigate: (path: string, replace?: boolean) => void;
   busRef: SceneBusRef;
+  prewarm: PrewarmApiRef;
+  compile: CompileApiRef;
+  archiveMaterials: ArchiveMaterialCache;
 }
 
 /**
  * Distant silver globular cluster — the portfolio "archive". One brighter star
  * per visible project; with no published projects the cluster stays dimmer
- * and its label adds "coming soon" (BRIEF B2.3, see NodeLabels).
+ * and its label adds "coming soon" (BRIEF B2.3, see NodeLabels). While the
+ * URL is on the portfolio (or the flight in or out is visible) the archive
+ * view is mounted: the project card-objects and the observatory rings.
  */
 export function PortfolioCluster({
   node,
   runtime,
   preset,
+  focused,
+  focusedProject,
   onNavigate,
   busRef,
+  prewarm,
+  compile,
+  archiveMaterials,
 }: PortfolioClusterProps) {
   const groupRef = useRef<Group>(null);
+  const archiveWanted = useRef(false);
+  const scratch = useRef({ card: new Vector3(), forward: new Vector3() });
+  const [fading, setFading] = useState(false);
   const spinRef = useRef<Group>(null);
   const materialRef = useRef<ShaderMaterial>(null);
   const projectCount = node.projectSlugs.length;
@@ -57,6 +77,7 @@ export function PortfolioCluster({
       uPixelRatio: { value: 1 },
       uEmphasis: { value: 0 },
       uBrightness: { value: node.comingSoon ? 0.68 : 1 },
+      uNearCut: { value: 0 },
     }),
     [node.comingSoon],
   );
@@ -77,12 +98,35 @@ export function PortfolioCluster({
       material.uniforms.uEmphasis.value = rt.emphasis[node.index] ?? 0;
       material.uniforms.uScale.value = pointScale(state);
       material.uniforms.uPixelRatio.value = state.viewport.dpr;
+      // With cards on show the cluster steps back into a backdrop.
+      const backdrop = node.comingSoon ? 1 : 1 - 0.35 * (rt.focus[node.index] ?? 0);
+      // A focused card: stars between it and the camera fade (clean card face).
+      const focusedCard = focusedProject
+        ? node.projects.find((project) => project.slug === focusedProject)
+        : undefined;
+      let nearCut = 0;
+      if (focusedCard && group) {
+        const { card, forward } = scratch.current;
+        card.set(...focusedCard.offset).add(group.position);
+        state.camera.getWorldDirection(forward);
+        nearCut = card.sub(state.camera.position).dot(forward) * (rt.focus[node.index] ?? 0);
+      }
+      material.uniforms.uNearCut.value = nearCut;
       material.uniforms.uBrightness.value =
         (node.comingSoon ? 0.68 : 1) *
+        backdrop *
         neighbourDim(rt, node.index, 0.45) *
         (rt.presence[node.index] ?? 1);
     }
+    // Keep the archive mounted while the flight in or out is visible.
+    const wanted = (rt.focus[node.index] ?? 0) > 0.002;
+    if (wanted !== archiveWanted.current) {
+      archiveWanted.current = wanted;
+      setFading(wanted);
+    }
   });
+
+  const showArchive = focused || fading;
 
   return (
     <group ref={groupRef} position={node.position}>
@@ -117,7 +161,22 @@ export function PortfolioCluster({
         runtime={runtime}
         index={node.index}
         preset={preset}
+        fadeOnFocus={!node.comingSoon}
       />
+      {showArchive ? (
+        <ArchiveContent
+          node={node}
+          preset={preset}
+          materials={archiveMaterials.get(node, preset.lowQualityShaders)}
+          mode="live"
+          runtime={runtime}
+          compile={compile}
+          busRef={busRef}
+          focusedProject={focusedProject}
+          active={focused}
+          onNavigate={onNavigate}
+        />
+      ) : null}
       <HitZone
         radius={3.6}
         nodeKey={node.key}
@@ -126,6 +185,8 @@ export function PortfolioCluster({
         busRef={busRef}
         runtime={runtime}
         index={node.index}
+        prewarm={prewarm}
+        prewarmKey={ARCHIVE_PREWARM_KEY}
       />
     </group>
   );

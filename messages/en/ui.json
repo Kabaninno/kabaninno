@@ -76,7 +76,66 @@
     "result": "Result",
     "stack": "Tech stack",
     "services": "Services",
-    "allProjects": "All projects"
+    "filterLabel": "Filter by category",
+    "filterAll": "All",
+    "resultCount": "{count, plural, =0 {No projects in this category} one {# project} other {# projects}}",
+    "previous": "Previous project",
+    "next": "Next project",
+    "siblingsNav": "Other projects",
+    "gallery": "Gallery",
+    "galleryImage": "{title}: illustration {index} of {total}",
+    "demo": "Demo",
+    "demoLoad": "Load the live demo",
+    "demoLoadHint": "The external page ({host}) loads only after you click.",
+    "demoOpen": "Open in a new tab",
+    "demoFrameTitle": "Live demo: {title}",
+    "demoVideo": "Video: {title}",
+    "demoMockupHint": "An interactive mockup: try the buttons.",
+    "newTab": "opens in a new tab",
+    "mockups": {
+      "chat": {
+        "title": "Order bot",
+        "status": "online",
+        "input": "Write a message…",
+        "reset": "Restart the conversation",
+        "greeting": "Hello! How can I help?",
+        "options": {
+          "order": "Place an order",
+          "status": "Order status",
+          "hours": "Opening hours"
+        },
+        "replies": {
+          "order": "Great! Pick a product from the menu and I will confirm the order.",
+          "status": "Order no. 1024 is on its way and will arrive in about 30 minutes.",
+          "hours": "We are open every day from 7:00 to 19:00."
+        }
+      },
+      "dashboard": {
+        "title": "Results dashboard",
+        "period": "Period",
+        "week": "Week",
+        "month": "Month",
+        "leads": "Inquiries",
+        "conversion": "Conversion",
+        "revenue": "Revenue",
+        "chart": "Inquiries in the selected period"
+      },
+      "booking": {
+        "title": "Class booking",
+        "day": "Day",
+        "time": "Time",
+        "book": "Book",
+        "booked": "Booked: {day}, {time}",
+        "taken": "taken"
+      },
+      "store": {
+        "title": "Shop",
+        "add": "Add to cart",
+        "remove": "Remove",
+        "cart": "Cart",
+        "empty": "Your cart is empty"
+      }
+    }
   },
   "configurator": {
     "eyebrow": "Configurator",
