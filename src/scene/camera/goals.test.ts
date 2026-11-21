@@ -17,6 +17,7 @@ import {
   overviewGoal,
   minCoreDiameterPx,
   resolveSafeFrame,
+  selectionGoal,
   usesPortraitOverview,
   viewOffsetForCenter,
   type CameraGoal,
@@ -564,5 +565,96 @@ describe('planet focus framing', () => {
     expect(computeCameraGoal(target, model, aspect, frame)).toEqual(
       computeCameraGoal(target, model, aspect, frame, { planetAngle: orbit.phase }),
     );
+  });
+});
+
+describe('configurator selection framing (D81)', () => {
+  const configurator = { mode: 'configurator' as const };
+  const key = (id: string) => `category:${id}`;
+  const views = [
+    [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+    [PHONE_VIEW, PHONE_SHEET_RECT],
+  ] as const;
+  const selections = [
+    ['crm'],
+    ['web', 'crm'],
+    ['ai', 'telegram'],
+    model.categories.map((node) => node.categoryId),
+  ];
+
+  it('keeps the plain beacon focus without a selection, and ignores it elsewhere', () => {
+    const frame = resolveSafeFrame(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
+    const aspect = DESKTOP_VIEW.width / DESKTOP_VIEW.height;
+    const plain = computeCameraGoal(configurator, model, aspect, frame);
+    expect(computeCameraGoal(configurator, model, aspect, frame, { emphasis: [] })).toEqual(plain);
+    // Unknown ids and the beacon itself do not count as a selection.
+    expect(
+      computeCameraGoal(configurator, model, aspect, frame, {
+        emphasis: ['category:nope', 'configurator'],
+      }),
+    ).toEqual(plain);
+    for (const target of [
+      { mode: 'universe' as const },
+      { mode: 'system' as const, category: 'web' },
+      { mode: 'portfolio' as const },
+    ]) {
+      expect(
+        computeCameraGoal(target, model, aspect, frame, { emphasis: [key('web'), key('ai')] }),
+      ).toEqual(computeCameraGoal(target, model, aspect, frame));
+    }
+  });
+
+  it('fits the beacon and every selected category into the free rect', () => {
+    for (const [view, rect] of views) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      const aspect = view.width / view.height;
+      // The beacon focus approaches from the overview, which depends on the sway.
+      const plain = computeCameraGoal(configurator, model, aspect, frame, { sway: 0.2 });
+      const overview = computeCameraGoal({ mode: 'universe' }, model, aspect, frame, { sway: 0.2 });
+      for (const ids of selections) {
+        const goal = computeCameraGoal(configurator, model, aspect, frame, {
+          emphasis: ids.map(key),
+          sway: 0.2,
+        });
+        expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(true);
+        for (const id of ids) {
+          const node = model.byKey.get(key(id))!;
+          expect(sphereInRect(goal, node.position, 1, view, frame, rect)).toBe(true);
+        }
+        // Never closer than the beacon focus, never wider than the overview.
+        const distance = dist(goal.position, goal.lookAt);
+        expect(distance).toBeGreaterThanOrEqual(dist(plain.position, plain.lookAt) - 1e-9);
+        expect(distance).toBeLessThanOrEqual(dist(overview.position, overview.lookAt) + 1e-9);
+        // Same viewing direction as the beacon focus: a dolly out, not a swing around.
+        const direction = (g: CameraGoal) =>
+          normalize([
+            g.position[0] - g.lookAt[0],
+            g.position[1] - g.lookAt[1],
+            g.position[2] - g.lookAt[2],
+          ]);
+        direction(goal).forEach((value, axis) =>
+          expect(value).toBeCloseTo(direction(plain)[axis]!, 9),
+        );
+      }
+    }
+  });
+
+  it('keeps the beacon and the nearest selected nodes when not all of them fit', () => {
+    const [view, rect] = views[1];
+    const frame = resolveSafeFrame(rect, view.width, view.height);
+    const aspect = view.width / view.height;
+    const focus = computeCameraGoal(configurator, model, aspect, frame);
+    const focusDistance = dist(focus.position, focus.lookAt);
+    const crm = model.byKey.get(key('crm'))!;
+    const telegram = model.byKey.get(key('telegram'))!;
+    const crmOnly = selectionGoal(model, focus, [crm], aspect, frame, Infinity);
+    const cap = dist(crmOnly.position, crmOnly.lookAt) + 0.5;
+    // CRM is the nearest category to the beacon; Telegram is across the ring.
+    const goal = selectionGoal(model, focus, [telegram, crm], aspect, frame, cap);
+    expect(goal).toEqual(crmOnly);
+    expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(true);
+    expect(sphereInRect(goal, crm.position, 1, view, frame, rect)).toBe(true);
+    // Nothing fits under the cap: the plain beacon focus.
+    expect(selectionGoal(model, focus, [telegram], aspect, frame, focusDistance)).toEqual(focus);
   });
 });

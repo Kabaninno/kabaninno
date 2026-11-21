@@ -108,16 +108,15 @@ test.describe('[M3, not yet run] «← Universe» button', () => {
 test.describe('[M3, not yet run] request toggle', () => {
   test('adds and removes, announces, shows the HUD badge and persists', async ({ page }) => {
     await open(page, first.path);
+    // APG toggle button: the name stays «Dodaj do zapytania», aria-pressed carries the state.
     const toggle = page
       .locator('main')
-      .getByRole('button', { name: ui[locale].service.addToRequest });
+      .getByRole('button', { name: ui[locale].service.addToRequest, exact: true });
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
 
     await toggle.click();
-    const added = page
-      .locator('main')
-      .getByRole('button', { name: ui[locale].service.addedToRequest });
-    await expect(added).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAccessibleName(ui[locale].service.addToRequest);
     await expect(page.locator('main [role="status"]')).toContainText(
       serviceTitle(locale, crm.id, first.slug),
     );
@@ -132,12 +131,12 @@ test.describe('[M3, not yet run] request toggle', () => {
       JSON.stringify({ v: 1, items: [`${crm.id}/${first.slug}`] }),
     );
 
-    // Survives a reload and soft navigation to a sibling and back.
+    // Survives a reload.
     await page.reload();
-    await expect(added).toHaveAttribute('aria-pressed', 'true');
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
     await expect(hudLink).toHaveAccessibleName(new RegExp(`, 1 `));
 
-    await added.click();
+    await toggle.click();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     await expect(hudLink).toHaveAccessibleName(ui[locale].hud.configurator);
     expect(await page.evaluate((key) => localStorage.getItem(key), REQUEST_KEY)).toBeNull();

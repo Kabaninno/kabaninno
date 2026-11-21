@@ -1,7 +1,7 @@
 /**
  * Order of the request wizard steps. Labels live in
- * `messages/<locale>/ui.json` → `configurator.steps.<id>`. The wizard itself
- * (validation, state, draft persistence) arrives in M4.
+ * `messages/<locale>/ui.json` → `configurator.steps.<id>` (and `hints.<id>`);
+ * validation and persistence are in `src/lib/configurator/`.
  */
 export const CONFIGURATOR_STEPS = [
   'type',

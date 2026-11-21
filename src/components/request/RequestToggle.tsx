@@ -19,8 +19,8 @@ function useInteractive(): boolean {
 }
 
 export interface RequestToggleLabels {
+  /** The button's constant name (WAI-ARIA APG toggle button: the state is `aria-pressed`). */
   add: string;
-  added: string;
   /** Live-region text after adding (already formatted with the service name). */
   addedStatus: string;
   /** Live-region text after removing. */
@@ -47,10 +47,12 @@ const ADDED_STATE =
  * «Add to request» on a planet panel (BRIEF scene 2).
  * - Server HTML and pre-hydration: a link to the configurator with `?add=`
  *   (works without JavaScript; the configurator reads it in M4).
- * - Interactive: a toggle button (`aria-pressed`) that adds or removes the
- *   service in the request draft (`store/request.ts`); its label switches to
- *   the "added" state, a polite live region confirms the change, and a
- *   secondary link leads to the request while the service is in it.
+ * - Interactive: a toggle button that adds or removes the service in the
+ *   request draft (`store/request.ts`). Per the WAI-ARIA APG toggle-button
+ *   pattern its name stays «Add to request» and `aria-pressed` carries the
+ *   state; the added state shows as a check mark and an accent style. A
+ *   polite live region confirms each change, and a secondary link leads to
+ *   the request while the service is in it.
  */
 export function RequestToggle({ serviceRef, labels, fallbackHref }: RequestToggleProps) {
   const interactive = useInteractive();
@@ -73,7 +75,7 @@ export function RequestToggle({ serviceRef, labels, fallbackHref }: RequestToggl
           className={`${added ? ADDED_STATE : primaryButton} ${size} w-full sm:w-auto`}
         >
           <span aria-hidden="true">{added ? '✓' : '+'}</span>
-          {added ? labels.added : labels.add}
+          {labels.add}
         </button>
       ) : (
         <Link href={fallbackHref} className={`${primaryButton} ${size} w-full sm:w-auto`}>

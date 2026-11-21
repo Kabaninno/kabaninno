@@ -28,10 +28,20 @@ export interface ScenePrewarmReport {
   current: string | null;
 }
 
+/**
+ * Debug-only scene controls (`?debug=1`) for reviewers in a headless browser:
+ * `setEmphasis(['category:web', …])` stands in for the configurator wizard
+ * (store `emphasis`, D81) until a draft exists.
+ */
+export interface SceneDebugControls {
+  setEmphasis: (ids: readonly string[]) => void;
+}
+
 declare global {
   interface Window {
     __sceneStats?: SceneStats;
     __scenePrewarm?: ScenePrewarmReport;
+    __sceneDebug?: SceneDebugControls;
   }
 }
 

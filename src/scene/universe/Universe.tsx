@@ -7,7 +7,7 @@ import { useSceneStore } from '@/store/scene';
 import { keepAlive, type SceneBusRef } from '../bus';
 import { MOTION } from '../config';
 import { dampFactor } from '../camera/damp';
-import { universeKeyForHighlight } from '../node-ids';
+import { sceneNodeId, universeKeyForHighlight } from '../node-ids';
 import { systemPrewarmKey, type CompileApiRef, type PrewarmApiRef } from '../prewarm/api';
 import type { SystemMaterialCache } from '../prewarm/system-materials';
 import type { QualityPreset } from '../quality';
@@ -22,10 +22,14 @@ import { PortfolioCluster } from './PortfolioCluster';
 import {
   DRIFT_AMPLITUDE,
   FOCUSED_NETWORK,
+  SELECTED_EMPHASIS,
   createUniverseRuntime,
+  easeSelection,
+  stepSelection,
   writeDrift,
   type UniverseRuntime,
 } from './runtime';
+import { SelectionLinks } from './SelectionLinks';
 import { coreWorldRadius, pixelsPerUnit, smallCoreBoost } from './screen-size';
 
 /** True world radius of each node kind's core (portfolio: the cluster's bright core). */
@@ -83,6 +87,8 @@ export function Universe({
   const runtime = useRef<UniverseRuntime | null>(null);
   // Highlight id from the shared store (3D hover or HTML nav focus), kept in a ref.
   const highlightRef = useRef<string | null>(null);
+  // Configurator selection (store `emphasis`, D81) as universe node keys.
+  const emphasisRef = useRef<ReadonlySet<string>>(new Set());
   const scratch = useRef({
     world: new Vector3(),
     forward: new Vector3(),
@@ -105,6 +111,22 @@ export function Universe({
     });
   }, [busRef, model, prewarm]);
 
+  useEffect(() => {
+    const apply = (ids: readonly string[]) => {
+      const keys = new Set<string>();
+      for (const id of ids) {
+        const key = universeKeyForHighlight(id);
+        if (key) keys.add(key);
+      }
+      emphasisRef.current = keys;
+      keepAlive(busRef.current, 600);
+    };
+    apply(useSceneStore.getState().emphasis);
+    return useSceneStore.subscribe((state, previous) => {
+      if (state.emphasis !== previous.emphasis) apply(state.emphasis);
+    });
+  }, [busRef]);
+
   // After CameraControls moved the camera (-1), before the node components (0).
   useFrame((state, delta) => {
     const dt = Math.min(delta, 0.1);
@@ -112,6 +134,8 @@ export function Universe({
     const hoverK = dampFactor(MOTION.hoverRate, dt);
     const focusK = reducedMotion ? 1 : dampFactor(MOTION.focusRate, dt);
     const highlighted = highlightRef.current;
+    // The selection only shows on the configurator view (D81); elsewhere it eases out.
+    const selection = focusKey === sceneNodeId.configurator ? emphasisRef.current : null;
     const rt = (runtime.current ??= createUniverseRuntime());
     const shared = busRef.current;
     const cam = state.camera;
@@ -150,9 +174,15 @@ export function Universe({
         if (Math.abs(focusTarget - focus) > 0.002) settling = true;
       }
       if (Math.abs(hoverTarget - hover) > 0.002) settling = true;
+      const selectTarget = node.kind !== 'configurator' && selection?.has(node.key) ? 1 : 0;
+      const progress = stepSelection(rt.selectProgress[i]!, selectTarget, dt, reducedMotion);
+      if (progress !== selectTarget) settling = true;
+      rt.selectProgress[i] = progress;
+      rt.selected[i] = easeSelection(progress);
       rt.hover[i] = hover;
       rt.focus[i] = focus;
-      rt.emphasis[i] = Math.max(hover, focus * 0.45);
+      // Hover / highlight stays on top of the steady selected state.
+      rt.emphasis[i] = Math.max(hover, focus * 0.45, rt.selected[i]! * SELECTED_EMPHASIS);
       maxFocus = Math.max(maxFocus, focus);
       writeDrift(rt.offsets[i]!, i, time, DRIFT_AMPLITUDE * (1 - focus));
 
@@ -202,6 +232,7 @@ export function Universe({
   return (
     <group>
       <Network model={model} runtime={runtime} preset={preset} busRef={busRef} />
+      <SelectionLinks model={model} runtime={runtime} preset={preset} />
       {model.categories.map((node) => (
         <CategoryNode
           key={node.key}

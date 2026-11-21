@@ -99,7 +99,6 @@ export default async function ServicePage({ params }: ServicePageProps) {
         fallbackHref={{ pathname: paths.configurator(), query: { add: ref } }}
         labels={{
           add: t('addToRequest'),
-          added: t('addedToRequest'),
           addedStatus: t('requestAddedStatus', { service: text.title }),
           removedStatus: t('requestRemovedStatus', { service: text.title }),
           goTo: t('goToRequest'),

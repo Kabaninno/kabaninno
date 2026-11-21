@@ -69,3 +69,5 @@ Do NOT edit `src/scene/**` (scene-engineer) or content texts in `messages/*/cont
 # Lessons learned
 
 (Rules added by the orchestrator when a mistake repeats. Follow them strictly.)
+
+- Run `prettier --write` (and any other auto-fixer) only on explicit paths you own or changed — never on `src`, `.` or other agents' folders, especially while another agent is working (M4: `prettier --write src` reformatted scene-engineer's in-progress files).

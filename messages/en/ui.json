@@ -52,7 +52,6 @@
     "previous": "Previous service",
     "next": "Next service",
     "siblings": "Services in this system",
-    "addedToRequest": "Added to request",
     "requestAddedStatus": "Added to your request: {service}",
     "requestRemovedStatus": "Removed from your request: {service}",
     "goToRequest": "Go to your request"
@@ -83,7 +82,6 @@
     "eyebrow": "Configurator",
     "title": "Build your request",
     "lead": "A few quick steps, and you'll have a ready-made message to send us via Telegram.",
-    "stepsHeading": "Steps",
     "steps": {
       "type": "Solution type",
       "features": "Features",
@@ -93,7 +91,132 @@
       "contact": "Name and comment",
       "summary": "Summary"
     },
-    "comingSoon": "The interactive wizard is coming soon."
+    "hints": {
+      "type": "Select one or more areas your project covers.",
+      "features": "Choose what the solution should include. The list depends on the areas you picked.",
+      "business": "A few details about your business help us suggest the right solution.",
+      "budget": "An approximate amount in PLN. You can also choose “Not sure yet”.",
+      "timeline": "When should the solution be up and running?",
+      "contact": "How should we address you? The comment is optional.",
+      "summary": "Check the message, edit it if needed and send it via Telegram."
+    },
+    "progress": "Step {current} of {total}",
+    "stepsNav": "Request steps",
+    "nav": {
+      "back": "Back",
+      "next": "Next",
+      "toSummary": "To the summary",
+      "edit": "Change",
+      "startOver": "Start over",
+      "startOverConfirm": "Clear all answers?",
+      "startOverYes": "Yes, clear",
+      "startOverNo": "Cancel"
+    },
+    "fields": {
+      "types": "Project areas",
+      "features": "Features",
+      "industry": "Industry",
+      "size": "Company size",
+      "hasWebsite": "Does the business already have a website?",
+      "hasCrm": "Does the business already use a CRM?",
+      "budget": "Budget",
+      "timeline": "Timeline",
+      "name": "Name",
+      "nameHint": "Your first name or the company name is enough.",
+      "comment": "Comment (optional)",
+      "commentHint": "Up to {max} characters. Briefly describe what you need."
+    },
+    "yes": "Yes",
+    "no": "No",
+    "extras": {
+      "multilingual": "Multiple languages",
+      "cms": "Content editing panel",
+      "seo": "Search engine optimisation (SEO)",
+      "online-payments": "Online payments",
+      "data-migration": "Data migration",
+      "team-training": "Team training",
+      "telephony": "Phone system integration",
+      "mobile-access": "Mobile access",
+      "e-invoicing": "E-invoicing",
+      "erp-integration": "ERP integration",
+      "scheduled-reports": "Scheduled reports",
+      "knowledge-base": "AI knowledge base",
+      "voice": "Voice support",
+      "human-handoff": "Handover to a person",
+      "crm-sync": "CRM sync",
+      "broadcasts": "Broadcast messages"
+    },
+    "industries": {
+      "retail": "Retail",
+      "services": "Services",
+      "beauty-health": "Beauty and health",
+      "food": "Food and hospitality",
+      "education": "Education",
+      "real-estate": "Real estate",
+      "logistics": "Logistics and transport",
+      "manufacturing": "Manufacturing",
+      "it": "IT and technology",
+      "other": "Other"
+    },
+    "sizes": {
+      "solo": "One-person business",
+      "2-10": "2–10 people",
+      "11-50": "11–50 people",
+      "51-200": "51–200 people",
+      "200-plus": "Over 200 people"
+    },
+    "timelines": {
+      "asap": "As soon as possible",
+      "1-month": "Within a month",
+      "1-3-months": "1–3 months",
+      "3-plus-months": "Over 3 months",
+      "flexible": "Flexible"
+    },
+    "budget": {
+      "upTo": "up to {currency} {max}",
+      "range": "{currency} {min}–{max}",
+      "from": "{currency} {min}+",
+      "notSure": "Not sure yet"
+    },
+    "errors": {
+      "requiredMulti": "Choose at least one option.",
+      "requiredOne": "Choose one of the options.",
+      "requiredText": "Enter your name.",
+      "tooShort": "Enter at least {min, plural, one {# character} other {# characters}}.",
+      "tooLong": "Up to {max, plural, one {# character} other {# characters}}.",
+      "unknown": "This option is no longer available. Choose another one."
+    },
+    "prefilled": "Services you added to your request are already selected.",
+    "summary": {
+      "choices": "Your answers",
+      "message": "Message",
+      "messageHint": "You can edit it freely before sending.",
+      "restoreDefault": "Restore the default text",
+      "send": "Send via Telegram",
+      "copy": "Copy text",
+      "copied": "Copied to the clipboard.",
+      "copyFailed": "Copying failed. Select the text and copy it manually.",
+      "openChat": "Open the chat",
+      "newTab": "opens in a new tab",
+      "truncated": "The message is long, so Telegram will show a shortened version. Copy the full text and paste it into the chat.",
+      "unconfigured": "The Telegram chat is not set up yet. Copy the text and send it to us.",
+      "sent": "Your request has been sent.",
+      "sendFailed": "The request could not be sent. Copy the text and send it to us another way."
+    }
+  },
+  "lead": {
+    "title": "Request from the {studio} website",
+    "types": "Areas",
+    "features": "Features",
+    "business": "Business",
+    "website": "Website",
+    "crm": "CRM",
+    "budget": "Budget",
+    "timeline": "Timeline",
+    "name": "Name",
+    "comment": "Comment",
+    "yes": "yes",
+    "no": "no"
   },
   "notFound": {
     "title": "This sector is empty",

@@ -11,6 +11,7 @@ import {
   type ShaderMaterial,
 } from 'three';
 import type { SceneBusRef } from '../bus';
+import { dampFactor } from '../camera/damp';
 import { qualityDefines, type QualityPreset } from '../quality';
 import { beamFragment, beamVertex, pingFragment, pingVertex } from '../shaders/beacon';
 import { nodeCoreFragment, nodeCoreVertex } from '../shaders/node-core';
@@ -26,6 +27,8 @@ export const BEACON_CORE_RADIUS = 0.3;
 const CORE_RADIUS = BEACON_CORE_RADIUS;
 /** Seconds each palette color dominates before blending into the next. */
 const COLOR_PERIOD = 6;
+/** Rate at which the beacon's tint follows a selection change. */
+const TINT_RATE = 6;
 
 interface ConfiguratorBeaconProps {
   node: ConfiguratorNodeModel;
@@ -38,8 +41,8 @@ interface ConfiguratorBeaconProps {
 
 /**
  * The configurator "beacon": faceted core, vertical signal beam and sonar
- * pings. Its tint slowly blends the category accents (in M4 it will blend the
- * categories the visitor selected).
+ * pings. Its tint slowly blends the category accents — only those the
+ * visitor selected in the configurator while there is a selection (D81).
  */
 export function ConfiguratorBeacon({
   node,
@@ -58,6 +61,8 @@ export function ConfiguratorBeacon({
   const palette = useMemo(() => node.palette.map((hex) => new Color(hex)), [node.palette]);
   const white = useMemo(() => new Color('#ffffff'), []);
   const currentColor = useRef(new Color(node.color));
+  // Palette indices (= category node indices) blended this frame; reused, no allocation.
+  const activeRef = useRef<number[]>([]);
 
   const coreUniforms = useMemo(
     () => ({
@@ -96,7 +101,7 @@ export function ConfiguratorBeacon({
     [node.color],
   );
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const rt = runtimeRef.current;
     if (!rt) return;
     const group = groupRef.current;
@@ -110,14 +115,26 @@ export function ConfiguratorBeacon({
 
     // Blend through the palette with long, eased crossfades — in OKLCH, so
     // complementary accents never pass through a dull grey (visual V2-07).
+    // With a configurator selection only the selected categories take part.
+    const active = activeRef.current;
+    active.length = 0;
+    for (let i = 0; i < palette.length; i++) {
+      if ((rt.selected[i] ?? 0) > 0.5) active.push(i);
+    }
+    const count = active.length > 0 ? active.length : palette.length;
+    const pick = (slot: number) =>
+      palette[active.length > 0 ? active[slot % count]! : slot % count];
     const cycle = time / COLOR_PERIOD;
-    const from = palette[Math.floor(cycle) % palette.length];
-    const to = palette[(Math.floor(cycle) + 1) % palette.length];
+    const from = pick(Math.floor(cycle));
+    const to = pick(Math.floor(cycle) + 1);
     const blend = smoothstep(0.55, 1, cycle - Math.floor(cycle));
     const current = currentColor.current;
     if (from && to) {
       const [r, g, b] = mixOklch([from.r, from.g, from.b], [to.r, to.g, to.b], blend);
-      current.setRGB(r, g, b);
+      // Ease toward the palette colour so a selection change never pops.
+      const k = rt.animated ? dampFactor(TINT_RATE, Math.min(delta, 0.1)) : 1;
+      const [cr, cg, cb] = mixOklch([current.r, current.g, current.b], [r, g, b], k);
+      current.setRGB(cr, cg, cb);
     }
     rt.liveAccent[node.index] = `#${current.getHexString()}`;
 

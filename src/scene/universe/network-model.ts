@@ -193,6 +193,22 @@ export function buildNetwork(model: UniverseModel, minorCount: number): NetworkM
   return { minor, links };
 }
 
+/**
+ * Control point of a main link's gentle bow (quadratic curve): lifted away
+ * from the universe centre and slightly upward.
+ */
+export function bowControlPoint(start: Vec3, end: Vec3): Vec3 {
+  const mid: Vec3 = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
+  const length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+  const outward = Math.hypot(mid[0], mid[2]) || 1;
+  const bow = length * 0.09;
+  return [
+    mid[0] + (mid[0] / outward) * bow,
+    mid[1] + length * 0.05,
+    mid[2] + (mid[2] / outward) * bow,
+  ];
+}
+
 /** Deterministic seed from the model's node keys (content-driven). */
 function seedFor(model: UniverseModel): number {
   let hash = 0x811c9dc5;

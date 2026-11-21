@@ -54,6 +54,15 @@ interface SceneUiState {
    */
   focus: string | null;
   setFocus: (focus: string | null) => void;
+  /**
+   * Node ids (see `scene/node-ids.ts`, e.g. "category:web") the scene should
+   * show as "selected" — set by the configurator from the draft's solution
+   * types while its route is active, cleared (empty array) when leaving it.
+   * Unlike `highlighted` (a transient hover/focus), emphasis is a steady
+   * state; the scene renders both, highlight on top.
+   */
+  emphasis: readonly string[];
+  setEmphasis: (ids: readonly string[]) => void;
   /** Highlighted node id, e.g. "category:web" — set from 3D hover or HTML focus. */
   highlighted: string | null;
   setHighlighted: (id: string | null) => void;
@@ -69,6 +78,13 @@ export const useSceneStore = create<SceneUiState>()((set) => ({
   setFlight: (flight) => set({ flight }),
   focus: null,
   setFocus: (focus) => set({ focus }),
+  emphasis: [],
+  setEmphasis: (ids) =>
+    set((state) =>
+      state.emphasis.length === ids.length && state.emphasis.every((id, i) => id === ids[i])
+        ? state
+        : { emphasis: [...ids] },
+    ),
   highlighted: null,
   setHighlighted: (highlighted) => set({ highlighted }),
   quality: 'high',

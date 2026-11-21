@@ -54,6 +54,39 @@ export interface CaptureState {
 
 const pl = (path: string) => localized('pl', path);
 
+/** A complete configurator draft (valid ids from content and `content/configurator.ts`). */
+const CONFIGURATOR_DRAFT = {
+  types: ['web', 'crm'],
+  features: ['web/online-stores', 'web/seo', 'crm/custom-crm'],
+  business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
+  budget: '15k-40k',
+  timeline: '1-3-months',
+  contact: {
+    name: 'Łucja Żółkiewska',
+    comment: 'Sklep z integracją CRM i płatnościami online. Zależy nam na terminie przed sezonem.',
+  },
+};
+
+/** Seeds the stored configurator draft (`kabaninno.configurator.v1`) on a given step. */
+function seedConfigurator(step: string) {
+  return async (page: Page) => {
+    await page.addInitScript(
+      (stored) => localStorage.setItem('kabaninno.configurator.v1', JSON.stringify(stored)),
+      { v: 1, step, draft: CONFIGURATOR_DRAFT },
+    );
+  };
+}
+
+const CONFIGURATOR_STEP_IDS = [
+  'type',
+  'features',
+  'business',
+  'budget',
+  'timeline',
+  'contact',
+  'summary',
+] as const;
+
 /** The home index link of a locale-less path. */
 function indexLink(page: Page, locale: TestLocale, path: string) {
   return page.locator(
@@ -195,6 +228,28 @@ export const STATES: CaptureState[] = [
   { name: 'portfolio-pl', path: pl(paths.portfolio()), tags: ['portfolio'] },
   { name: 'configurator-pl', path: pl(paths.configurator()), tags: ['configurator'] },
   { name: 'configurator-uk', path: localized('uk', paths.configurator()), tags: ['configurator'] },
+  // Every wizard step on desktop, seeded with a complete draft (no clicking through).
+  ...CONFIGURATOR_STEP_IDS.map((step, index): CaptureState => ({
+    name: `configurator-step-${index + 1}-${step}-pl`,
+    path: pl(paths.configurator()),
+    viewports: ['desktop'],
+    tags: ['configurator', 'wizard'],
+    init: seedConfigurator(step),
+  })),
+  {
+    name: 'configurator-step-7-summary-uk',
+    path: localized('uk', paths.configurator()),
+    viewports: ['desktop'],
+    tags: ['configurator', 'wizard'],
+    init: seedConfigurator('summary'),
+  },
+  {
+    name: 'configurator-summary-mobile-pl',
+    path: pl(paths.configurator()),
+    viewports: ['mobile'],
+    tags: ['configurator', 'wizard', 'sheet'],
+    init: seedConfigurator('summary'),
+  },
   { name: '404', path: '/pl/this-sector-is-empty/', scene: false, status: 404, tags: ['404'] },
 
   // Transition: home → first system (index link), then Back.

@@ -1,12 +1,16 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { getCategory } from '~/content';
+import { siteConfig } from '~/site.config';
+import { ConfiguratorWizard } from '@/components/configurator/ConfiguratorWizard';
 import { ContentPanel } from '@/components/panel/ContentPanel';
 import { isLocale } from '@/i18n/routing';
-import { CONFIGURATOR_STEPS } from '@/lib/configurator-steps';
+import { buildWizardLabels, type Translate } from '@/lib/configurator/labels';
+import { getConfiguratorModel } from '@/lib/configurator/model';
+import { getCategoryText, getServiceText } from '@/lib/content-text';
 import { buildPageMetadata } from '@/lib/metadata';
 import { paths } from '@/lib/routes';
-import { formatIndex } from '@/lib/style';
 import { bindShortWords } from '@/lib/typography';
 
 interface ConfiguratorPageProps {
@@ -25,11 +29,32 @@ export async function generateMetadata({ params }: ConfiguratorPageProps): Promi
   });
 }
 
+/**
+ * The request configurator. The option model and every label are resolved
+ * here, on the server, and handed to the client wizard as plain props: no
+ * content layer, dictionaries or ICU formatting in the browser (D05, D09).
+ */
 export default async function ConfiguratorPage({ params }: ConfiguratorPageProps) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
   const t = await getTranslations('configurator');
+  const tLead = await getTranslations('lead');
+
+  const model = getConfiguratorModel();
+  const labels = buildWizardLabels({
+    locale,
+    model,
+    // The keys are built from model ids; next-intl's typed keys cannot see them.
+    t: t as unknown as Translate,
+    tLead: tLead as unknown as Translate,
+    studio: siteConfig.studioName,
+    category: (id) => ({
+      name: getCategoryText(locale, id).name,
+      color: getCategory(id)?.dna.color ?? '#E8ECF5',
+    }),
+    serviceTitle: (categoryId, slug) => getServiceText(locale, categoryId, slug).title,
+  });
 
   return (
     <ContentPanel labelledBy="configurator-title">
@@ -43,25 +68,12 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
       <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted">
         {bindShortWords(t('lead'), locale)}
       </p>
-
-      <h2 className="mt-8 mb-3 eyebrow">{t('stepsHeading')}</h2>
-      <ol className="flex flex-col">
-        {CONFIGURATOR_STEPS.map((step, index) => (
-          <li
-            key={step}
-            className="flex min-h-12 items-center gap-4 border-b border-white/[0.06] text-[0.9375rem] text-ink/90 last:border-b-0"
-          >
-            <span aria-hidden="true" className="mono-index text-faint">
-              {formatIndex(index + 1)}
-            </span>
-            {t(`steps.${step}`)}
-          </li>
-        ))}
-      </ol>
-
-      <p className="corner-brackets mt-6 bg-white/[0.025] px-4 py-3 text-sm text-muted">
-        {bindShortWords(t('comingSoon'), locale)}
-      </p>
+      <ConfiguratorWizard
+        model={model}
+        labels={labels}
+        locale={locale}
+        telegramUsername={siteConfig.telegramUsername}
+      />
     </ContentPanel>
   );
 }

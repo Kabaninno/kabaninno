@@ -18,6 +18,12 @@ export interface UniverseRuntime {
   focus: number[];
   /** Combined emphasis per node (what shaders display), 0..1. */
   emphasis: number[];
+  /**
+   * Steady "selected" state per node (configurator route, store `emphasis`,
+   * D81), eased 0..1 (`selectProgress` is its linear clock).
+   */
+  selected: number[];
+  selectProgress: number[];
   /** Core world radius after the minimum on-screen size rule. */
   coreRadius: number[];
   /** On-screen core diameter, CSS px. */
@@ -60,6 +66,8 @@ export function createUniverseRuntime(): UniverseRuntime {
     hover: filled(0),
     focus: filled(0),
     emphasis: filled(0),
+    selected: filled(0),
+    selectProgress: filled(0),
     coreRadius: filled(0.3),
     corePx: filled(20),
     pxPerUnit: filled(20),
@@ -80,13 +88,36 @@ export const FOCUSED_NETWORK = 0.18;
 
 /**
  * Brightness factor for a main node while the camera focuses another one:
- * neighbours dim with the network (down to `floor`), the focused node does not.
+ * neighbours dim with the network (down to `floor`); the focused node and
+ * selected nodes (configurator emphasis) do not.
  */
 export function neighbourDim(rt: UniverseRuntime, index: number, floor = 0.35): number {
   const visible = Math.min(Math.max((rt.network - FOCUSED_NETWORK) / (1 - FOCUSED_NETWORK), 0), 1);
   const dim = floor + (1 - floor) * visible;
-  const focus = rt.focus[index] ?? 0;
-  return dim + (1 - dim) * focus;
+  const lift = Math.max(rt.focus[index] ?? 0, rt.selected[index] ?? 0);
+  return dim + (1 - dim) * lift;
+}
+
+/** Duration of the selected-state transition (configurator emphasis), seconds. */
+export const SELECT_SECONDS = 0.3;
+/** Emphasis a selected node displays (hover = 1 stays on top). */
+export const SELECTED_EMPHASIS = 0.6;
+
+/**
+ * Advances the linear clock of a node's selected state toward `target`
+ * (0 or 1) so a full transition takes SELECT_SECONDS; `instant` (reduced
+ * motion) jumps straight to it.
+ */
+export function stepSelection(progress: number, target: number, dt: number, instant: boolean) {
+  if (instant) return target;
+  const step = dt / SELECT_SECONDS;
+  return target > progress ? Math.min(progress + step, target) : Math.max(progress - step, target);
+}
+
+/** Displayed selected amount for a linear progress: ease in-out (smoothstep). */
+export function easeSelection(progress: number): number {
+  const t = Math.min(Math.max(progress, 0), 1);
+  return t * t * (3 - 2 * t);
 }
 
 /** Ambient drift amplitude of nodes, world units. */

@@ -137,6 +137,8 @@ interface DirectorState {
   goalAspect: number;
   /** Planet angle the cached goal was computed for (planet routes). */
   goalPlanetAngle: number | undefined;
+  /** Configurator selection the goal was fitted to (store `emphasis`, D81). */
+  goalEmphasis: readonly string[] | undefined;
   /** Visitor's azimuth deviation carried into focused views (approach from their side). */
   azimuthOffset: number;
   /** Goal distance the current limits and zoom ratio refer to. */
@@ -346,6 +348,8 @@ export function CameraDirector({
     const angleChanged =
       planetAngle !== undefined &&
       (d.goalPlanetAngle === undefined || Math.abs(planetAngle - d.goalPlanetAngle) > 1e-5);
+    // On the configurator the framing also keeps the selected categories in view.
+    const emphasis = target.mode === 'configurator' ? useSceneStore.getState().emphasis : undefined;
     let goalChanged = false;
     if (
       d.goal === null ||
@@ -353,16 +357,19 @@ export function CameraDirector({
       model !== d.goalModel ||
       aspect !== d.goalAspect ||
       frameChanged ||
-      angleChanged
+      angleChanged ||
+      emphasis !== d.goalEmphasis
     ) {
       d.goal = computeCameraGoal(target, model, aspect, d.frame, {
         sway: reducedMotion ? 0 : IDLE.overview.amplitude,
         planetAngle,
+        emphasis,
       });
       d.goalPose = poseFromLookAt(d.goal.position, d.goal.lookAt);
       d.goalModel = model;
       d.goalAspect = aspect;
       d.goalPlanetAngle = planetAngle;
+      d.goalEmphasis = emphasis;
       goalChanged = true;
     }
     const goal = d.goal;
@@ -939,6 +946,7 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     goalModel: null,
     goalAspect: 0,
     goalPlanetAngle: undefined,
+    goalEmphasis: undefined,
     azimuthOffset: 0,
     settledRadius: 1,
     safeRect: undefined,

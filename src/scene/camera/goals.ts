@@ -213,9 +213,6 @@ export function overviewGoal(
     Math.sin(elevation),
     Math.cos(azimuth) * Math.cos(elevation),
   ];
-  const forward = scale(dir, -1);
-  const right = normalize(cross(forward, [0, 1, 0]));
-  const up = cross(right, forward);
   const framed = model.nodes.filter((node) => !(portrait && node.kind === 'portfolio'));
   const centroid: Vec3 = framed.length
     ? scale(
@@ -236,19 +233,57 @@ export function overviewGoal(
     }));
   });
 
-  let look: Vec3 = centroid;
-  let distance: number = OVERVIEW.minDistance;
+  const { look, distance } = fitPoints(
+    points,
+    dir,
+    centroid,
+    OVERVIEW.minDistance,
+    OVERVIEW.maxDistance,
+  );
+  return { position: add(look, scale(dir, distance)), lookAt: look, fov };
+}
 
-  // A few fixed-point iterations: fit the distance, then recentre on the projected extents.
-  for (let iteration = 0; iteration < 5; iteration++) {
-    distance = OVERVIEW.minDistance;
+/** A sphere to keep in the frame: centre, radius and the frame tangents it may use. */
+interface FitPoint {
+  p: Vec3;
+  r: number;
+  tanV: number;
+  tanH: number;
+}
+
+/**
+ * Distance and look target from which every sphere fits its frame tangents,
+ * looking along `-dir` (up = +Y): fixed-point iterations that fit the
+ * distance, then recentre on the projected extents so the group centres in
+ * the frame. `finalFit` refits the distance at the final look target, which
+ * guarantees containment when the recentring has not fully converged (wide,
+ * deep groups such as the configurator selection).
+ */
+function fitPoints(
+  points: readonly FitPoint[],
+  dir: Vec3,
+  start: Vec3,
+  minDistance: number,
+  maxDistance: number,
+  { iterations = 5, finalFit = false }: { iterations?: number; finalFit?: boolean } = {},
+): { look: Vec3; distance: number } {
+  const forward = scale(dir, -1);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const up = cross(right, forward);
+  const fitDistanceAt = (look: Vec3) => {
+    let distance = minDistance;
     for (const { p, r, tanV, tanH } of points) {
       const rel = sub(p, look);
       const x = Math.abs(dot(rel, right)) + r;
       const y = Math.abs(dot(rel, up)) + r;
       distance = Math.max(distance, Math.max(x / tanH, y / tanV) - dot(rel, forward));
     }
-    distance = Math.min(distance, OVERVIEW.maxDistance);
+    return Math.min(distance, maxDistance);
+  };
+  let look = start;
+  let distance = minDistance;
+  for (let iteration = 0; iteration < iterations; iteration++) {
+    distance = fitDistanceAt(look);
 
     // Extents in units of each axis' frame tangent, so the box centres in the frame.
     let minX = Infinity;
@@ -271,8 +306,80 @@ export function overviewGoal(
       add(scale(right, ((minX + maxX) / 2) * distance), scale(up, ((minY + maxY) / 2) * distance)),
     );
   }
+  if (finalFit) distance = fitDistanceAt(look);
+  return { look, distance };
+}
 
-  return { position: add(look, scale(dir, distance)), lookAt: look, fov };
+/**
+ * Configurator with a selection (D81): the beacon plus the selected nodes,
+ * fitted into the free frame from the beacon focus' viewing direction, never
+ * closer than the beacon focus itself. Nodes join nearest-first while the fit
+ * stays within `maxDistance` (the overview distance); if not all of them fit,
+ * the framing keeps the beacon and the nearest selected nodes with the
+ * network around them instead of zooming out past the overview. `sway`: the
+ * idle auto-rotate range the fit must cover (as in the overview).
+ */
+export function selectionGoal(
+  model: UniverseModel,
+  focus: CameraGoal,
+  selected: readonly UniverseNode[],
+  aspect: number,
+  frame: SafeFrame,
+  maxDistance: number,
+  sway = 0,
+): CameraGoal {
+  if (selected.length === 0) return focus;
+  const anchor = model.configurator;
+  const { tanV, tanH } = frameTangents(focus.fov, aspect, frame);
+  const angles = sway > 0 ? [0, -sway, sway, -sway / 2, sway / 2] : [0];
+  const toPoints = (node: UniverseNode, centroid: Vec3): FitPoint[] => {
+    const { radius, margin } = selectionFraming(node);
+    return angles.map((angle) => ({
+      p: rotateY(node.position, centroid, angle),
+      r: radius,
+      tanV: tanV * margin,
+      tanH: tanH * margin,
+    }));
+  };
+  const dir = normalize(sub(focus.position, focus.lookAt));
+  const minDistance = Math.hypot(...sub(focus.position, focus.lookAt));
+  const ordered = [...selected].sort(
+    (a, b) =>
+      Math.hypot(...sub(a.position, anchor.position)) -
+      Math.hypot(...sub(b.position, anchor.position)),
+  );
+  let best = focus;
+  for (let n = 1; n <= ordered.length; n++) {
+    const group = [anchor, ...ordered.slice(0, n)];
+    const centroid = scale(
+      group.reduce<Vec3>((sum, node) => add(sum, node.position), [0, 0, 0]),
+      1 / group.length,
+    );
+    const points = group.flatMap((node) => toPoints(node, centroid));
+    const fit = fitPoints(points, dir, centroid, minDistance, Infinity, {
+      iterations: 12,
+      finalFit: true,
+    });
+    if (fit.distance > maxDistance) break;
+    best = { position: add(fit.look, scale(dir, fit.distance)), lookAt: fit.look, fov: focus.fov };
+  }
+  return best;
+}
+
+/**
+ * Selection framing per node: the beacon with its pings, a selected category
+ * with its glowing core and halo (not the whole orbit preview, which would
+ * push the camera far back for little gain).
+ */
+function selectionFraming(node: UniverseNode): { radius: number; margin: number } {
+  switch (node.kind) {
+    case 'configurator':
+      return { radius: 1.8, margin: 0.9 };
+    case 'category':
+      return { radius: Math.max(Math.min(node.systemRadius, 2.2), 1.2), margin: 0.86 };
+    case 'portfolio':
+      return { radius: 1.6, margin: 0.9 };
+  }
 }
 
 /**
@@ -280,13 +387,14 @@ export function overviewGoal(
  * focus is fitted into it (the rig shifts the principal point to its centre).
  * `sway`: idle auto-rotate amplitude the overview fit must cover.
  * `planetAngle`: live orbit angle of the focused planet (planet mode).
+ * `emphasis`: configurator selection (store `emphasis`, D81), configurator mode only.
  */
 export function computeCameraGoal(
   target: SceneTarget,
   model: UniverseModel,
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
-  options: { sway?: number; planetAngle?: number } = {},
+  options: { sway?: number; planetAngle?: number; emphasis?: readonly string[] } = {},
 ): CameraGoal {
   const overview = overviewGoal(model, aspect, frame, options.sway ?? 0);
   const fov = overview.fov;
@@ -322,7 +430,20 @@ export function computeCameraGoal(
     case 'configurator': {
       const anchor = model.configurator;
       const distance = Math.max(fitDistance(4.6, 4.2, fov, aspect, frame), 8.5);
-      return approach(anchor.position, overview.position, distance, fov, 0.18);
+      const focus = approach(anchor.position, overview.position, distance, fov, 0.18);
+      const selected = (options.emphasis ?? [])
+        .map((key) => model.byKey.get(key))
+        .filter((node): node is UniverseNode => !!node && node.kind !== 'configurator');
+      return selectionGoal(
+        model,
+        focus,
+        selected,
+        aspect,
+        frame,
+        // Never wider than the overview (which already shows every node).
+        Math.hypot(...sub(overview.position, overview.lookAt)),
+        options.sway ?? 0,
+      );
     }
     default:
       return overview;

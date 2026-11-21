@@ -52,7 +52,6 @@
     "previous": "Poprzednia usługa",
     "next": "Następna usługa",
     "siblings": "Usługi w tym systemie",
-    "addedToRequest": "Dodano do zapytania",
     "requestAddedStatus": "Dodano do zapytania: {service}",
     "requestRemovedStatus": "Usunięto z zapytania: {service}",
     "goToRequest": "Przejdź do zapytania"
@@ -83,7 +82,6 @@
     "eyebrow": "Konfigurator",
     "title": "Utwórz zapytanie",
     "lead": "Kilka prostych kroków, a na końcu gotowa wiadomość, którą wyślesz nam przez Telegram.",
-    "stepsHeading": "Kroki",
     "steps": {
       "type": "Rodzaj rozwiązania",
       "features": "Funkcje",
@@ -93,7 +91,132 @@
       "contact": "Imię i komentarz",
       "summary": "Podsumowanie"
     },
-    "comingSoon": "Interaktywny kreator pojawi się tu wkrótce."
+    "hints": {
+      "type": "Zaznacz jeden lub kilka obszarów, których dotyczy projekt.",
+      "features": "Wybierz, co ma się znaleźć w rozwiązaniu. Lista zależy od wybranych obszarów.",
+      "business": "Kilka informacji o firmie pomoże nam dobrać rozwiązanie.",
+      "budget": "Orientacyjna kwota w PLN. Możesz też wybrać „Jeszcze nie wiem”.",
+      "timeline": "Kiedy rozwiązanie powinno zacząć działać?",
+      "contact": "Jak mamy się do Ciebie zwracać? Komentarz jest opcjonalny.",
+      "summary": "Sprawdź wiadomość, w razie potrzeby popraw ją i wyślij przez Telegram."
+    },
+    "progress": "Krok {current} z {total}",
+    "stepsNav": "Kroki zapytania",
+    "nav": {
+      "back": "Wstecz",
+      "next": "Dalej",
+      "toSummary": "Do podsumowania",
+      "edit": "Zmień",
+      "startOver": "Zacznij od nowa",
+      "startOverConfirm": "Wyczyścić wszystkie odpowiedzi?",
+      "startOverYes": "Tak, wyczyść",
+      "startOverNo": "Anuluj"
+    },
+    "fields": {
+      "types": "Obszary projektu",
+      "features": "Funkcje",
+      "industry": "Branża",
+      "size": "Wielkość firmy",
+      "hasWebsite": "Czy firma ma już stronę WWW?",
+      "hasCrm": "Czy firma korzysta już z CRM?",
+      "budget": "Budżet",
+      "timeline": "Termin",
+      "name": "Imię",
+      "nameHint": "Wystarczy imię albo nazwa firmy.",
+      "comment": "Komentarz (opcjonalnie)",
+      "commentHint": "Do {max} znaków. Opisz krótko, czego potrzebujesz."
+    },
+    "yes": "Tak",
+    "no": "Nie",
+    "extras": {
+      "multilingual": "Wersje językowe",
+      "cms": "Panel do edycji treści",
+      "seo": "Pozycjonowanie (SEO)",
+      "online-payments": "Płatności online",
+      "data-migration": "Przeniesienie danych",
+      "team-training": "Szkolenie zespołu",
+      "telephony": "Integracja z telefonią",
+      "mobile-access": "Dostęp mobilny",
+      "e-invoicing": "E-faktury",
+      "erp-integration": "Integracja z ERP",
+      "scheduled-reports": "Raporty wysyłane automatycznie",
+      "knowledge-base": "Baza wiedzy dla AI",
+      "voice": "Obsługa głosowa",
+      "human-handoff": "Przekazanie rozmowy do człowieka",
+      "crm-sync": "Synchronizacja z CRM",
+      "broadcasts": "Wysyłka komunikatów"
+    },
+    "industries": {
+      "retail": "Handel",
+      "services": "Usługi",
+      "beauty-health": "Uroda i zdrowie",
+      "food": "Gastronomia",
+      "education": "Edukacja",
+      "real-estate": "Nieruchomości",
+      "logistics": "Logistyka i transport",
+      "manufacturing": "Produkcja",
+      "it": "IT i technologie",
+      "other": "Inna"
+    },
+    "sizes": {
+      "solo": "Jednoosobowa",
+      "2-10": "2–10 osób",
+      "11-50": "11–50 osób",
+      "51-200": "51–200 osób",
+      "200-plus": "Ponad 200 osób"
+    },
+    "timelines": {
+      "asap": "Jak najszybciej",
+      "1-month": "Do miesiąca",
+      "1-3-months": "1–3 miesiące",
+      "3-plus-months": "Ponad 3 miesiące",
+      "flexible": "Termin jest elastyczny"
+    },
+    "budget": {
+      "upTo": "do {max} {currency}",
+      "range": "{min}–{max} {currency}",
+      "from": "od {min} {currency}",
+      "notSure": "Jeszcze nie wiem"
+    },
+    "errors": {
+      "requiredMulti": "Wybierz co najmniej jedną opcję.",
+      "requiredOne": "Wybierz jedną z opcji.",
+      "requiredText": "Wpisz imię.",
+      "tooShort": "Wpisz co najmniej {min, plural, one {# znak} few {# znaki} many {# znaków} other {# znaku}}.",
+      "tooLong": "Maksymalnie {max, plural, one {# znak} few {# znaki} many {# znaków} other {# znaku}}.",
+      "unknown": "Ta opcja nie jest już dostępna. Wybierz inną."
+    },
+    "prefilled": "Usługi dodane wcześniej do zapytania są już zaznaczone.",
+    "summary": {
+      "choices": "Twoje odpowiedzi",
+      "message": "Wiadomość",
+      "messageHint": "Przed wysłaniem możesz ją dowolnie zmienić.",
+      "restoreDefault": "Przywróć tekst domyślny",
+      "send": "Wyślij w Telegramie",
+      "copy": "Skopiuj tekst",
+      "copied": "Skopiowano do schowka.",
+      "copyFailed": "Nie udało się skopiować. Zaznacz tekst i skopiuj go ręcznie.",
+      "openChat": "Otwórz czat",
+      "newTab": "otwiera się w nowej karcie",
+      "truncated": "Wiadomość jest długa, więc w Telegramie pojawi się jej skrócona wersja. Skopiuj pełny tekst i wklej go w czacie.",
+      "unconfigured": "Czat w Telegramie nie jest jeszcze skonfigurowany. Skopiuj tekst i wyślij go nam.",
+      "sent": "Zapytanie zostało wysłane.",
+      "sendFailed": "Nie udało się wysłać zapytania. Skopiuj tekst i wyślij go nam inną drogą."
+    }
+  },
+  "lead": {
+    "title": "Zapytanie ze strony {studio}",
+    "types": "Obszary",
+    "features": "Funkcje",
+    "business": "Firma",
+    "website": "Strona WWW",
+    "crm": "CRM",
+    "budget": "Budżet",
+    "timeline": "Termin",
+    "name": "Imię",
+    "comment": "Komentarz",
+    "yes": "tak",
+    "no": "nie"
   },
   "notFound": {
     "title": "Ten sektor jest pusty",

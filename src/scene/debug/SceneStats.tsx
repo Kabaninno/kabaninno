@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { useSceneStore } from '@/store/scene';
 import {
   SCENE_STATS_INTERVAL_MS,
   isSceneDebugEnabled,
@@ -18,7 +19,8 @@ interface Sampler {
 }
 
 /**
- * Publishes `window.__sceneStats` when the page was opened with `?debug=1`
+ * Publishes `window.__sceneStats` (and the `window.__sceneDebug` controls)
+ * when the page was opened with `?debug=1`
  * (checked once on mount, so the hook survives client-side navigations that
  * drop the query). No-op otherwise. Renderer info is accumulated manually
  * (`info.autoReset = false`) so multi-pass frames (post-processing) are summed.
@@ -39,7 +41,9 @@ export function SceneStats() {
   useEffect(() => {
     if (!isSceneDebugEnabled(window.location.search)) return;
     enabled.current = true;
+    window.__sceneDebug = { setEmphasis: (ids) => useSceneStore.getState().setEmphasis(ids) };
     return () => {
+      delete window.__sceneDebug;
       enabled.current = false;
       if (configured.current) {
         configured.current = false;

@@ -16,6 +16,7 @@ import { fogUniforms, pointScale } from '../three-utils';
 import type { Vec3 } from '../types';
 import type { UniverseModel } from './model';
 import {
+  bowControlPoint,
   buildNetwork,
   type LinkEnd,
   type NetworkLinkKind,
@@ -256,17 +257,4 @@ function buildLinkAttributes(
     }
   });
   return { positions, t, endA, endB, seed, kind, color, count: vertexCount };
-}
-
-/** Control point lifted away from the universe centre and slightly upward. */
-function bowControlPoint(start: Vec3, end: Vec3): Vec3 {
-  const mid: Vec3 = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2, (start[2] + end[2]) / 2];
-  const length = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
-  const outward = Math.hypot(mid[0], mid[2]) || 1;
-  const bow = length * 0.09;
-  return [
-    mid[0] + (mid[0] / outward) * bow,
-    mid[1] + length * 0.05,
-    mid[2] + (mid[2] / outward) * bow,
-  ];
 }
