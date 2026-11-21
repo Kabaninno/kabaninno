@@ -9,8 +9,8 @@ const pl: LeadLabels = {
   types: 'Rodzaj rozwiązania',
   features: 'Funkcje',
   business: 'Firma',
-  website: 'Strona WWW',
-  crm: 'CRM',
+  website: 'Ma stronę WWW',
+  crm: 'Korzysta z CRM',
   budget: 'Budżet',
   timeline: 'Termin',
   name: 'Imię',
@@ -35,7 +35,8 @@ const en: LeadLabels = {
   types: 'Solution type',
   features: 'Features',
   business: 'Business',
-  website: 'Website',
+  website: 'Has a website',
+  crm: 'Uses a CRM',
   budget: 'Budget',
   timeline: 'Timeline',
   name: 'Name',
@@ -60,7 +61,8 @@ const uk: LeadLabels = {
   types: 'Тип рішення',
   features: 'Функції',
   business: 'Бізнес',
-  website: 'Сайт',
+  website: 'Має сайт',
+  crm: 'Користується CRM',
   budget: 'Бюджет',
   timeline: 'Терміни',
   name: 'Ім’я',
@@ -102,7 +104,7 @@ describe('buildLeadMessage', () => {
         '• Pozycjonowanie (SEO)',
         '• CRM szyty na miarę',
         'Firma: Handel, 2–10 osób',
-        'Strona WWW: tak · CRM: nie',
+        'Ma stronę WWW: tak · Korzysta z CRM: nie',
         'Budżet: 15 000–40 000 PLN',
         'Termin: 1–3 miesiące',
         'Imię: Zoë Łukasiewicz',
@@ -116,7 +118,7 @@ describe('buildLeadMessage', () => {
   it('en and uk use only the given labels (Cyrillic intact)', () => {
     const english = buildLeadMessage(draft(), en);
     expect(english).toContain('Solution type: Web Development, CRM');
-    expect(english).toContain('Website: yes · CRM: no');
+    expect(english).toContain('Has a website: yes · Uses a CRM: no');
     expect(english).not.toMatch(/[ąęłńóśźżА-я]/);
 
     const ukrainian = buildLeadMessage(draft('Потрібна інтеграція з Telegram, ґанок і їжак.'), uk);
@@ -139,7 +141,7 @@ describe('buildLeadMessage', () => {
         'Zapytanie ze strony KABANINNO',
         'Rodzaj rozwiązania: Strony i aplikacje, CRM',
         'Funkcje: Landing page, Pozycjonowanie (SEO), CRM szyty na miarę',
-        'Firma: Handel, 2–10 osób; Strona WWW: tak; CRM: nie',
+        'Firma: Handel, 2–10 osób; Ma stronę WWW: tak; Korzysta z CRM: nie',
         'Budżet: 15 000–40 000 PLN · Termin: 1–3 miesiące',
         'Imię: Zoë Łukasiewicz',
         'Komentarz: Pilne. Bardzo.',
@@ -162,7 +164,7 @@ describe('buildLeadMessage', () => {
         'Zapytanie ze strony KABANINNO',
         '',
         'Rodzaj rozwiązania: ai',
-        'CRM: tak',
+        'Korzysta z CRM: tak',
         'Budżet: Jeszcze nie wiem',
       ].join('\n'),
     );

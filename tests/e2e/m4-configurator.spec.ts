@@ -1,10 +1,6 @@
 /**
  * M4 "Configurator + Telegram", UI side.
  *
- * NOT RUN YET: written under light mode (D57), where e2e, browsers and builds
- * are off. The final block runs this file with the rest of the suite; until
- * then it is type-checked and linted only.
- *
  * Covers: step navigation and validation, persistence across reload, prefill
  * from `?add=` and from the request draft, the summary text in pl and uk,
  * the Telegram link (encoded, within the budget, leading "@" rule) or the
@@ -40,10 +36,22 @@ async function seed(page: Page, step: string, draft: object = DRAFT) {
   ] as const);
 }
 
+/** Seeds the stored draft on the first load only (a reload keeps what the page saved). */
+async function seedOnce(page: Page, step: string, draft: object = DRAFT) {
+  await page.addInitScript(
+    ([key, value]) => {
+      if (sessionStorage.getItem('e2e-seeded')) return;
+      sessionStorage.setItem('e2e-seeded', '1');
+      localStorage.setItem(key, value);
+    },
+    [CONFIGURATOR_KEY, JSON.stringify({ v: 1, step, draft })] as const,
+  );
+}
+
 const panel = (page: Page) => page.locator('main [data-route-ui]');
 const stepTitle = (page: Page) => panel(page).locator('#cfg-step-title');
 
-test.describe('[M4, not yet run] wizard navigation and validation', () => {
+test.describe('wizard navigation and validation', () => {
   test('Next without an answer shows the error and focuses the field', async ({ page }) => {
     await open(page);
     await expect(stepTitle(page)).toHaveText(ui.pl.configurator.steps.type);
@@ -97,7 +105,7 @@ test.describe('[M4, not yet run] wizard navigation and validation', () => {
   });
 });
 
-test.describe('[M4, not yet run] persistence and prefill', () => {
+test.describe('persistence and prefill', () => {
   test('the draft and the step survive a reload', async ({ page }) => {
     await open(page);
     await panel(page)
@@ -130,6 +138,21 @@ test.describe('[M4, not yet run] persistence and prefill', () => {
     );
   });
 
+  test('?add= is applied once and then dropped from the URL (Q-F3-02)', async ({ page }) => {
+    await open(page, 'pl', '?add=crm%2Fcustom-crm&utm_source=e2e#top');
+    const crm = panel(page).getByRole('checkbox', { name: categoryName('pl', 'crm') });
+    await expect(crm).toBeChecked();
+    await expect(page).toHaveURL(/\/pl\/configurator\/\?utm_source=e2e#top$/);
+
+    // Deselecting sticks across a reload: the prefill is not re-applied.
+    await crm.uncheck();
+    await page.waitForTimeout(500);
+    await page.reload();
+    await expect(
+      panel(page).getByRole('checkbox', { name: categoryName('pl', 'crm') }),
+    ).not.toBeChecked();
+  });
+
   test('services added to the request are preselected', async ({ page }) => {
     await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [
       REQUEST_KEY,
@@ -158,7 +181,7 @@ test.describe('[M4, not yet run] persistence and prefill', () => {
   });
 });
 
-test.describe('[M4, not yet run] summary and hand-off', () => {
+test.describe('summary and hand-off', () => {
   test('the message is complete in Polish and editable with "Restore default"', async ({
     page,
   }) => {
@@ -178,6 +201,70 @@ test.describe('[M4, not yet run] summary and hand-off', () => {
       .getByRole('button', { name: ui.pl.configurator.summary.restoreDefault })
       .click();
     await expect(message).toHaveValue(text);
+  });
+
+  test('an edit made before an answer changed is flagged, then updated or kept (Q-F3-01)', async ({
+    page,
+  }) => {
+    await seedOnce(page, 'summary', { ...DRAFT, budget: 'up-to-5k' });
+    await open(page);
+    const summary = ui.pl.configurator.summary;
+    const message = panel(page).getByLabel(summary.message, { exact: true });
+    const original = await message.inputValue();
+    await message.fill(`${original}\nPS. Proszę o telefon.`);
+
+    // Change the budget through «Zmień» and come back.
+    await panel(page)
+      .getByRole('button', {
+        name: `${ui.pl.configurator.nav.edit}: ${ui.pl.configurator.steps.budget}`,
+      })
+      .click();
+    await expect(stepTitle(page)).toHaveText(ui.pl.configurator.steps.budget);
+    await panel(page).locator('#cfg-budget-3').check();
+    await panel(page)
+      .getByRole('button', { name: ui.pl.configurator.steps.summary, exact: false })
+      .first()
+      .click();
+    await expect(stepTitle(page)).toHaveText(ui.pl.configurator.steps.summary);
+
+    // The edit is stale: the notice says so, and the text still has the old budget.
+    await expect(panel(page)).toContainText(summary.staleNotice);
+    expect(await message.inputValue()).toContain('PS. Proszę o telefon.');
+
+    // The edit (and its base) survives a reload (Q-F3-05).
+    await page.waitForTimeout(500);
+    await page.reload();
+    await expect(panel(page)).toContainText(summary.staleNotice);
+
+    // "Keep my text" keeps it and the notice goes.
+    await panel(page).getByRole('button', { name: summary.staleKeep }).click();
+    await expect(panel(page)).not.toContainText(summary.staleNotice);
+    expect(await message.inputValue()).toContain('PS. Proszę o telefon.');
+  });
+
+  test('"Update the message" regenerates it from the changed answers (Q-F3-01)', async ({
+    page,
+  }) => {
+    await seedOnce(page, 'summary', { ...DRAFT, budget: 'up-to-5k' });
+    await open(page);
+    const summary = ui.pl.configurator.summary;
+    const message = panel(page).getByLabel(summary.message, { exact: true });
+    await message.fill('Mój własny tekst');
+    await panel(page)
+      .getByRole('button', {
+        name: `${ui.pl.configurator.nav.edit}: ${ui.pl.configurator.steps.budget}`,
+      })
+      .click();
+    await panel(page).locator('#cfg-budget-3').check();
+    await panel(page)
+      .getByRole('button', { name: ui.pl.configurator.steps.summary, exact: false })
+      .first()
+      .click();
+    await panel(page).getByRole('button', { name: summary.staleUpdate }).click();
+    await expect(panel(page)).not.toContainText(summary.staleNotice);
+    const text = await message.inputValue();
+    expect(text).not.toContain('Mój własny tekst');
+    expect(text.split('\n')[0]).toBe('Zapytanie ze strony KABANINNO');
   });
 
   test('the message is in Ukrainian on /uk/', async ({ page }) => {

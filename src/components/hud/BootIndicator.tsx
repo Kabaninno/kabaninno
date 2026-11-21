@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSceneStore } from '@/store/scene';
+import { useUiStore } from '@/store/ui';
 
 /** No boot step for this long: the scene stalled or gave up, stop showing progress. */
 const STALL_MS = 20_000;
@@ -13,15 +14,16 @@ const STALL_MS = 20_000;
  * usable before the 3D layer arrives — and is decorative (`aria-hidden`), so
  * screen readers are not told about a visual-only layer.
  *
- * Hidden in simple mode, before the UI has decided the mode (server HTML,
- * hydration), and after a long stall (the scene failed to load or the
- * context could not be created).
+ * Hidden in simple mode, when WebGL is unavailable, before the UI has
+ * decided the mode (server HTML, hydration), and after a long stall (the
+ * scene chunk failed to load).
  */
 export function BootIndicator() {
   const progress = useSceneStore((state) => state.bootProgress);
   const simple = useSceneStore((state) => state.simpleMode);
+  const unavailable = useUiStore((state) => state.webglUnavailable);
   const [stalledAt, setStalledAt] = useState<number | null>(null);
-  const loading = simple === false && progress < 1;
+  const loading = simple === false && !unavailable && progress < 1;
 
   useEffect(() => {
     if (!loading) return;

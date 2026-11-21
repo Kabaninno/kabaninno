@@ -1,14 +1,10 @@
 /**
  * Final block F1, UI side: simple (2D) mode, the loading indicator, the
  * first-visit intro, SEO extras and the mobile fixes.
- *
- * [F1, not yet run] Written while browsers and builds were off; the F2 pass
- * runs it with the rest of the suite. Until then it is type-checked and
- * linted only.
  */
 import type { Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
-import { sitePath, VIEWPORTS } from '../support/env';
+import { builtSiteUrl, sitePath, VIEWPORTS } from '../support/env';
 import { CANVAS, waitForScene, withSimpleMode, withoutWebGL2Api } from '../support/scene';
 import { categories, categoryName, localized, paths, ui } from '../support/site';
 
@@ -197,8 +193,17 @@ test.describe('SEO extras', () => {
       expect(data['@graph'].find((node) => node['@type'] === 'Organization')?.name).toBe(
         'KABANINNO',
       );
-      const image = await page.locator('meta[property="og:image"]').getAttribute('content');
-      expect(image).toMatch(new RegExp(`${sitePath(`/og/${code}.png`)}$`));
+      // Absolute URLs use the build's public site URL (never localhost, D123).
+      const site = builtSiteUrl();
+      expect(site).not.toMatch(/localhost|127\.0\.0\.1/);
+      await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+        'content',
+        `${site}/og/${code}.png`,
+      );
+      await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+        'href',
+        `${site}/${code}/`,
+      );
       await expect(page.locator('meta[property="og:locale"]')).toHaveAttribute(
         'content',
         code === 'pl' ? 'pl_PL' : 'uk_UA',

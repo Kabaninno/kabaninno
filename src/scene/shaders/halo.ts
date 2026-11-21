@@ -32,6 +32,8 @@ uniform vec3 uGlow;
 uniform float uIntensity;
 uniform float uEmphasis;
 uniform float uSize;
+/** Floor of the near fade (planet glows in focus, BL-F3-01); 0 = fade out fully. */
+uniform float uNearFloor;
 
 varying vec2 vUv;
 varying float vDepth;
@@ -54,7 +56,11 @@ void main() {
   float closeFade = mix(0.28, 1.0, smoothstep(2.0, 12.0, vDepth));
   // A glow never covers the camera (S2): it fades out as the camera comes
   // within a few of its own sizes, before the billboard fills the frame.
-  closeFade *= smoothstep(uSize * 1.2, uSize * 2.6, vDepth);
+  // The floor (focused planets) never applies to a billboard that fills the
+  // frame: it would lift the whole void toward the glow (mi-F4-02).
+  float cover = uSize / max(vDepth, 1e-3);
+  float nearFloor = uNearFloor * (1.0 - smoothstep(0.3, 0.6, cover));
+  closeFade *= mix(nearFloor, 1.0, smoothstep(uSize * 1.2, uSize * 2.6, vDepth));
   float a = (core + glow + streak) * edge * uIntensity * (0.7 + 0.65 * uEmphasis) * closeFade;
   a *= fogFactor(vDepth);
   // The centre tints toward the glow only halfway: the halo keeps the DNA hue (V-07).

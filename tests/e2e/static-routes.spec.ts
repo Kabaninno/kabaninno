@@ -77,7 +77,8 @@ test.describe('404 at any depth', () => {
 
 test.describe('locale switch', () => {
   test('keeps the query string and the hash (soft navigation)', async ({ page }) => {
-    const query = '?add=web%2Flanding-pages';
+    // A neutral parameter: `?add=` is consumed and removed by the configurator (Q-F3-02).
+    const query = '?utm_source=e2e';
     await page.goto(`${sitePath(localized('pl', paths.configurator()))}${query}#steps`);
     await expect(page.locator('main h1')).toHaveText(ui.pl.configurator.title);
     const mark = await markDocument(page);
@@ -85,12 +86,12 @@ test.describe('locale switch', () => {
     const switcher = page.getByRole('navigation', { name: ui.pl.hud.language });
     const en = switcher.locator('a[hreflang="en"]');
     // The query-aware links replace the static fallback after hydration.
-    await expect(en).toHaveAttribute('href', /add=/);
+    await expect(en).toHaveAttribute('href', /utm_source=e2e/);
     await en.click();
 
     await expect(page).toHaveURL(new RegExp(`${escapeRegExp(sitePath('/en/configurator/'))}\\?`));
     const url = new URL(page.url());
-    expect(url.searchParams.get('add')).toBe('web/landing-pages');
+    expect(url.searchParams.get('utm_source')).toBe('e2e');
     expect(url.hash).toBe('#steps');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await expect(page.locator('main h1')).toHaveText(ui.en.configurator.title);

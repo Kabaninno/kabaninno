@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { prefersReducedMotion } from '@/lib/motion';
 import { accentStyle } from '@/lib/style';
 
 /** DOM id of a draft field, e.g. "business.industry" → "cfg-business-industry". */
@@ -8,11 +9,16 @@ export function fieldDomId(field: string): string {
   return `cfg-${field.replace(/\./g, '-')}`;
 }
 
-/** Focuses a field (text input, or the first option of a group) without jumping the page. */
+/**
+ * Focuses a field (text input, or the first option of a group) and centres
+ * it in the panel, so it is never left under the sticky footer (A-F3-03).
+ */
 export function focusField(field: string): void {
   const id = fieldDomId(field);
   const element = document.getElementById(id) ?? document.getElementById(`${id}-0`);
-  element?.focus();
+  if (!element) return;
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({ block: 'center', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
 
 function describedBy(...ids: (string | false | undefined)[]): string | undefined {

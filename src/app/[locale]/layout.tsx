@@ -12,6 +12,7 @@ import { IntroControl } from '@/components/layout/IntroControl';
 import { RouteFocus } from '@/components/layout/RouteFocus';
 import { SafeAreaPublisher } from '@/components/layout/SafeAreaPublisher';
 import { SimpleBackdrop } from '@/components/layout/SimpleBackdrop';
+import { SimpleMap } from '@/components/layout/SimpleMap';
 import { SkipLink } from '@/components/layout/SkipLink';
 import { RouteExit } from '@/components/motion/RouteExit';
 import { RequestSync } from '@/components/request/RequestSync';
@@ -20,6 +21,7 @@ import { isLocale, locales } from '@/i18n/routing';
 import { allServiceRefs, buildNavCategories } from '@/lib/nav-data';
 import { buildSceneManifest } from '@/lib/scene-manifest';
 import { simpleModeBootScript } from '@/lib/simple-mode';
+import { buildSimpleMapData } from '@/lib/simple-map-data';
 import { SITE_URL } from '@/lib/site-url';
 import { SceneRoot } from '@/scene/SceneRoot';
 import { fontVariables } from '../fonts';
@@ -96,6 +98,8 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           <main id="main" tabIndex={-1} className="pointer-events-none relative z-10">
             {children}
           </main>
+          {/* Simple (2D) mode map: after <main>, so Tab reaches the page content first. */}
+          <SimpleMap data={buildSimpleMapData(locale)} />
         </NextIntlClientProvider>
       </body>
     </html>

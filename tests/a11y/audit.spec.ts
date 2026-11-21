@@ -4,7 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { ROOT, sitePath, VIEWPORTS, type ViewportName } from '../support/env';
 import { sceneFocusFor, waitForFlightSettled, waitForFonts, waitForScene } from '../support/scene';
-import { categories, localized, paths, type TestLocale } from '../support/site';
+import { categories, localized, paths, ui, type TestLocale } from '../support/site';
 
 /**
  * axe-core audit of the key routes in pl and uk, desktop and mobile, written
@@ -24,7 +24,29 @@ interface Route {
   status?: number;
   scene?: boolean;
   viewports?: ViewportName[];
-  prepare?: (page: Page) => Promise<void>;
+  /** Before the page loads (storage seeds). */
+  init?: (page: Page) => Promise<void>;
+  prepare?: (page: Page, locale: TestLocale) => Promise<void>;
+}
+
+/** A complete configurator draft (ids from content and `content/configurator.ts`). */
+const DRAFT = {
+  types: ['web', 'crm'],
+  features: ['web/online-stores', 'web/seo', 'crm/custom-crm'],
+  business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
+  budget: '15k-40k',
+  timeline: '1-3-months',
+  contact: { name: 'Łucja Żółkiewska', comment: 'Sklep z integracją CRM.' },
+};
+
+/** Seeds localStorage before the page loads. */
+function seed(key: string, value: unknown) {
+  return async (page: Page) => {
+    await page.addInitScript(([k, v]) => localStorage.setItem(k, v), [
+      key,
+      JSON.stringify(value),
+    ] as const);
+  };
 }
 
 const web = categories[0]!;
@@ -35,6 +57,38 @@ const ROUTES: Route[] = [
   { name: 'portfolio', path: (l) => localized(l, paths.portfolio()) },
   { name: 'configurator', path: (l) => localized(l, paths.configurator()) },
   { name: '404', path: (l) => `/${l}/this-sector-is-empty/`, status: 404, scene: false },
+  // States that hid the F3 blockers (A-F3-06): a non-empty request (HUD
+  // link name), the wizard summary (definition list) and validation errors.
+  {
+    name: 'home-request',
+    path: (l) => localized(l, paths.home()),
+    init: seed('kabaninno.request.v1', {
+      v: 1,
+      items: [`${web.id}/${web.services[0]!.slug}`, `${web.id}/${web.services[1]!.slug}`],
+    }),
+  },
+  {
+    name: 'wizard-summary',
+    path: (l) => localized(l, paths.configurator()),
+    init: seed('kabaninno.configurator.v1', { v: 1, step: 'summary', draft: DRAFT }),
+  },
+  {
+    name: 'wizard-errors',
+    path: (l) => localized(l, paths.configurator()),
+    init: seed('kabaninno.configurator.v1', {
+      v: 1,
+      step: 'business',
+      draft: { ...DRAFT, business: { industry: null, size: null, hasWebsite: null, hasCrm: null } },
+    }),
+    prepare: async (page, locale) => {
+      await page
+        .locator('main [data-route-ui]')
+        .getByRole('button', { name: ui[locale].configurator.nav.next })
+        .click();
+      await page.locator('[aria-invalid="true"]').first().waitFor();
+      await page.waitForTimeout(300);
+    },
+  },
   {
     name: 'home-menu-open',
     path: (l) => localized(l, paths.home()),
@@ -63,10 +117,19 @@ test('axe audit of key routes', async ({ browser, baseURL }) => {
 
   for (const viewport of VIEWPORT_NAMES) {
     const context = await browser.newContext({ ...VIEWPORTS[viewport], baseURL, locale: 'pl-PL' });
+    // A returning visitor: the first-visit intro (D94) would hide the home hero.
+    await context.addInitScript(() => {
+      try {
+        localStorage.setItem('kabaninno.intro.v1', 'true');
+      } catch {
+        // ignore
+      }
+    });
     for (const route of ROUTES) {
       if (route.viewports && !route.viewports.includes(viewport)) continue;
       for (const locale of LOCALES) {
         const page = await context.newPage();
+        await route.init?.(page);
         const url = sitePath(route.path(locale));
         const response = await page.goto(url);
         if (route.scene !== false) {
@@ -75,7 +138,7 @@ test('axe audit of key routes', async ({ browser, baseURL }) => {
         }
         await waitForFonts(page);
         await page.waitForTimeout(400);
-        await route.prepare?.(page);
+        await route.prepare?.(page, locale);
 
         const axe = await new AxeBuilder({ page }).withTags(TAGS).analyze();
         const violations = axe.violations.map((violation) => {

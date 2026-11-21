@@ -165,6 +165,15 @@ Surface surface() {
   return s;
 }
 
+/**
+ * Glow of facet edges: only on hard-edged shapes (uFacetEdges, from the shape
+ * registry) and only where the normal jumps between faces — a small smooth
+ * body changes its normal fast everywhere and would light up all over.
+ */
+float facetEdge(vec3 n, float enabled) {
+  return enabled * smoothstep(0.35, 0.8, length(fwidth(n)));
+}
+
 /** Opaque output with depth fog. */
 vec4 finishOpaque(vec3 color) {
   return vec4(mix(uFogColor, color, fogFactor(vDepth) * uDim), 1.0);

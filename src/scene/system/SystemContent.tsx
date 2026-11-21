@@ -6,6 +6,7 @@ import { Vector3, type Group, type Mesh, type ShaderMaterial } from 'three';
 import { useSceneStore } from '@/store/scene';
 import { keepAlive, systemReadyKey, type SceneBusRef } from '../bus';
 import { dampFactor } from '../camera/damp';
+import { PLANET_SHAPES } from './planet-geometry';
 import { MOTION, SYSTEM_BASE_TILT } from '../config';
 import { sceneNodeId } from '../node-ids';
 import type { CompileApiRef } from '../prewarm/api';
@@ -105,7 +106,7 @@ export function SystemContent({
   });
   const invalidate = useThree((state) => state.invalidate);
   const [compiled, setCompiled] = useState(false);
-  const coreLookRef = useRef({ dim: 1, corona: 1 });
+  const coreLookRef = useRef({ dim: 1, corona: 1, tail: 1 });
   // Read once when the compile starts (a later change must not restart it).
   const priorityRef = useRef(priority);
   const style = CORE_STYLES[node.core];
@@ -201,6 +202,7 @@ export function SystemContent({
     const coreLook = coreLookRef.current;
     coreLook.dim += (look.dim - coreLook.dim) * lookK;
     coreLook.corona += (look.corona - coreLook.corona) * lookK;
+    coreLook.tail += (look.tail - coreLook.tail) * lookK;
     const coreDim = coreLook.dim;
     const core = coreRef.current;
     if (core) {
@@ -229,7 +231,7 @@ export function SystemContent({
       const tail = m.tail.uniforms;
       tail.uCoreRadius.value = NODE_CORE_RADIUS * scale;
       tail.uLength.value = COMET_TAIL_LENGTH;
-      tail.uIntensity.value = detail * coreDim;
+      tail.uIntensity.value = detail * coreDim * coreLook.tail;
       tail.uScale.value = pointScale(state);
       tail.uPixelRatio.value = state.viewport.dpr;
     }
@@ -287,7 +289,11 @@ export function SystemContent({
       bus.planetTargets.set(key, {
         x: (ndc.x * 0.5 + 0.5) * width,
         y: (0.5 - ndc.y * 0.5) * height,
-        radiusPx: orbit.size * fade * st.pxPerUnit * planetScreenBoost(orbit.size, st.pxPerUnit),
+        radiusPx:
+          orbit.size *
+          fade *
+          st.pxPerUnit *
+          planetScreenBoost(orbit.size * PLANET_SHAPES[orbit.planet.shape].body, st.pxPerUnit),
         pxPerUnit: st.pxPerUnit,
         inFront: ndc.z < 1,
         visible: fade > 0.5,

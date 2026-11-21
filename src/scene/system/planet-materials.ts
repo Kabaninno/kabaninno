@@ -46,15 +46,49 @@ export interface MaterialEntry {
   fragment: string;
   transparent: boolean;
   additive: boolean;
+  /**
+   * Minimum look (visual BL-F3-01): `minOpacity` floors the body's alpha (1 =
+   * opaque), `rim` is the fresnel rim strength in the glow colour. A clear
+   * glass body against deep space otherwise all but vanishes up close.
+   */
+  look: { minOpacity: number; rim: number };
 }
 
 export const PLANET_MATERIALS: Record<PlanetMaterial, MaterialEntry> = {
-  glass: { fragment: glassFragment, transparent: true, additive: false },
-  'liquid-metal': { fragment: liquidMetalFragment, transparent: false, additive: false },
-  hologram: { fragment: hologramFragment, transparent: true, additive: true },
-  iridescent: { fragment: iridescentFragment, transparent: false, additive: false },
-  emissive: { fragment: emissiveFragment, transparent: false, additive: false },
+  glass: {
+    fragment: glassFragment,
+    transparent: true,
+    additive: false,
+    look: { minOpacity: 0.38, rim: 0.75 },
+  },
+  'liquid-metal': {
+    fragment: liquidMetalFragment,
+    transparent: false,
+    additive: false,
+    look: { minOpacity: 1, rim: 0.35 },
+  },
+  hologram: {
+    fragment: hologramFragment,
+    transparent: true,
+    additive: true,
+    look: { minOpacity: 0.36, rim: 0.8 },
+  },
+  iridescent: {
+    fragment: iridescentFragment,
+    transparent: false,
+    additive: false,
+    look: { minOpacity: 1, rim: 0.4 },
+  },
+  emissive: {
+    fragment: emissiveFragment,
+    transparent: false,
+    additive: false,
+    look: { minOpacity: 1, rim: 1.1 },
+  },
 };
+
+/** In-focus floor of a planet glow's near fade (BL-F3-01: dark or clear bodies need it). */
+export const FOCUS_GLOW_FLOOR = 0.4;
 
 /** Uniforms shared by every material of one system (one update per frame). */
 export interface SystemUniforms {
@@ -123,6 +157,9 @@ export function createSurfaceMaterial(
       ...planet,
       uDeform: { value: shape.deform },
       uOpacity: { value: 1 },
+      uMinOpacity: { value: entry.look.minOpacity },
+      uRim: { value: entry.look.rim },
+      uFacetEdges: { value: shape.faceted ? 1 : 0 },
     },
     transparent: entry.transparent,
     depthWrite: !entry.transparent,
@@ -163,6 +200,8 @@ export function createShellMaterial(
       ...planet,
       uDeform: { value: 0 },
       uOpacity: { value: 0.42 },
+      uMinOpacity: { value: 0 },
+      uRim: { value: PLANET_MATERIALS.hologram.look.rim },
     },
     transparent: true,
     depthWrite: false,
@@ -287,6 +326,7 @@ export function createGlowMaterial(
       uLift: { value: orbit.size },
       uIntensity: { value: 0.55 },
       uEmphasis: planet.uHover,
+      uNearFloor: { value: FOCUS_GLOW_FLOOR },
     },
     transparent: true,
     depthWrite: false,
@@ -333,6 +373,32 @@ export interface PlanetMaterials {
   track: ShaderMaterial | null;
   trail: ShaderMaterial | null;
   glow: ShaderMaterial;
+  /** Glowing outline of a clear body with no shell (BL-F3-01), else null. */
+  edges: ShaderMaterial | null;
+}
+
+/** A clear (glass) body without a shell gets a glowing edge overlay. */
+export function needsEdgeOverlay(planet: Planet): boolean {
+  return planet.material === 'glass' && planet.shell === 'none';
+}
+
+/** Edge overlay of a clear body: its geometric edges as glowing lines. */
+export function createEdgeMaterial(
+  orbit: OrbitPreview,
+  system: SystemUniforms,
+  planet: PlanetUniforms,
+  lowQuality: boolean,
+): ShaderMaterial {
+  return new ShaderMaterial({
+    name: `edges:${orbit.serviceSlug}`,
+    vertexShader: lineVertex,
+    fragmentShader: lineFragment,
+    defines: defines(lowQuality),
+    uniforms: { ...fogUniforms(), ...system, ...planet, uOpacity: { value: 0.85 } },
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+  });
 }
 
 export function createPlanetMaterials(
@@ -357,6 +423,9 @@ export function createPlanetMaterials(
         : null,
     trail: planet.trail ? createTrailMaterial(orbit, system, uniforms, lowQuality) : null,
     glow: createGlowMaterial(orbit, uniforms, lowQuality),
+    edges: needsEdgeOverlay(planet)
+      ? createEdgeMaterial(orbit, system, uniforms, lowQuality)
+      : null,
   };
 }
 
@@ -369,6 +438,7 @@ export function disposePlanetMaterials(materials: PlanetMaterials): void {
     materials.track,
     materials.trail,
     materials.glow,
+    materials.edges,
   ]) {
     material?.dispose();
   }

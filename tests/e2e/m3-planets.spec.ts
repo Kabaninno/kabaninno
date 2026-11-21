@@ -1,10 +1,6 @@
 /**
  * M3 "Planetary systems", UI side.
  *
- * NOT RUN YET: written under light mode (D57), where e2e, browsers and builds
- * are off. The final block runs this file with the rest of the suite; until
- * then it is type-checked and linted only.
- *
  * Covers: ←/→ planet switching (push from the system, replace between
  * planets, D16), the swipe on the bottom sheet, the «← Universe» button, the
  * request toggle (state, live region, HUD badge, persistence, no-JS
@@ -13,6 +9,7 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from '../support/fixtures';
 import { sitePath, urlFor, VIEWPORTS } from '../support/env';
+import { waitForSceneReady } from '../support/scene';
 import { categories, localized, paths, serviceTitle, ui } from '../support/site';
 
 const locale = 'pl';
@@ -27,7 +24,7 @@ const at = (path: string) => urlFor(localized(locale, path));
 const open = (page: Page, path: string) => page.goto(sitePath(localized(locale, path)));
 const historyLength = (page: Page) => page.evaluate(() => history.length);
 
-test.describe('[M3, not yet run] planet switching with ←/→', () => {
+test.describe('planet switching with ←/→', () => {
   test('from the system → enters the first planet and ← the last (push)', async ({ page }) => {
     await open(page, crm.path);
     await expect(page.locator('main h1')).toBeVisible();
@@ -91,7 +88,7 @@ test.describe('[M3, not yet run] planet switching with ←/→', () => {
   });
 });
 
-test.describe('[M3, not yet run] «← Universe» button', () => {
+test.describe('«← Universe» button', () => {
   for (const path of [crm.path, first.path]) {
     test(`is visible and leads home from ${path}`, async ({ page }) => {
       await open(page, path);
@@ -108,7 +105,7 @@ test.describe('[M3, not yet run] «← Universe» button', () => {
   }
 });
 
-test.describe('[M3, not yet run] request toggle', () => {
+test.describe('request toggle', () => {
   test('adds and removes, announces, shows the HUD badge and persists', async ({ page }) => {
     await open(page, first.path);
     // APG toggle button: the name stays «Dodaj do zapytania», aria-pressed carries the state.
@@ -173,7 +170,7 @@ test.describe('[M3, not yet run] request toggle', () => {
   });
 });
 
-test.describe('[M3, not yet run] mobile bottom sheet', () => {
+test.describe('mobile bottom sheet', () => {
   test.use({ ...VIEWPORTS.mobile });
 
   test('the handle collapses and expands the sheet (tap and keyboard)', async ({ page }) => {
@@ -195,12 +192,15 @@ test.describe('[M3, not yet run] mobile bottom sheet', () => {
 
   test('a collapsed sheet stays collapsed across planet swipes', async ({ page }) => {
     await open(page, first.path);
+    // Swipe only once the scene has settled (its boot keeps the main thread busy).
+    expect(await waitForSceneReady(page, first.path)).toBe(true);
     await page.locator('[data-sheet-handle]').tap();
     await expect(page.locator('main [data-route-ui]')).toHaveAttribute('data-sheet', 'collapsed');
 
     await swipe(page, { fromX: 300, toX: 80, y: 760 });
     await expect(page).toHaveURL(at(second.path));
     await expect(page.locator('main [data-route-ui]')).toHaveAttribute('data-sheet', 'collapsed');
+    expect(await waitForSceneReady(page, second.path)).toBe(true);
 
     await swipe(page, { fromX: 80, toX: 300, y: 760 });
     await expect(page).toHaveURL(at(first.path));
@@ -208,6 +208,7 @@ test.describe('[M3, not yet run] mobile bottom sheet', () => {
 
   test('a vertical drag inside the sheet scrolls and does not switch planets', async ({ page }) => {
     await open(page, first.path);
+    expect(await waitForSceneReady(page, first.path)).toBe(true);
     await swipe(page, { fromX: 200, toX: 210, y: 760, toY: 560 });
     await page.waitForTimeout(400);
     await expect(page).toHaveURL(at(first.path));
@@ -215,26 +216,41 @@ test.describe('[M3, not yet run] mobile bottom sheet', () => {
 });
 
 /** A touch drag through CDP (touchStart → moves → touchEnd), which yields pointer events. */
+/**
+ * A touch flick through CDP with explicit event timestamps (start, +50 ms,
+ * +100 ms, end at +120 ms): the swipe's duration is then the gesture's own,
+ * not how long a busy main thread (software GL) took to deliver the events,
+ * which pushed it past the 700 ms swipe limit (Q-F3-03).
+ */
 async function swipe(
   page: Page,
   { fromX, toX, y, toY = y }: { fromX: number; toX: number; y: number; toY?: number },
 ) {
   const cdp = await page.context().newCDPSession(page);
-  // Few moves: under software GL each dispatched move waits for a busy main
-  // thread, and six of them stretched a quick flick past the 700 ms swipe limit.
-  const steps = 2;
+  const start = Date.now() / 1000;
+  const at = (fraction: number) => ({
+    x: fromX + (toX - fromX) * fraction,
+    y: y + (toY - y) * fraction,
+  });
   await cdp.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
-    touchPoints: [{ x: fromX, y }],
+    touchPoints: [at(0)],
+    timestamp: start,
   });
-  for (let step = 1; step <= steps; step += 1) {
-    await cdp.send('Input.dispatchTouchEvent', {
-      type: 'touchMove',
-      touchPoints: [
-        { x: fromX + ((toX - fromX) * step) / steps, y: y + ((toY - y) * step) / steps },
-      ],
-    });
-  }
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [at(0.5)],
+    timestamp: start + 0.05,
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchMove',
+    touchPoints: [at(1)],
+    timestamp: start + 0.1,
+  });
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchEnd',
+    touchPoints: [],
+    timestamp: start + 0.12,
+  });
   await cdp.detach();
 }

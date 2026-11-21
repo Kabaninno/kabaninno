@@ -34,3 +34,14 @@ export function systemDetail(focus: number, coreDiameterPx: number): number {
   const t = Math.min(Math.max((coreDiameterPx - 20) / 36, 0), 1);
   return focus * t * t * (3 - 2 * t);
 }
+
+/**
+ * Visibility of a category's universe preview (orbit sparks and their tails):
+ * gone once the route focuses the category, whatever the core's on-screen
+ * size (MJ-F3-02: on phones the system detail never reached 1, so the sparks
+ * stayed as soft planet-sized "ghost" discs on the orbits).
+ */
+export function previewVisibility(focus: number, detail: number): number {
+  const t = Math.min(Math.max(Math.max(focus, detail) / 0.6, 0), 1);
+  return 1 - t * t * (3 - 2 * t);
+}

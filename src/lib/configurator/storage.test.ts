@@ -43,7 +43,17 @@ describe('configurator storage', () => {
   it('round-trips the draft and the step under a versioned key', () => {
     expect(saveConfigurator(draft, 'budget')).toBe(true);
     expect(JSON.parse(data.get(CONFIGURATOR_STORAGE_KEY)!)).toMatchObject({ v: 1, step: 'budget' });
-    expect(loadConfigurator(model)).toEqual({ draft, step: 'budget' });
+    expect(loadConfigurator(model)).toEqual({ draft, step: 'budget', message: null });
+  });
+
+  it('round-trips the edited message with its base (Q-F3-05)', () => {
+    const draft = { ...emptyDraft(), types: ['web'] };
+    const message = { text: 'Mój tekst', base: 'Domyślny tekst' };
+    expect(saveConfigurator(draft, 'type', message)).toBe(true);
+    expect(loadConfigurator(model)?.message).toEqual(message);
+    expect(
+      readStoredConfigurator({ v: 1, step: 'type', draft, message: 'x' }, model)?.message,
+    ).toBeNull();
     clearConfigurator();
     expect(loadConfigurator(model)).toBeNull();
   });

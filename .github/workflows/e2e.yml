@@ -1,4 +1,4 @@
-# End-to-end tests against the static preview build (out/, base path /kabaninno).
+# End-to-end tests against the static preview build (out/, base path as on GitHub Pages for this repo).
 # Separate from deploy.yml on purpose: it never blocks the GitHub Pages deploy.
 name: E2E
 
@@ -37,7 +37,7 @@ jobs:
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Build static preview (base path /kabaninno)
+      - name: Build static preview (base path and URL as on GitHub Pages for this repo)
         run: npm run build:preview
 
       - name: E2E tests

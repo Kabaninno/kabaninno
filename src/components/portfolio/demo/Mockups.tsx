@@ -17,6 +17,7 @@ import {
   type MockupLabels,
   type MockupVariant,
 } from '@/lib/mockups';
+import { editButtonName } from '@/lib/a11y-names';
 import { fillTemplate } from '@/lib/portfolio';
 
 /**
@@ -272,8 +273,8 @@ function StoreMockup({ labels }: { labels: MockupLabels['store'] }) {
               disabled={(cart[product.id] ?? 0) >= MAX_PER_PRODUCT}
               className={`${secondaryButton} min-h-11 px-2 text-[0.6875rem] disabled:opacity-40 md:min-h-8 md:pointer-coarse:min-h-11`}
             >
-              {labels.add}
-              <span className="sr-only">: {product.code}</span>
+              <span aria-hidden="true">{labels.add}</span>
+              <span className="sr-only">{editButtonName(labels.add, product.code)}</span>
             </button>
           </li>
         ))}

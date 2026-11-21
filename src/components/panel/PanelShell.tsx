@@ -37,6 +37,10 @@ export interface PanelShellProps {
  * - The scrolling section exposes its paddings as `--panel-px` /
  *   `--panel-pb` (the bottom one applied by the content wrapper), so
  *   full-bleed children (the wizard's sticky footer) can cancel them.
+ * - `scroll-padding` keeps focused elements clear of the top scroll fade and
+ *   of a sticky footer: a child that sticks to the bottom publishes its
+ *   height as `--panel-footer` on the section (`data-panel-scroll`), and
+ *   the browser's focus scrolling stops above it (WCAG 2.4.11, A-F3-03).
  * - `touch-action: pan-y pinch-zoom` on the frame AND on the scrolling
  *   section: vertical scrolling and zoom stay native, horizontal swipes reach
  *   the planet-switching handlers. The section needs its own value: it is a
@@ -91,7 +95,8 @@ export function PanelShell({
         ref={scrollRef}
         aria-labelledby={labelledBy}
         tabIndex={0}
-        className="min-h-0 flex-1 touch-pan-y touch-pinch-zoom scroll-thin overflow-y-auto rounded-[inherit] px-[var(--panel-px)] pt-3 [--panel-pb:max(1.5rem,env(safe-area-inset-bottom))] [--panel-px:1.25rem] focus-visible:outline-offset-[-3px] side:pt-7 side:[--panel-pb:2rem] side:[--panel-px:1.75rem] short:side:pt-4 short:side:[--panel-pb:1.25rem] short:side:[--panel-px:1.25rem]"
+        data-panel-scroll=""
+        className="min-h-0 flex-1 touch-pan-y touch-pinch-zoom scroll-pt-16 scroll-pb-[calc(var(--panel-footer,0px)+0.5rem)] scroll-thin overflow-y-auto rounded-[inherit] px-[var(--panel-px)] pt-3 [--panel-pb:max(1.5rem,env(safe-area-inset-bottom))] [--panel-px:1.25rem] focus-visible:outline-offset-[-3px] side:scroll-pt-12 side:pt-7 side:[--panel-pb:2rem] side:[--panel-px:1.75rem] short:side:pt-4 short:side:[--panel-pb:1.25rem] short:side:[--panel-px:1.25rem]"
       >
         {/*
           The bottom padding lives on the content, not on the scroller: sticky

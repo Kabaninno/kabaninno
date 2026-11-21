@@ -1,38 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { absoluteUrl, resolveSiteUrl } from './site-url';
+import { SITE_URL_MISSING, absoluteUrl, resolveSiteUrl } from './site-url';
 
 describe('resolveSiteUrl', () => {
   it('prefers NEXT_PUBLIC_SITE_URL and strips trailing slashes', () => {
-    expect(resolveSiteUrl('https://user.github.io/repo/', '[DOMAIN]', '/repo')).toBe(
+    expect(resolveSiteUrl('https://user.github.io/repo/', '[DOMAIN]', '/repo', 'production')).toBe(
       'https://user.github.io/repo',
     );
-    expect(resolveSiteUrl('https://example.com', 'other.com', '')).toBe('https://example.com');
+    expect(resolveSiteUrl('https://example.com', 'other.com', '', 'production')).toBe(
+      'https://example.com',
+    );
   });
 
   it('drops query strings and hashes from the env URL', () => {
-    expect(resolveSiteUrl('https://example.com/base/?x=1#y', 'x', '')).toBe(
+    expect(resolveSiteUrl('https://example.com/base/?x=1#y', 'x', '', 'production')).toBe(
       'https://example.com/base',
     );
   });
 
-  it('falls back to the configured domain when the env URL is invalid or missing', () => {
-    expect(resolveSiteUrl('not a url', 'studio.example', '')).toBe('https://studio.example');
-    expect(resolveSiteUrl(undefined, 'studio.example', '')).toBe('https://studio.example');
-    expect(resolveSiteUrl('', 'studio.example', '')).toBe('https://studio.example');
+  it('ignores env values that are not http(s) URLs', () => {
+    expect(resolveSiteUrl('ftp://example.com', 'studio.example', '', 'production')).toBe(
+      'https://studio.example',
+    );
+    expect(resolveSiteUrl('not a url', 'studio.example', '', 'production')).toBe(
+      'https://studio.example',
+    );
   });
 
-  it('appends the base path to the configured domain', () => {
-    expect(resolveSiteUrl(undefined, 'studio.example', '/kabaninno')).toBe(
+  it('falls back to a real configured domain, with the base path', () => {
+    expect(resolveSiteUrl(undefined, 'studio.example', '', 'production')).toBe(
+      'https://studio.example',
+    );
+    expect(resolveSiteUrl('', 'studio.example', '/kabaninno', 'production')).toBe(
       'https://studio.example/kabaninno',
     );
   });
 
   it.each(['[ДОМЕН]', '[DOMAIN]', 'localhost', 'no-tld', ''])(
-    'ignores the placeholder/invalid domain %j and uses localhost',
+    'uses localhost only outside production (placeholder/invalid domain %j)',
     (domain) => {
-      expect(resolveSiteUrl(undefined, domain, '')).toBe('http://localhost:3000');
-      expect(resolveSiteUrl(undefined, domain, '/kabaninno')).toBe(
+      expect(resolveSiteUrl(undefined, domain, '', 'development')).toBe('http://localhost:3000');
+      expect(resolveSiteUrl(undefined, domain, '/kabaninno', 'test')).toBe(
         'http://localhost:3000/kabaninno',
+      );
+      expect(resolveSiteUrl(undefined, domain, '/kabaninno', undefined)).toBe(
+        'http://localhost:3000/kabaninno',
+      );
+    },
+  );
+
+  it.each(['[ДОМЕН]', 'localhost', ''])(
+    'fails a production build without a public URL (domain %j)',
+    (domain) => {
+      expect(() => resolveSiteUrl(undefined, domain, '/kabaninno', 'production')).toThrow(
+        SITE_URL_MISSING,
+      );
+      expect(() => resolveSiteUrl('not a url', domain, '', 'production')).toThrow(
+        /NEXT_PUBLIC_SITE_URL/,
       );
     },
   );

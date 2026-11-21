@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { getCategories } from '~/content';
+import { siteConfig } from '~/site.config';
 import type * as RobotsModule from '@/app/robots';
+import { isValidTelegramUsername, normalizeUsername } from '@/lib/configurator/telegram';
 import type * as SitemapModule from '@/app/sitemap';
 import type * as SitePathsModule from '@/lib/site-paths';
 import type * as StructuredDataModule from '@/lib/structured-data';
@@ -63,8 +65,13 @@ describe('home JSON-LD', () => {
     expect(organization.name).toBe('KABANINNO');
     expect(organization.url).toBe(`${SITE}/pl/`);
     expect(organization.image).toBe(`${SITE}/og/pl.png`);
-    // The Telegram username is still a placeholder: no sameAs link.
-    expect(organization.sameAs).toBeUndefined();
+    // sameAs only with a real Telegram username (never the placeholder).
+    const telegram = normalizeUsername(siteConfig.telegramUsername);
+    if (isValidTelegramUsername(telegram)) {
+      expect(organization.sameAs).toEqual([`https://t.me/${telegram}`]);
+    } else {
+      expect(organization.sameAs).toBeUndefined();
+    }
     const json = JSON.stringify(data);
     for (const key of ['address', 'telephone', 'email', 'geo', '[TELEGRAM', '[ДОМЕН']) {
       expect(json).not.toContain(key);

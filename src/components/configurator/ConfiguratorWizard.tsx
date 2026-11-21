@@ -16,7 +16,15 @@ import {
 } from '@/lib/configurator/draft';
 import { errorText, type WizardLabels } from '@/lib/configurator/labels';
 import { budgetIds, featuresFor, type ConfiguratorModel } from '@/lib/configurator/model';
-import { emphasisForDraft, requestSync, startingDraft } from '@/lib/configurator/session';
+import {
+  editMessage,
+  emphasisForDraft,
+  keepEdit,
+  requestSync,
+  startingDraft,
+  urlWithoutPrefill,
+  type MessageEdit,
+} from '@/lib/configurator/session';
 import { clearConfigurator, loadConfigurator, saveConfigurator } from '@/lib/configurator/storage';
 import { TelegramLinkSubmitter } from '@/lib/configurator/submitters';
 import { useRequestStore } from '@/store/request';
@@ -99,10 +107,12 @@ export function ConfiguratorWizard({
   const [notice, setNotice] = useState('');
   const [ready, setReady] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  // The visitor's edit of the summary message and the default it was based on (Q-F3-01).
+  const [message, setMessage] = useState<MessageEdit | null>(null);
   const draftRef = useRef(draft);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const cancelResetRef = useRef<HTMLButtonElement>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
   const moved = useRef(false);
   const submitter = useMemo(
     () => new TelegramLinkSubmitter({ username: telegramUsername }),
@@ -124,23 +134,34 @@ export function ConfiguratorWizard({
         draftRef.current = start;
         setDraft(start);
         if (stored) setStep(stored.step);
+        if (stored?.message) setMessage(stored.message);
         if (added.length > 0) setNotice(labels.prefilled);
+        // Applied once: drop `?add=` so a reload or Back does not re-add a
+        // service deselected since (Q-F3-02). Keeps other params and the hash.
+        const cleaned = urlWithoutPrefill(window.location.href);
+        if (cleaned) window.history.replaceState(window.history.state, '', cleaned);
         setReady(true);
       }),
     [model, labels.prefilled],
   );
 
-  // Persist (debounced), and flush the latest state on unmount.
-  const latest = useRef<{ draft: ConfiguratorDraft; step: ConfiguratorStepId } | null>(null);
+  // Persist (debounced), and flush the latest state on unmount. The edited
+  // message is stored with the draft (Q-F3-05).
+  const latest = useRef<{
+    draft: ConfiguratorDraft;
+    step: ConfiguratorStepId;
+    message: MessageEdit | null;
+  } | null>(null);
   useEffect(() => {
     if (!ready) return;
-    latest.current = { draft, step };
-    const timer = window.setTimeout(() => saveConfigurator(draft, step), SAVE_DELAY_MS);
+    latest.current = { draft, step, message };
+    const timer = window.setTimeout(() => saveConfigurator(draft, step, message), SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [draft, step, ready]);
+  }, [draft, step, message, ready]);
   useEffect(
     () => () => {
-      if (latest.current) saveConfigurator(latest.current.draft, latest.current.step);
+      const last = latest.current;
+      if (last) saveConfigurator(last.draft, last.step, last.message);
     },
     [],
   );
@@ -150,6 +171,23 @@ export function ConfiguratorWizard({
     useSceneStore.getState().setEmphasis(emphasisForDraft(draft));
   }, [draft]);
   useEffect(() => () => useSceneStore.getState().setEmphasis([]), []);
+
+  // The sticky footer's height becomes the panel's bottom scroll padding, so
+  // focus scrolling never leaves a field under it (WCAG 2.4.11, A-F3-03).
+  useEffect(() => {
+    const footer = footerRef.current;
+    const scroller = footer?.closest<HTMLElement>('[data-panel-scroll]');
+    if (!footer || !scroller) return;
+    const publish = () =>
+      scroller.style.setProperty('--panel-footer', `${Math.ceil(footer.offsetHeight)}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(footer);
+    return () => {
+      observer.disconnect();
+      scroller.style.removeProperty('--panel-footer');
+    };
+  }, []);
 
   // The reset confirmation takes focus on its safe choice ("Cancel").
   useEffect(() => {
@@ -189,7 +227,7 @@ export function ConfiguratorWizard({
     submitter,
     locale,
     username: submitter.username,
-    edited: message,
+    edit: message,
   });
 
   const errors: StepErrors = attempted[step] ? validateStep(step, draft, model) : {};
@@ -455,8 +493,9 @@ export function ConfiguratorWizard({
             labels={labels}
             handoff={handoff}
             onEdit={goTo}
-            edited={message}
-            onEditedChange={setMessage}
+            onEdited={(text) => setMessage((current) => editMessage(current, text, handoff.full))}
+            onRestoreDefault={() => setMessage(null)}
+            onKeepEdit={() => setMessage((current) => current && keepEdit(current, handoff.full))}
           />
         ) : null}
       </form>
@@ -466,7 +505,10 @@ export function ConfiguratorWizard({
         step scrolls, full-bleed (cancels the panel paddings), above the
         panel's bottom scroll fade.
       */}
-      <div className="sticky bottom-0 z-[2] -mx-[var(--panel-px)] mt-8 flex flex-wrap items-center gap-2 border-t border-white/[0.08] bg-[rgb(8_11_22/0.92)] px-[var(--panel-px)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+      <div
+        ref={footerRef}
+        className="sticky bottom-0 z-[2] -mx-[var(--panel-px)] mt-8 flex flex-wrap items-center gap-2 border-t border-white/[0.08] bg-[rgb(8_11_22/0.92)] px-[var(--panel-px)] pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md"
+      >
         {index > 0 ? (
           <button
             type="button"

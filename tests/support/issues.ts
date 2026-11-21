@@ -41,6 +41,13 @@ export class IssueCollector {
   private readonly allowances: Allowance[] = [];
 
   constructor(context: BrowserContext) {
+    /*
+     * Chrome sometimes probes `/favicon.ico` at the ORIGIN root, outside the
+     * base path (the local server has nothing there; on GitHub Pages it is
+     * another site's root). The site's own icon lives under the base path and
+     * is declared in <head>, so only that exact root URL is tolerated.
+     */
+    this.allowNotFound(/https?:\/\/[^/]+\/favicon\.ico\)?$/);
     context.on('console', (message: ConsoleMessage) => {
       const type = message.type();
       if (type === 'error') {

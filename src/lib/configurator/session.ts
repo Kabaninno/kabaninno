@@ -48,3 +48,59 @@ export function requestSync(
     remove: before.filter((ref) => !after.includes(ref)),
   };
 }
+
+/**
+ * The visitor's own version of the summary message, with the default text
+ * it was based on (`base`). The default follows the answers; the edit does
+ * not, so when the default changes after an edit, the edit is stale: the
+ * summary says so and offers "Update message" / "Keep my text" (Q-F3-01).
+ */
+export interface MessageEdit {
+  text: string;
+  base: string;
+}
+
+/** Longest stored edit (characters); longer stored values are dropped. */
+export const MESSAGE_EDIT_MAX = 10_000;
+
+/** The text to show, copy and send. */
+export function messageText(edit: MessageEdit | null, full: string): string {
+  return edit?.text ?? full;
+}
+
+/** A new keystroke: keeps the base of an existing edit, else starts from the current default. */
+export function editMessage(edit: MessageEdit | null, text: string, full: string): MessageEdit {
+  return { text, base: edit?.base ?? full };
+}
+
+/** The answers changed after the edit, and the edit is not simply the new default. */
+export function isEditStale(edit: MessageEdit | null, full: string): boolean {
+  return edit !== null && edit.base !== full && edit.text !== full;
+}
+
+/** "Keep my text": the edit stays, now based on the current default (the notice goes). */
+export function keepEdit(edit: MessageEdit, full: string): MessageEdit {
+  return { text: edit.text, base: full };
+}
+
+/** A stored edit, or null when missing or malformed. */
+export function parseMessageEdit(value: unknown): MessageEdit | null {
+  if (!value || typeof value !== 'object') return null;
+  const { text, base } = value as { text?: unknown; base?: unknown };
+  if (typeof text !== 'string' || typeof base !== 'string') return null;
+  if (text.length > MESSAGE_EDIT_MAX || base.length > MESSAGE_EDIT_MAX) return null;
+  return { text, base };
+}
+
+/**
+ * The current URL without the `?add=` prefill (Q-F3-02): once applied, the
+ * services live in the draft and the request; keeping the parameter would
+ * re-add a service the visitor deselected on every reload or Back. Other
+ * parameters and the hash stay. Returns null when there is nothing to remove.
+ */
+export function urlWithoutPrefill(href: string): string | null {
+  const url = new URL(href);
+  if (!url.searchParams.has('add')) return null;
+  url.searchParams.delete('add');
+  return `${url.pathname}${url.search}${url.hash}`;
+}

@@ -20,8 +20,8 @@ const HINT_ID = 'home-explore';
 /** Glass chip on phones, quiet right-aligned link from md up. */
 const ITEM_LINK =
   'group flex min-h-11 items-center gap-2.5 rounded-full glass px-3.5 text-sm text-ink transition-[background-color,border-color,color] duration-200 ease-calm ' +
-  'hover:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] hover:bg-[rgb(10_14_28/0.8)] focus-visible:outline-offset-[-1px] active:bg-[rgb(10_14_28/0.9)] ' +
-  'md:border-transparent md:bg-transparent md:px-3 md:text-muted md:text-halo md:[backdrop-filter:none] md:hover:bg-[rgb(10_14_28/0.55)] md:hover:text-ink md:pointer-fine:min-h-9 ' +
+  'hover:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] hover:bg-[rgb(10_14_28/0.8)] data-highlighted:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] data-highlighted:bg-[rgb(10_14_28/0.8)] focus-visible:outline-offset-[-1px] active:bg-[rgb(10_14_28/0.9)] ' +
+  'md:border-transparent md:bg-transparent md:px-3 md:text-muted md:text-halo md:[backdrop-filter:none] md:hover:bg-[rgb(10_14_28/0.55)] md:hover:text-ink md:data-highlighted:bg-[rgb(10_14_28/0.55)] md:data-highlighted:text-ink md:pointer-fine:min-h-9 ' +
   'short:gap-2 short:px-2.5 short:text-[0.8125rem]';
 
 /**
@@ -73,14 +73,14 @@ export function CategoryIndex({
             >
               <span
                 aria-hidden="true"
-                className="mono-index text-faint group-hover:text-[var(--accent)] max-sm:hidden short:max-md:hidden"
+                className="mono-index text-faint group-hover:text-[var(--accent)] group-data-highlighted:text-[var(--accent)] max-sm:hidden short:max-md:hidden"
               >
                 {formatIndex(category.index)}
               </span>
               <span>{category.name}</span>
               <span
                 aria-hidden="true"
-                className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)] transition-transform duration-200 group-hover:scale-150"
+                className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_10px_var(--accent)] transition-transform duration-200 group-hover:scale-150 group-data-highlighted:scale-150"
               />
             </HighlightLink>
           </li>
@@ -97,7 +97,7 @@ export function CategoryIndex({
             {/* Silver cluster: a dot with a faint halo. */}
             <span
               aria-hidden="true"
-              className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_0_2.5px_color-mix(in_srgb,var(--accent)_14%,transparent),0_0_10px_var(--accent)] transition-transform duration-200 group-hover:scale-150"
+              className="size-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_0_2.5px_color-mix(in_srgb,var(--accent)_14%,transparent),0_0_10px_var(--accent)] transition-transform duration-200 group-hover:scale-150 group-data-highlighted:scale-150"
             />
           </HighlightLink>
         </li>
@@ -111,7 +111,7 @@ export function CategoryIndex({
             {/* Beacon: an outlined diamond. */}
             <span
               aria-hidden="true"
-              className="size-[0.4375rem] rotate-45 border border-[var(--accent)] shadow-[0_0_8px_var(--accent)] transition-transform duration-200 group-hover:scale-150 group-hover:rotate-[135deg]"
+              className="size-[0.4375rem] rotate-45 border border-[var(--accent)] shadow-[0_0_8px_var(--accent)] transition-transform duration-200 group-hover:scale-150 group-hover:rotate-[135deg] group-data-highlighted:scale-150 group-data-highlighted:rotate-[135deg]"
             />
           </HighlightLink>
         </li>

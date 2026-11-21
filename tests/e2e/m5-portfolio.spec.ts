@@ -1,11 +1,8 @@
 /**
  * M5 "Portfolio", UI side.
  *
- * NOT RUN YET: written under light mode (D57), where e2e, browsers and builds
- * are off. The final block runs this file with the rest of the suite.
- *
- * Most tests need visible cases, i.e. a preview built with drafts:
- *   SHOW_DRAFTS=true npm run build:preview
+ * Most tests need visible cases, i.e. a preview built with drafts (D110):
+ *   npm run build:preview -- --drafts
  * They skip themselves on a production build, where only the "coming soon"
  * test runs.
  */
@@ -28,9 +25,9 @@ const caseLinks = (page: Page) => {
   return panel(page).locator(`a[href^="${base}"][href$="/"]:not([href="${base}"])`);
 };
 
-test.describe('[M5, not yet run] portfolio index', () => {
+test.describe('portfolio index', () => {
   test('without published cases: the "coming soon" panel', async ({ page }) => {
-    test.skip(hasCases, 'this build contains cases (SHOW_DRAFTS)');
+    test.skip(hasCases, 'this build contains draft cases');
     await open(page, paths.portfolio());
     await expect(panel(page)).toContainText(ui[locale].portfolio.emptyTitle);
     await expect(
@@ -39,7 +36,7 @@ test.describe('[M5, not yet run] portfolio index', () => {
   });
 
   test('the category filter lives in the URL and replaces the history entry', async ({ page }) => {
-    test.skip(!hasCases, 'needs a SHOW_DRAFTS build');
+    test.skip(!hasCases, 'needs a drafts build (build:preview -- --drafts)');
     const category = cases[0]!.categories[0]!;
     const expected = cases.filter((project) => project.categories.includes(category));
     await open(page, paths.portfolio());
@@ -64,7 +61,7 @@ test.describe('[M5, not yet run] portfolio index', () => {
   });
 
   test('Back from a case restores the filter', async ({ page }) => {
-    test.skip(!hasCases, 'needs a SHOW_DRAFTS build');
+    test.skip(!hasCases, 'needs a drafts build (build:preview -- --drafts)');
     const category = cases[0]!.categories[0]!;
     await page.goto(`${sitePath(localized(locale, paths.portfolio()))}?category=${category}`);
     const first = cases.find((project) => project.categories.includes(category))!;
@@ -80,11 +77,14 @@ test.describe('[M5, not yet run] portfolio index', () => {
   });
 });
 
-test.describe('[M5, not yet run] case page', () => {
+test.describe('case page', () => {
   test('sections, gallery with base path, «← Portfolio» and prev/next (replace)', async ({
     page,
   }) => {
-    test.skip(cases.length < 2, 'needs a SHOW_DRAFTS build with at least two cases');
+    test.skip(
+      cases.length < 2,
+      'needs a drafts build (build:preview -- --drafts) with at least two cases',
+    );
     const project = cases.find((item) => item.gallery.length > 0) ?? cases[0]!;
     await open(page, paths.project(project.slug));
     await expect(panel(page).locator('h1')).toHaveText(projectTitle(locale, project.slug));
@@ -122,7 +122,10 @@ test.describe('[M5, not yet run] case page', () => {
     const chat = cases.find(
       (project) => project.demo?.type === 'mockup' && project.demo.variant === 'telegram-chat',
     );
-    test.skip(!chat, 'needs a SHOW_DRAFTS build with the telegram-chat mockup');
+    test.skip(
+      !chat,
+      'needs a drafts build (build:preview -- --drafts) with the telegram-chat mockup',
+    );
     await open(page, paths.project(chat!.slug));
     const demo = panel(page).locator('section[aria-labelledby="project-demo"]');
     await demo
@@ -135,7 +138,7 @@ test.describe('[M5, not yet run] case page', () => {
 
   test('the live iframe loads only on request, sandboxed and lazy', async ({ page, issues }) => {
     const live = cases.find((project) => project.demo?.type === 'iframe');
-    test.skip(!live, 'needs a SHOW_DRAFTS build with an iframe demo');
+    test.skip(!live, 'needs a drafts build (build:preview -- --drafts) with an iframe demo');
     // The external page may be unreachable on CI; its own requests are not ours to check.
     issues.allow(/example\.com/);
     await open(page, paths.project(live!.slug));

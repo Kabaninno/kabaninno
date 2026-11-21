@@ -3,9 +3,10 @@
 import { useTranslations } from 'next-intl';
 import { useId, useSyncExternalStore } from 'react';
 import { analytics } from '@/lib/analytics';
-import { resolveSimpleMode, writeSimplePreference } from '@/lib/simple-mode';
+import { writeSimplePreference } from '@/lib/simple-mode';
 import { isWebGLAvailable } from '@/lib/webgl';
 import { useSceneStore } from '@/store/scene';
+import { useUiStore } from '@/store/ui';
 
 const subscribeNever = () => () => {};
 
@@ -19,8 +20,10 @@ interface SimpleModeToggleProps {
  * Switch for simple (2D) mode (D94): an APG switch (`role="switch"`,
  * `aria-checked`) that stores the choice and updates the scene store;
  * SceneRoot unmounts or mounts the 3D layer, BootState mirrors the change to
- * `html[data-simple]`. Without the WebGL 2 API simple mode is forced: the
- * switch stays on and says why (`aria-disabled`, still focusable).
+ * `html[data-simple]`. When 3D cannot run (no WebGL 2 API, or this browser
+ * failed to create a context: `webglUnavailable`, A-F3-04) simple mode is
+ * forced: the switch stays on and says why (`aria-disabled`, still
+ * focusable), so it can never leave an empty sky behind.
  *
  * The track and knob are styled from `html[data-simple]` (globals.css), not
  * from React state, so they are right from the first paint (the inline boot
@@ -32,14 +35,16 @@ export function SimpleModeToggle({ variant = 'compact', className = '' }: Simple
   const simple = useSceneStore((state) => state.simpleMode === true);
   // null while hydrating (no mismatch), then the real API check.
   const webgl = useSyncExternalStore(subscribeNever, isWebGLAvailable, () => null);
-  const forced = webgl === false;
+  const unavailable = useUiStore((state) => state.webglUnavailable);
+  const forced = webgl === false || unavailable;
   const hintId = useId();
 
   const toggle = () => {
     if (forced) return;
     const next = !simple;
     writeSimplePreference(next);
-    useSceneStore.getState().setSimpleMode(resolveSimpleMode(next, true));
+    // Not forced here, so the explicit choice decides (resolveSimpleMode).
+    useSceneStore.getState().setSimpleMode(next);
     analytics.track('simple_mode', { on: next });
   };
 

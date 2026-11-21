@@ -35,6 +35,17 @@ export interface ShapeEntry {
   spin: readonly [number, number];
   /** Largest extent relative to the unit sphere (camera framing, hit zones). */
   extent: number;
+  /**
+   * Radius of the visible body relative to the unit sphere, as seen on screen
+   * (flat, thin or sparse shapes show less): drives the small-planet boost.
+   */
+  body: number;
+  /**
+   * Hard-edged (flat-shaded / extruded) geometry: its facet edges may glow.
+   * Smooth shapes keep facet edges off — on a small curved body the normal
+   * changes fast everywhere and the edge glow washed it white (MJ-F4-01).
+   */
+  faceted: boolean;
 }
 
 const flat = (geometry: BufferGeometry): BufferGeometry => {
@@ -87,6 +98,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.12, 0],
     extent: 1,
+    body: 1,
+    faceted: false,
   },
   blob: {
     create: (detail) => new IcosahedronGeometry(1, 6 + detail * 5),
@@ -94,6 +107,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.08, 0],
     extent: 1.15,
+    body: 1,
+    faceted: false,
   },
   torus: {
     create: (detail) =>
@@ -102,6 +117,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.18, 0.11],
     extent: 1,
+    body: 0.85,
+    faceted: false,
   },
   'torus-knot': {
     create: (detail) =>
@@ -110,6 +127,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.22, 0.08],
     extent: 1,
+    body: 0.85,
+    faceted: false,
   },
   crystal: {
     create: () =>
@@ -123,6 +142,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.35, 0],
     extent: 1.45,
+    body: 0.7,
+    faceted: true,
   },
   icosahedron: {
     create: () => flat(new IcosahedronGeometry(1, 0)),
@@ -130,6 +151,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.2, 0.07],
     extent: 1,
+    body: 0.95,
+    faceted: true,
   },
   octahedron: {
     create: () => flat(new OctahedronGeometry(1, 0)),
@@ -137,6 +160,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.3, 0],
     extent: 1,
+    body: 0.8,
+    faceted: true,
   },
   gear: {
     create: (detail) => {
@@ -154,6 +179,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0, 0.45],
     extent: 1,
+    body: 0.42,
+    faceted: true,
   },
   funnel: {
     create: (detail) =>
@@ -174,6 +201,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: true,
     spin: [0.25, 0],
     extent: 1,
+    body: 0.75,
+    faceted: false,
   },
   dart: {
     create: () => {
@@ -185,6 +214,8 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0, 0.6],
     extent: 1.4,
+    body: 0.55,
+    faceted: true,
   },
   'cube-cluster': {
     create: (_detail, seed) => {
@@ -213,12 +244,15 @@ export const PLANET_SHAPES: Record<PlanetShape, ShapeEntry> = {
     doubleSided: false,
     spin: [0.16, 0.12],
     extent: 1,
+    body: 0.42,
+    faceted: true,
   },
 };
 
 /** Moon geometry per kind (unit size; the instance matrices scale them). */
 export const MOON_SHAPES: Record<MoonKind, () => BufferGeometry> = {
-  orb: () => new IcosahedronGeometry(1, 2),
+  // Faceted (MJ-F3-01): a cut crystal orb catches edges, a smooth sphere looked stock.
+  orb: () => flat(new IcosahedronGeometry(1, 1)),
   cube: () => new BoxGeometry(1, 1, 1),
   conveyor: () => new BoxGeometry(1, 1, 1),
   shard: () => flat(new OctahedronGeometry(1, 0)),

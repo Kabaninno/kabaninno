@@ -16,8 +16,39 @@ function normalizeBase(raw: string): string {
   return trimmed ? `/${trimmed}` : '';
 }
 
-/** Base path the preview build was made with (`npm run build:preview`). */
-export const BASE_PATH = normalizeBase(process.env.E2E_BASE_PATH ?? '/kabaninno');
+/**
+ * Base path of the build in out/, read from its root redirect
+ * (`url=<base>/pl/`): build:preview derives it from the repository (D123), so
+ * it is not always `/kabaninno`. E2E_BASE_PATH overrides; `/kabaninno` when
+ * there is no build yet (assertPreviewBuild then explains).
+ */
+function builtBasePath(): string | null {
+  const index = join(OUT_DIR, 'index.html');
+  if (!existsSync(index)) return null;
+  const target = /http-equiv="refresh" content="0; url=([^"]+)"/i.exec(
+    readFileSync(index, 'utf8'),
+  )?.[1];
+  const match = target ? /^(.*)\/[a-z]{2}\/$/.exec(target) : null;
+  return match ? match[1]! : null;
+}
+
+export const BASE_PATH = normalizeBase(
+  process.env.E2E_BASE_PATH ?? builtBasePath() ?? '/kabaninno',
+);
+
+/**
+ * Public site URL the build in out/ was made with (canonical, Open Graph,
+ * sitemap), read from robots.txt's sitemap line, e.g.
+ * `https://owner.github.io/kabaninno` or `https://kabaninno.invalid/kabaninno`.
+ * Tests compare absolute URLs against it instead of assuming a host.
+ */
+export function builtSiteUrl(): string {
+  const robots = readFileSync(join(OUT_DIR, 'robots.txt'), 'utf8');
+  const sitemap = /^Sitemap:\s*(\S+)\/sitemap\.xml\s*$/im.exec(robots)?.[1];
+  if (!sitemap)
+    throw new Error('out/robots.txt has no Sitemap line: rebuild with npm run build:preview');
+  return sitemap;
+}
 
 /** `/pl/services/web/` → `/kabaninno/pl/services/web/`. */
 export function sitePath(path: string): string {

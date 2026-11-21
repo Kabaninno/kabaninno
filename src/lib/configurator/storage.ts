@@ -2,6 +2,7 @@ import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '../configurator-ste
 import { safeStorage } from '../storage';
 import { canEnterStep, sanitizeDraft, type ConfiguratorDraft } from './draft';
 import type { ConfiguratorModel } from './model';
+import { parseMessageEdit, type MessageEdit } from './session';
 
 /**
  * Configurator draft persistence (BRIEF: draft in localStorage with
@@ -9,18 +10,25 @@ import type { ConfiguratorModel } from './model';
  * mode or with blocked storage the wizard simply works without persistence.
  */
 
-/** Bump the version when the stored shape changes; older drafts are ignored. */
+/**
+ * Bump the version when the stored shape changes incompatibly; older drafts
+ * are ignored. Optional fields (`message`, Q-F3-05) keep v1: drafts saved
+ * before them simply have none.
+ */
 export const CONFIGURATOR_STORAGE_KEY = 'kabaninno.configurator.v1';
 
 export interface StoredConfigurator {
   v: 1;
   step: ConfiguratorStepId;
   draft: ConfiguratorDraft;
+  /** The visitor's edit of the summary message, with its base. */
+  message?: MessageEdit;
 }
 
 export interface LoadedConfigurator {
   draft: ConfiguratorDraft;
   step: ConfiguratorStepId;
+  message: MessageEdit | null;
 }
 
 function isStep(value: unknown): value is ConfiguratorStepId {
@@ -44,15 +52,19 @@ export function readStoredConfigurator(
   while (!canEnterStep(step, draft, model)) {
     step = CONFIGURATOR_STEPS[CONFIGURATOR_STEPS.indexOf(step) - 1] ?? 'type';
   }
-  return { draft, step };
+  return { draft, step, message: parseMessageEdit(stored.message) };
 }
 
 export function loadConfigurator(model: ConfiguratorModel): LoadedConfigurator | null {
   return readStoredConfigurator(safeStorage.getJSON(CONFIGURATOR_STORAGE_KEY), model);
 }
 
-export function saveConfigurator(draft: ConfiguratorDraft, step: ConfiguratorStepId): boolean {
-  const stored: StoredConfigurator = { v: 1, step, draft };
+export function saveConfigurator(
+  draft: ConfiguratorDraft,
+  step: ConfiguratorStepId,
+  message: MessageEdit | null = null,
+): boolean {
+  const stored: StoredConfigurator = { v: 1, step, draft, ...(message ? { message } : {}) };
   return safeStorage.setJSON(CONFIGURATOR_STORAGE_KEY, stored);
 }
 

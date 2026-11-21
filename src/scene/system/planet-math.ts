@@ -53,18 +53,20 @@ export function planetSpeedTarget(focused: boolean, hovered: boolean): number {
   return hovered ? PLANET_SPEED.hovered : PLANET_SPEED.normal;
 }
 
-/** Smallest on-screen planet diameter before the boost kicks in, CSS px (visual MJ2). */
-export const MIN_PLANET_DIAMETER_PX = 16;
+/** Smallest on-screen planet BODY diameter before the boost kicks in, CSS px (MJ2, MJ-F3-03). */
+export const MIN_PLANET_DIAMETER_PX = 18;
 /** Largest on-screen boost of a small planet. */
-export const MAX_PLANET_BOOST = 1.8;
+export const MAX_PLANET_BOOST = 2.4;
 
 /**
  * Scale boost that keeps a planet readable in small free areas (phone system
- * views): planets under MIN_PLANET_DIAMETER_PX grow, up to MAX_PLANET_BOOST.
- * 1 for planets that are already big enough (desktop, planet focus).
+ * views): planets whose visible body (`bodyRadius` = orbit size × the
+ * shape's body scale — a flat gear or a thin dart shows far less than its
+ * orbit size, MJ-F3-03) is under MIN_PLANET_DIAMETER_PX grow, up to
+ * MAX_PLANET_BOOST. 1 for planets that are already big enough.
  */
-export function planetScreenBoost(size: number, pxPerUnit: number): number {
-  const px = 2 * size * pxPerUnit;
+export function planetScreenBoost(bodyRadius: number, pxPerUnit: number): number {
+  const px = 2 * bodyRadius * pxPerUnit;
   if (!(px > 0)) return 1;
   return Math.min(Math.max(MIN_PLANET_DIAMETER_PX / px, 1), MAX_PLANET_BOOST);
 }
@@ -79,10 +81,20 @@ export function coreClearable(orbit: OrbitPreview): boolean {
   return orbit.radius >= CORE_KEEP_OUT + planetReach(orbit) + 1.5 * orbit.size;
 }
 
-/** Core brightness and corona scale while a planet is focused (1 = normal). */
-export function focusCoreLook(orbit: OrbitPreview | undefined): { dim: number; corona: number } {
-  if (!orbit) return { dim: 1, corona: 1 };
-  return coreClearable(orbit) ? { dim: 0.5, corona: 0.55 } : { dim: 0.28, corona: 0.4 };
+/**
+ * Core brightness, corona scale and comet-tail strength while a planet is
+ * focused (1 = normal). The comet tail hides in planet focus (MJ-F3-01: its
+ * particles scattered soft dots over the frame).
+ */
+export function focusCoreLook(orbit: OrbitPreview | undefined): {
+  dim: number;
+  corona: number;
+  tail: number;
+} {
+  if (!orbit) return { dim: 1, corona: 1, tail: 1 };
+  return coreClearable(orbit)
+    ? { dim: 0.5, corona: 0.55, tail: 0 }
+    : { dim: 0.28, corona: 0.4, tail: 0 };
 }
 
 /**

@@ -3,7 +3,14 @@ import { getCategories } from '~/content';
 import { CAMERA } from '../config';
 import type { SceneManifest, Vec3 } from '../types';
 import { COMET_TAIL_CAPSULE, CORE_CORONA_RADIUS } from '../system/constants';
-import { planetReach, planetWorldPosition } from '../system/planet-math';
+import { PLANET_SHAPES } from '../system/planet-geometry';
+import {
+  MAX_PLANET_BOOST,
+  MIN_PLANET_DIAMETER_PX,
+  planetReach,
+  planetScreenBoost,
+  planetWorldPosition,
+} from '../system/planet-math';
 import { buildUniverseModel } from '../universe/model';
 import {
   FULL_FRAME,
@@ -934,5 +941,33 @@ describe('planet focus follows the free frame (S3)', () => {
     const p = projectPx(after, planet, PHONE_VIEW, collapsed, orbit.size);
     const fraction = (2 * p.r) / Math.min(collapsedRect.width, collapsedRect.height);
     expect(fraction).toBeGreaterThan(0.25);
+  });
+});
+
+describe('phone system views show every planet body (MJ-F3-03)', () => {
+  it('keeps each boosted body at the 18 px minimum above the sheet', () => {
+    const frame = resolveSafeFrame(PHONE_SHEET_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
+    for (const node of model.categories) {
+      const { goal } = goalFor(
+        { mode: 'system', category: node.categoryId },
+        PHONE_VIEW,
+        PHONE_SHEET_RECT,
+      );
+      const tan = Math.tan((goal.fov * Math.PI) / 360);
+      for (const orbit of node.orbits) {
+        for (const angle of [0, 1.6, 3.2, 4.8]) {
+          const planet = planetWorldPosition(node.position, orbit, angle);
+          const p = projectPx(goal, planet, PHONE_VIEW, frame);
+          const ppu = PHONE_VIEW.height / (2 * tan * p.z);
+          const body = orbit.size * PLANET_SHAPES[orbit.planet.shape].body;
+          const px = 2 * body * ppu * planetScreenBoost(body, ppu);
+          // The full minimum unless the boost is capped (MJ-F3-03: sparse and flat bodies).
+          const capped = planetScreenBoost(body, ppu) >= MAX_PLANET_BOOST;
+          expect(px, `${node.categoryId}/${orbit.serviceSlug}`).toBeGreaterThanOrEqual(
+            capped ? 12 : MIN_PLANET_DIAMETER_PX - 1e-6,
+          );
+        }
+      }
+    }
   });
 });

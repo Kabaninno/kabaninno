@@ -8,7 +8,7 @@ import { dampFactor } from '../camera/damp';
 import { MOTION } from '../config';
 import { sceneNodeId } from '../node-ids';
 import { orbitPosition } from '../orbit-math';
-import { systemDetail } from '../system/constants';
+import { systemDetail, previewVisibility } from '../system/constants';
 import { qualityDefines, type QualityPreset } from '../quality';
 import {
   orbitLineFragment,
@@ -98,6 +98,7 @@ export function NodeOrbits({
     const presence = (rt.presence[index] ?? 1) * neighbourDim(rt, index, 0.25);
     // In the system view the real planets replace the sparks and their tails.
     const detail = systemDetail(rt.focus[index] ?? 0, rt.corePx[index] ?? 0);
+    const preview = previewVisibility(rt.focus[index] ?? 0, detail);
     // Hovered planet (3D or HTML highlight) lights its orbit; the focused one stays lit.
     const highlight = highlightRef.current;
     let hotOrbit = orbits.findIndex(
@@ -118,7 +119,7 @@ export function NodeOrbits({
       line.uniforms.uTime.value = rt.time;
       line.uniforms.uEmphasis.value = emphasis;
       line.uniforms.uOpacity.value = LINE_OPACITY * presence;
-      line.uniforms.uTail.value = 1 - detail;
+      line.uniforms.uTail.value = preview;
       line.uniforms.uHot.value = hot.orbit;
       line.uniforms.uHotAmount.value = hot.amount;
     }
@@ -128,7 +129,7 @@ export function NodeOrbits({
       spark.uniforms.uEmphasis.value = emphasis;
       spark.uniforms.uScale.value = pointScale(state);
       spark.uniforms.uPixelRatio.value = state.viewport.dpr;
-      spark.uniforms.uOpacity.value = presence * (1 - detail);
+      spark.uniforms.uOpacity.value = presence * preview;
     }
   });
 

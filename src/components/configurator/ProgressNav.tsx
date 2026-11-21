@@ -73,6 +73,10 @@ export function ProgressNav({
                 disabled={!enabled}
                 aria-current={isCurrent ? 'step' : undefined}
                 onClick={() => onSelect(step)}
+                // Keyboard focus inside the scrolling row stays visible (A-F3-03).
+                onFocus={(event) =>
+                  event.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' })
+                }
                 className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-transparent px-2.5 text-xs whitespace-nowrap text-muted transition-colors duration-150 hover:border-white/15 hover:text-ink active:bg-white/[0.06] disabled:cursor-not-allowed disabled:text-faint/60 disabled:hover:border-transparent aria-[current=step]:border-white/20 aria-[current=step]:bg-white/[0.06] aria-[current=step]:text-ink pointer-coarse:min-h-11"
               >
                 <span aria-hidden="true" className="mono-index">

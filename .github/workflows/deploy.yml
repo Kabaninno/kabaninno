@@ -51,7 +51,13 @@ jobs:
         env:
           # "/<repo>" for <user>.github.io/<repo>, empty for a custom domain.
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          # Full public URL incl. base path (canonical URLs, sitemap, hreflang).
+          # Full public URL incl. base path (canonical, hreflang, Open Graph,
+          # sitemap, robots, JSON-LD): https://<owner>.github.io/<repo>, or
+          # https://<custom-domain> once a domain is set in Settings → Pages
+          # (then base_path above becomes empty, so both switch together).
+          # Required: a production build without it (and without a real
+          # domain in site.config.ts) fails, and postbuild rejects localhost
+          # or placeholder URLs in out/.
           NEXT_PUBLIC_SITE_URL: ${{ steps.pages.outputs.base_url }}
           # Optional repository variable; GitHub ignores CNAME files for
           # Actions deployments (the domain is set in Settings → Pages).

@@ -4,8 +4,8 @@
  */
 export const siteConfig = {
   studioName: 'KABANINNO',
-  /** Telegram username without "@". TODO: replace the placeholder. */
-  telegramUsername: '[TELEGRAM_USERNAME]',
+  /** Telegram username without "@" (https://t.me/wa1demarr). */
+  telegramUsername: 'wa1demarr',
   /** Production domain without protocol, e.g. "example.com". TODO: replace the placeholder. */
   domain: '[ДОМЕН]',
   /** Currency used by configurator budget ranges. */

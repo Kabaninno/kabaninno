@@ -81,6 +81,10 @@ export interface WizardLabels {
     newTab: string;
     truncated: string;
     unconfigured: string;
+    /** The answers changed after the visitor edited the message (Q-F3-01). */
+    staleNotice: string;
+    staleUpdate: string;
+    staleKeep: string;
     /** Results of a non-link submitter (`ApiSubmitter`, later). */
     sent: string;
     sendFailed: string;
@@ -217,6 +221,9 @@ export function buildWizardLabels({
       newTab: t('summary.newTab'),
       truncated: t('summary.truncated'),
       unconfigured: t('summary.unconfigured'),
+      staleNotice: t('summary.staleNotice'),
+      staleUpdate: t('summary.staleUpdate'),
+      staleKeep: t('summary.staleKeep'),
       sent: t('summary.sent'),
       sendFailed: t('summary.sendFailed'),
     },

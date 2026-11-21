@@ -55,9 +55,22 @@ GitHub Pages project sites live under `https://<user>.github.io/<repo>/`, so eve
 must respect the base path. Check that locally before pushing:
 
 ```bash
-npm run build:preview   # base path /kabaninno, site URL http://localhost:4173/kabaninno
+npm run build:preview   # base path and public URL as on GitHub Pages (see below)
 npm run serve           # http://localhost:4173/kabaninno/
 ```
+
+Which public URL a preview bakes into canonical links, hreflang, Open Graph, the sitemap and
+JSON-LD (`scripts/lib/site-target.mjs`), in this order:
+
+1. `NEXT_PUBLIC_SITE_URL` or `PREVIEW_SITE_URL`, if set (base path: `NEXT_PUBLIC_BASE_PATH` /
+   `PREVIEW_BASE_PATH`);
+2. what the Pages workflow will use for this repository, derived from `GITHUB_REPOSITORY` or the
+   git remote `origin` (`https://<owner>.github.io/<repo>`, base path `/<repo>`; a
+   `<owner>.github.io` repository is a user site without a base path);
+3. otherwise the reserved, non-resolvable `https://kabaninno.invalid/kabaninno`, with a warning.
+
+Never localhost: the pages are still served locally by `npm run serve`; only those absolute URLs
+point elsewhere.
 
 The preview server mimics GitHub Pages: directories serve `index.html`, `/kabaninno` redirects to
 `/kabaninno/`, and unknown URLs get `out/404.html` with status 404. Options:
@@ -132,14 +145,29 @@ Pages deploy.
 
 ## Simple mode, loading and the first-visit intro
 
-- **Simple (2D) mode** shows the same content without the 3D layer, over a static star field
-  and a flat constellation of the services. Visitors switch it in the HUD (the "2D" switch; in
-  the mobile menu on phones); the choice is stored in `localStorage`
-  (`kabaninno.simpleMode.v1`). Browsers without the WebGL 2 API get it automatically. A tiny
-  inline script in `<head>` decides before the first paint (`html[data-simple]`), so nothing
-  flashes. Code: `src/lib/simple-mode.ts`, `src/components/layout/{BootState,SimpleBackdrop}.tsx`,
+- **Simple (2D) mode** shows the same content without the 3D layer: a twinkling star field and
+  an interactive 2D map (`SimpleMap`). On the home, portfolio and configurator pages it is the
+  universe (every system, the portfolio and the configurator are links); on system and planet
+  pages it is that system with its planets on their orbits (links to the services). Hover/focus
+  highlights are shared both ways with the HTML lists. Motion is CSS only (opacity/transform:
+  twinkle, node pulse, rare impulses along the lines) and stops under reduced motion. Layout,
+  colours and labels come from `content/` (`src/lib/simple-map*.ts`). The rule (`resolveSimpleMode` in
+  `src/lib/simple-mode.ts`, mirrored by a tiny inline script in `<head>` that decides before the
+  first paint via `html[data-simple]`, so nothing flashes):
+  1. **forced** when 3D cannot run: no WebGL 2 API, or this browser failed to create a WebGL
+     context in the last 30 days (marker `kabaninno.webglFailed.v1`, per User-Agent; a browser
+     update retries). The HUD switch then stays on, disabled, with an explanation;
+  2. otherwise the visitor's **explicit choice** from the HUD "2D" switch (mobile menu on phones),
+     stored as `kabaninno.simpleMode.v1`, always wins;
+  3. without a choice, **low-end hints** turn it on (D115): `navigator.deviceMemory` ≤ 2,
+     `navigator.hardwareConcurrency` ≤ 2, or Data Saver (`navigator.connection.saveData`).
+     Everything else starts in 3D. Note for test machines with 2 CPU cores: they start in simple
+     mode unless a choice is stored.
+
+  Code: `src/lib/simple-mode.ts`, `src/components/layout/{BootState,SimpleBackdrop}.tsx`,
   `src/components/hud/SimpleModeToggle.tsx`; the star tiles in `public/sky/` are generated and
   checked by `src/lib/simple-sky.test.ts` (regenerate with `npm test -- -u`).
+
 - **Loading indicator**: a hairline under the HUD bar fills while the 3D scene boots; the HTML is
   usable all along.
 - **First-visit intro** (≤ 3 s): only on the first visit to a home page, never under reduced
@@ -175,14 +203,31 @@ One-time setup:
 3. Push to `main` (or run the workflow from the Actions tab). The site URL appears in the
    `deploy` job and under Settings → Pages.
 
-The base path and public URL come from `actions/configure-pages` automatically:
-`/<repo>` and `https://<user>.github.io/<repo>` for a project site, empty and
-`https://<custom-domain>` once a custom domain is configured.
+The base path and public URL come from `actions/configure-pages` automatically (its `base_path`
+and `base_url` outputs, mapped to `NEXT_PUBLIC_BASE_PATH` and `NEXT_PUBLIC_SITE_URL` in
+deploy.yml): `/<repo>` and `https://<owner>.github.io/<repo>` for a project site.
+
+**Site URL rules.** Every absolute URL (canonical, hreflang and `x-default`, `og:url`,
+`og:image`, Twitter tags, sitemap, robots, JSON-LD) is built from the site URL
+(`src/lib/site-url.ts`):
+
+1. `NEXT_PUBLIC_SITE_URL` (the workflow sets it);
+2. else a real domain in `site.config.ts` (`https://<domain>` + base path);
+3. else `http://localhost:3000` in development only (`npm run dev`, tests);
+4. else a production `npm run build` **fails** with a message asking for one of the above.
+
+After every build, `scripts/postbuild.mjs` scans `out/` (pages, sitemap, robots, RSC payloads, and
+JS chunks for URL-shaped hits) and fails on `//localhost`, `//127.0.0.1`, `[ДОМЕН]` or
+`[TELEGRAM_USERNAME]` (`scripts/lib/url-guard.mjs`). The deploy runs the same script, so it can
+never ship a placeholder or localhost.
 
 **Custom domain:** set it in **Settings → Pages → Custom domain** (and configure DNS as GitHub
-describes). With GitHub Actions deployments GitHub ignores `CNAME` files, so none is required.
-If you still want `out/CNAME` (e.g. for mirroring the artifact elsewhere), set the repository
-variable `PAGES_CNAME` (Settings → Secrets and variables → Actions → Variables).
+describes). From the next deployment `configure-pages` reports `https://<custom-domain>` with an
+empty base path, so the base path, every absolute URL and the sitemap switch together; nothing in
+the code changes. Optionally put the domain into `site.config.ts` too (used when no env URL is
+set). With GitHub Actions deployments GitHub ignores `CNAME` files, so none is required; if you
+still want `out/CNAME` (e.g. for mirroring the artifact elsewhere), set the repository variable
+`PAGES_CNAME` (Settings → Secrets and variables → Actions → Variables).
 
 After the first deployment, check the site on a real phone (Safari on iOS and Chrome on Android).
 
@@ -191,22 +236,24 @@ After the first deployment, check the site on a real phone (Safari on iOS and Ch
 
 ## Environment variables
 
-| Variable                | Used at           | Purpose                                                                                                                                                                                                             |
-| ----------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NEXT_PUBLIC_BASE_PATH` | build             | Base path, e.g. `/kabaninno`; empty for a custom domain. Set by the workflow.                                                                                                                                       |
-| `NEXT_PUBLIC_SITE_URL`  | build             | Public URL of the site root incl. base path (canonical URLs, hreflang, sitemap). Set by the workflow. Fallback: `https://<domain>` from `site.config.ts` if it is a real domain, otherwise `http://localhost:3000`. |
-| `SHOW_DRAFTS`           | build             | `true` includes portfolio cases with `status: 'draft'` in `npm run build`. `build:preview` ignores it: use `npm run build:preview -- --drafts`. Drafts are always visible in `npm run dev`.                         |
-| `PAGES_CNAME`           | build (postbuild) | Optional hostname written to `out/CNAME`. In CI it comes from the `PAGES_CNAME` repository variable.                                                                                                                |
-| `NEXT_PUBLIC_API_URL`   | build (future)    | Endpoint of the future CRM/API backend used by `ApiSubmitter` instead of the Telegram hand-off. Not used yet.                                                                                                       |
+| Variable                                | Used at           | Purpose                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NEXT_PUBLIC_BASE_PATH`                 | build             | Base path, e.g. `/kabaninno`; empty for a custom domain. Set by the workflow.                                                                                                                                                                                                                                      |
+| `NEXT_PUBLIC_SITE_URL`                  | build             | Public URL of the site root incl. base path (canonical URLs, hreflang, Open Graph, sitemap, JSON-LD). Set by the workflow from `configure-pages`. Fallback: `https://<domain>` from `site.config.ts` if it is a real domain; `http://localhost:3000` in development only; a production build without either fails. |
+| `PREVIEW_SITE_URL`, `PREVIEW_BASE_PATH` | build:preview     | Override the public URL / base path of a preview build (see "Static preview").                                                                                                                                                                                                                                     |
+| `SHOW_DRAFTS`                           | build             | `true` includes portfolio cases with `status: 'draft'` in `npm run build`. `build:preview` ignores it: use `npm run build:preview -- --drafts`. Drafts are always visible in `npm run dev`.                                                                                                                        |
+| `PAGES_CNAME`                           | build (postbuild) | Optional hostname written to `out/CNAME`. In CI it comes from the `PAGES_CNAME` repository variable.                                                                                                                                                                                                               |
+| `NEXT_PUBLIC_API_URL`                   | build (future)    | Endpoint of the future CRM/API backend used by `ApiSubmitter` instead of the Telegram hand-off. Not used yet.                                                                                                                                                                                                      |
 
-## Placeholders to replace
+## Site settings and placeholders
 
-All studio-wide placeholders live in [`site.config.ts`](site.config.ts):
+All studio-wide settings live in [`site.config.ts`](site.config.ts):
 
 - `studioName` — `KABANINNO`;
-- `telegramUsername` — `[TELEGRAM_USERNAME]` (without `@`), used by the request configurator;
-- `domain` — `[ДОМЕН]`, the production domain without protocol (used for absolute URLs when
-  `NEXT_PUBLIC_SITE_URL` is not set);
+- `telegramUsername` — `wa1demarr` (without `@`): the request configurator links to `https://t.me/wa1demarr` and the home JSON-LD lists it in `sameAs`. With an invalid value or a bracketed placeholder the configurator falls back to Copy only;
+- `domain` — still the placeholder `[ДОМЕН]`; the production domain without protocol (used for absolute URLs when
+  `NEXT_PUBLIC_SITE_URL` is not set). The placeholder never reaches a page: deploys use the URL from the
+  Pages workflow, and the postbuild guard fails on `[ДОМЕН]`;
 - `currency` — currency of configurator budget ranges (`PLN`).
 
 Texts marked for human review are listed in [`CONTENT_REVIEW.md`](CONTENT_REVIEW.md).

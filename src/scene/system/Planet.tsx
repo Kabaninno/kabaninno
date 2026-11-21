@@ -5,6 +5,7 @@ import { useFrame } from '@react-three/fiber';
 import {
   BufferAttribute,
   BufferGeometry,
+  EdgesGeometry,
   Euler,
   IcosahedronGeometry,
   Matrix4,
@@ -27,7 +28,7 @@ import type { CategoryNodeModel, OrbitPreview } from '../universe/model';
 import { createMoonPose, moonPose } from './moon-layout';
 import { MOON_SHAPES, PLANET_SHAPES } from './planet-geometry';
 import { SHELL_SCALE, planetReach, planetScreenBoost, trailIntensity } from './planet-math';
-import type { PlanetMaterials } from './planet-materials';
+import { needsEdgeOverlay, type PlanetMaterials } from './planet-materials';
 
 /** Per-planet motion state, written by SystemContent before the planets read it. */
 export interface PlanetRuntime {
@@ -49,6 +50,8 @@ export interface SystemRuntime {
 
 /** Minimum hit-zone diameter on screen (touch target), CSS px. */
 const MIN_HIT_PX = 44;
+/** Faces meeting at more than this angle get a glowing edge (clear bodies, BL-F3-01). */
+const EDGE_ANGLE_DEG = 25;
 /** Planet glow half size relative to the planet radius (smaller halos: MJ2). */
 const GLOW_SIZE = 2.4;
 const TRAIL_POINTS = 48;
@@ -172,6 +175,11 @@ export function Planet({
     return trail;
   }, [planet.trail, index]);
 
+  // Clear glass with no shell: its edges glow (BL-F3-01), following the body's facets.
+  const edgesGeometry = useMemo(
+    () => (needsEdgeOverlay(planet) ? new EdgesGeometry(geometry, EDGE_ANGLE_DEG) : null),
+    [planet, geometry],
+  );
   // Imperatively created geometries are released here (materials belong to the cache).
   useEffect(
     () => () => {
@@ -181,8 +189,17 @@ export function Planet({
       moonGeometry?.dispose();
       trackGeometry?.dispose();
       trailGeometry?.dispose();
+      edgesGeometry?.dispose();
     },
-    [geometry, shellGeometry, ringGeometries, moonGeometry, trackGeometry, trailGeometry],
+    [
+      geometry,
+      shellGeometry,
+      ringGeometries,
+      moonGeometry,
+      trackGeometry,
+      trailGeometry,
+      edgesGeometry,
+    ],
   );
 
   const reach = planetReach(orbit);
@@ -204,7 +221,7 @@ export function Planet({
     orbitPosition(orbit, st.angle, s.point);
     group.position.set(s.point.x, s.point.y, s.point.z);
     // Small on screen (phone system views): the planet grows, its glow does not (MJ2).
-    const boost = planetScreenBoost(orbit.size, st.pxPerUnit);
+    const boost = planetScreenBoost(orbit.size * shape.body, st.pxPerUnit);
     group.scale.setScalar(orbit.size * st.fade * boost);
     if (isDart) {
       // Point along the direction of travel.
@@ -263,6 +280,9 @@ export function Planet({
       <group ref={groupRef}>
         <group ref={spinRef}>
           <mesh geometry={geometry} material={materials.surface} />
+          {edgesGeometry && materials.edges ? (
+            <lineSegments geometry={edgesGeometry} material={materials.edges} renderOrder={3} />
+          ) : null}
         </group>
         {shellGeometry && materials.shell ? (
           <group ref={shellRef} scale={SHELL_SCALE}>

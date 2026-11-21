@@ -174,7 +174,7 @@ export default async function ServicePage({ params }: ServicePageProps) {
                   href={paths.service(category.id, sibling.slug)}
                   highlightId={sceneNodeId.service(category.id, sibling.slug)}
                   aria-current={current ? 'page' : undefined}
-                  className="group flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-muted transition-colors duration-150 hover:bg-white/[0.04] hover:text-ink active:bg-white/[0.07] aria-[current]:text-ink"
+                  className="group flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-muted transition-colors duration-150 hover:bg-white/[0.04] hover:text-ink active:bg-white/[0.07] aria-[current]:text-ink data-highlighted:bg-white/[0.04] data-highlighted:text-ink"
                 >
                   <span
                     aria-hidden="true"

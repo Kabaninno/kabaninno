@@ -23,6 +23,7 @@ import {
   planetReach,
   planetSpeedTarget,
   planetWorldPosition,
+  planetScreenBoost,
 } from './planet-math';
 import { PLANET_MATERIALS } from './planet-materials';
 
@@ -206,7 +207,7 @@ describe('focus core look (S2)', () => {
     const { coreClearable, focusCoreLook } = await import('./planet-math');
     const { CORE_KEEP_OUT } = await import('./constants');
     const orbits = model.categories.flatMap((node) => node.orbits);
-    expect(focusCoreLook(undefined)).toEqual({ dim: 1, corona: 1 });
+    expect(focusCoreLook(undefined)).toEqual({ dim: 1, corona: 1, tail: 1 });
     for (const orbit of orbits) {
       const clearable = orbit.radius >= CORE_KEEP_OUT + planetReach(orbit) + 1.5 * orbit.size;
       expect(coreClearable(orbit)).toBe(clearable);
@@ -239,5 +240,164 @@ describe('trail follows the planet speed (S1)', () => {
       });
     }
     cache.dispose();
+  });
+});
+
+describe('focused planets stay visible (BL-F3-01)', () => {
+  it('floors every planet body, rim and glow in focus, for every material × shell', async () => {
+    const { FOCUS_GLOW_FLOOR, PLANET_MATERIALS: registry } = await import('./planet-materials');
+    const cache = new SystemMaterialCache();
+    const planets = model.categories.flatMap((node) =>
+      node.orbits.map((orbit, i) => ({ node, orbit, i })),
+    );
+    expect(planets).toHaveLength(20);
+    for (const { node, orbit, i } of planets) {
+      const { material, shell } = orbit.planet;
+      const look = registry[material].look;
+      const label = `${node.categoryId}/${orbit.serviceSlug} (${material}, shell ${shell})`;
+      // Visibility proxy: an opaque body, or a transparent one with a floor and a strong rim.
+      expect(look.minOpacity, label).toBeGreaterThanOrEqual(0.35);
+      if (registry[material].transparent) {
+        expect(look.rim, label).toBeGreaterThanOrEqual(0.6);
+      }
+      // The shaders get exactly these values, and the glow keeps a floor near the camera.
+      const materials = cache.get(node, false).planets[i]!;
+      expect(materials.surface.uniforms.uMinOpacity?.value, label).toBe(look.minOpacity);
+      expect(materials.surface.uniforms.uRim?.value, label).toBe(look.rim);
+      expect(materials.glow.uniforms.uNearFloor?.value, label).toBeGreaterThanOrEqual(0.35);
+    }
+    expect(FOCUS_GLOW_FLOOR).toBeGreaterThanOrEqual(0.35);
+    // Every material × shell combination the schema allows meets the same floor.
+    for (const material of Object.keys(registry) as Array<keyof typeof registry>) {
+      const { look, transparent } = registry[material];
+      expect(look.minOpacity).toBeGreaterThanOrEqual(0.35);
+      if (transparent) expect(look.rim).toBeGreaterThanOrEqual(0.6);
+    }
+    cache.dispose();
+  });
+
+  it('hides the comet tail in planet focus and fades nearby particles', async () => {
+    const { focusCoreLook } = await import('./planet-math');
+    const { cometTailVertex } = await import('../shaders/system-parts');
+    for (const orbit of model.categories.flatMap((node) => node.orbits)) {
+      expect(focusCoreLook(orbit).tail).toBe(0);
+    }
+    expect(focusCoreLook(undefined).tail).toBe(1);
+    expect(cometTailVertex).toContain('nearFade');
+  });
+
+  it('cuts orb moons into facets (no plain glossy spheres, MJ-F3-01)', () => {
+    const orb = MOON_SHAPES.orb();
+    // Flat shading: no shared vertices, so each face has its own normal.
+    expect(orb.index).toBeNull();
+    orb.dispose();
+  });
+});
+
+describe('universe preview leaves the system view (MJ-F3-02)', () => {
+  it('hides the sparks once the route focuses the category, even with a small core', async () => {
+    const { previewVisibility } = await import('./constants');
+    expect(previewVisibility(0, 0)).toBe(1);
+    // Phone system view: focused, but the core never reaches the full detail size.
+    expect(previewVisibility(1, 0.3)).toBe(0);
+    expect(previewVisibility(0.6, 0)).toBe(0);
+    expect(previewVisibility(0.3, 0)).toBeGreaterThan(0);
+    expect(previewVisibility(0.3, 0)).toBeLessThan(1);
+  });
+});
+
+describe('small planets grow by their visible body (MJ-F3-03)', () => {
+  it('boosts thin and flat bodies more than round ones of the same size', async () => {
+    const { MAX_PLANET_BOOST, MIN_PLANET_DIAMETER_PX } = await import('./planet-math');
+    const ppu = 40;
+    const size = 0.12;
+    const round = planetScreenBoost(size * PLANET_SHAPES.sphere.body, ppu);
+    const gear = planetScreenBoost(size * PLANET_SHAPES.gear.body, ppu);
+    expect(gear).toBeGreaterThan(round);
+    for (const shape of Object.values(PLANET_SHAPES)) {
+      expect(shape.body).toBeGreaterThan(0);
+      expect(shape.body).toBeLessThanOrEqual(1);
+      const boost = planetScreenBoost(size * shape.body, ppu);
+      const px = 2 * size * shape.body * ppu * boost;
+      // Reaches the minimum body size unless the boost is capped.
+      if (boost < MAX_PLANET_BOOST)
+        expect(px).toBeGreaterThanOrEqual(MIN_PLANET_DIAMETER_PX - 1e-9);
+    }
+    expect(MAX_PLANET_BOOST).toBeGreaterThanOrEqual(2.4);
+  });
+});
+
+describe('clear bodies get an edge overlay (BL-F3-01)', () => {
+  it('outlines every glass planet without a shell, and only those', async () => {
+    const { needsEdgeOverlay } = await import('./planet-materials');
+    const cache = new SystemMaterialCache();
+    let outlined = 0;
+    for (const node of model.categories) {
+      const set = cache.get(node, false);
+      node.orbits.forEach((orbit, i) => {
+        const wanted = orbit.planet.material === 'glass' && orbit.planet.shell === 'none';
+        expect(needsEdgeOverlay(orbit.planet)).toBe(wanted);
+        expect(set.planets[i]!.edges !== null, orbit.serviceSlug).toBe(wanted);
+        if (wanted) outlined += 1;
+      });
+    }
+    // sales-orders (the BL-F3-01 dart) is one of them.
+    expect(outlined).toBeGreaterThan(0);
+    cache.dispose();
+  });
+});
+
+describe('facet edges only on hard-edged shapes (MJ-F4-01)', () => {
+  /** Largest angle (degrees) between normals of vertices that share a position. */
+  function hardEdgeAngle(shape: keyof typeof PLANET_SHAPES): number {
+    const geometry = PLANET_SHAPES[shape].create(1, 1);
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    const byPosition = new Map<string, Array<[number, number, number]>>();
+    for (let i = 0; i < position.count; i++) {
+      const key = [position.getX(i), position.getY(i), position.getZ(i)]
+        .map((v) => v.toFixed(4))
+        .join(',');
+      const list = byPosition.get(key) ?? [];
+      list.push([normal.getX(i), normal.getY(i), normal.getZ(i)]);
+      byPosition.set(key, list);
+    }
+    let worst = 0;
+    for (const normals of byPosition.values()) {
+      for (let a = 1; a < normals.length; a++) {
+        const [x0, y0, z0] = normals[0]!;
+        const [x1, y1, z1] = normals[a]!;
+        const cos = Math.min(Math.max(x0 * x1 + y0 * y1 + z0 * z1, -1), 1);
+        worst = Math.max(worst, (Math.acos(cos) * 180) / Math.PI);
+      }
+    }
+    geometry.dispose();
+    return worst;
+  }
+
+  it('marks exactly the hard-edged shapes as faceted', () => {
+    for (const shape of Object.keys(PLANET_SHAPES) as Array<keyof typeof PLANET_SHAPES>) {
+      const hard = hardEdgeAngle(shape) > 30;
+      expect(PLANET_SHAPES[shape].faceted, shape).toBe(hard);
+    }
+    // The MJ-F4-01 body: a smooth torus never lights up its facet edges.
+    expect(PLANET_SHAPES.torus.faceted).toBe(false);
+  });
+
+  it('passes the flag to every planet surface and clamps emissive bodies to their accent', async () => {
+    const { emissiveFragment } = await import('../shaders/planet-materials');
+    const cache = new SystemMaterialCache();
+    for (const node of model.categories) {
+      const set = cache.get(node, false);
+      node.orbits.forEach((orbit, i) => {
+        const expected = PLANET_SHAPES[orbit.planet.shape].faceted ? 1 : 0;
+        expect(set.planets[i]!.surface.uniforms.uFacetEdges?.value, orbit.serviceSlug).toBe(
+          expected,
+        );
+      });
+    }
+    cache.dispose();
+    expect(emissiveFragment).toContain('facetEdge(s.n, uFacetEdges)');
+    expect(emissiveFragment).toContain('min(color, max(uColor, uGlow)');
   });
 });

@@ -8,6 +8,8 @@ import type { ConfiguratorStepId } from '@/lib/configurator-steps';
 import type { ConfiguratorDraft } from '@/lib/configurator/draft';
 import type { WizardLabels } from '@/lib/configurator/labels';
 import { buildLeadMessage, fitLeadMessage } from '@/lib/configurator/message';
+import { editButtonName } from '@/lib/a11y-names';
+import { isEditStale, messageText, type MessageEdit } from '@/lib/configurator/session';
 import {
   isLinkSubmitter,
   type LeadSubmitter,
@@ -22,8 +24,8 @@ interface HandoffInput {
   locale: string;
   /** Telegram username used for the URL budget (any string works). */
   username: string;
-  /** The visitor's edited message, or null for the default (kept by the wizard across steps). */
-  edited: string | null;
+  /** The visitor's edit of the message (with its base), or null for the default. */
+  edit: MessageEdit | null;
 }
 
 export interface LeadHandoff {
@@ -31,6 +33,10 @@ export interface LeadHandoff {
   full: string;
   /** What "Copy" copies and the textarea shows: the edited text or `full`. */
   text: string;
+  /** The visitor edited the message. */
+  edited: boolean;
+  /** The answers changed after the edit: the edit no longer matches them (Q-F3-01). */
+  stale: boolean;
   /** A link submitter (Telegram) is configured with a valid username and produced a link. */
   prepared: PreparedTelegramLink | null;
   /** The link had to shorten the text. */
@@ -60,7 +66,7 @@ export function useLeadHandoff({
   submitter,
   locale,
   username,
-  edited,
+  edit,
 }: HandoffInput): LeadHandoff {
   const full = useMemo(() => buildLeadMessage(draft, labels.lead), [draft, labels.lead]);
   const fitted = useMemo(
@@ -68,15 +74,17 @@ export function useLeadHandoff({
     [draft, labels.lead, username],
   );
   const [status, setStatus] = useState('');
-  const text = edited ?? full;
+  const text = messageText(edit, full);
   const link = isLinkSubmitter(submitter) ? submitter : null;
-  const prepared = link?.prepare(edited ?? fitted.text) ?? null;
+  const prepared = link?.prepare(edit?.text ?? fitted.text) ?? null;
 
   return {
     full,
     text,
+    edited: edit !== null && edit.text !== full,
+    stale: isEditStale(edit, full),
     prepared,
-    shortened: Boolean(prepared?.truncated) || (edited === null && fitted.truncated),
+    shortened: Boolean(prepared?.truncated) || (edit === null && fitted.truncated),
     chatUrl: link?.chatUrl() ?? null,
     unconfigured: link !== null && !link.configured,
     submits: link === null,
@@ -155,8 +163,12 @@ interface SummaryStepProps {
   labels: WizardLabels;
   handoff: LeadHandoff;
   onEdit: (step: ConfiguratorStepId) => void;
-  edited: string | null;
-  onEditedChange: (text: string | null) => void;
+  /** The visitor typed in the message. */
+  onEdited: (text: string) => void;
+  /** Back to the default message (also "Update message" after stale answers). */
+  onRestoreDefault: () => void;
+  /** Keep the stale edit as it is (the notice goes). */
+  onKeepEdit: () => void;
 }
 
 /**
@@ -165,14 +177,20 @@ interface SummaryStepProps {
  * (shortened link, Telegram not configured), "Open chat" (no text) as an
  * extra fallback, and the status of the last copy/send. The primary actions
  * live in the wizard's sticky footer (`SummaryActions`).
+ *
+ * When an answer changes after the visitor edited the message, the edit is
+ * stale: a notice right above the textarea says so and offers "Update
+ * message" (regenerates it from the answers) or "Keep my text" (Q-F3-01), so
+ * what is copied or sent never silently contradicts the answers shown.
  */
 export function SummaryStep({
   draft,
   labels,
   handoff,
   onEdit,
-  edited,
-  onEditedChange: setEdited,
+  onEdited,
+  onRestoreDefault,
+  onKeepEdit,
 }: SummaryStepProps) {
   const messageId = fieldDomId('summary.message');
 
@@ -216,21 +234,26 @@ export function SummaryStep({
         <h3 id="cfg-summary-choices" className="mb-2 eyebrow">
           {labels.summary.choices}
         </h3>
+        {/*
+          Valid definition list (axe definition-list / dlitem, A-F3-01): each
+          row is `div > dt + dd`; the "Change" button lives inside the dd.
+        */}
         <dl className="divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08]">
           {answers.map((answer) => (
-            <div key={answer.step} className="flex items-start gap-3 px-3.5 py-2.5">
-              <div className="min-w-0 flex-1">
-                <dt className="text-xs text-muted">{answer.label}</dt>
-                <dd className="mt-0.5 text-sm text-ink">{answer.value || '—'}</dd>
-              </div>
-              <button
-                type="button"
-                onClick={() => onEdit(answer.step)}
-                className="min-h-9 shrink-0 rounded-full px-2.5 text-xs text-muted underline decoration-white/25 underline-offset-4 transition-colors hover:text-ink active:text-white pointer-coarse:min-h-11"
-              >
-                {labels.nav.edit}
-                <span className="sr-only">: {answer.label}</span>
-              </button>
+            <div key={answer.step} className="px-3.5 py-2.5">
+              <dt className="text-xs text-muted">{answer.label}</dt>
+              <dd className="mt-0.5 flex items-start justify-between gap-3">
+                <span className="min-w-0 text-sm text-ink">{answer.value || '—'}</span>
+                <button
+                  type="button"
+                  onClick={() => onEdit(answer.step)}
+                  className="-mt-2 min-h-9 shrink-0 rounded-full px-2.5 text-xs text-muted underline decoration-white/25 underline-offset-4 transition-colors hover:text-ink active:text-white pointer-coarse:min-h-11"
+                >
+                  {/* One sr-only name, no stray space before the colon (a11y-names.ts). */}
+                  <span aria-hidden="true">{labels.nav.edit}</span>
+                  <span className="sr-only">{editButtonName(labels.nav.edit, answer.label)}</span>
+                </button>
+              </dd>
             </div>
           ))}
         </dl>
@@ -243,18 +266,44 @@ export function SummaryStep({
         <p id={`${messageId}-hint`} className="mt-1 text-sm text-muted">
           {labels.summary.messageHint}
         </p>
+        {handoff.stale ? (
+          <div
+            id={`${messageId}-stale`}
+            className="corner-brackets mt-3 bg-[color-mix(in_srgb,var(--color-brand)_7%,transparent)] px-4 py-3"
+          >
+            <p className="text-sm text-ink">{labels.summary.staleNotice}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onRestoreDefault}
+                className={`${secondaryButton} min-h-11 px-4 text-sm`}
+              >
+                {labels.summary.staleUpdate}
+              </button>
+              <button
+                type="button"
+                onClick={onKeepEdit}
+                className="min-h-11 rounded-full px-3 text-sm text-muted underline decoration-white/25 underline-offset-4 transition-colors hover:text-ink active:text-white"
+              >
+                {labels.summary.staleKeep}
+              </button>
+            </div>
+          </div>
+        ) : null}
         <textarea
           id={messageId}
           value={handoff.text}
-          onChange={(event) => setEdited(event.target.value)}
-          aria-describedby={`${messageId}-hint`}
+          onChange={(event) => onEdited(event.target.value)}
+          aria-describedby={
+            handoff.stale ? `${messageId}-hint ${messageId}-stale` : `${messageId}-hint`
+          }
           rows={12}
           className={`${inputClass} mt-3 min-h-60 resize-y border-white/[0.12] font-sans text-sm leading-relaxed`}
         />
-        {edited !== null && edited !== handoff.full ? (
+        {handoff.edited && !handoff.stale ? (
           <button
             type="button"
-            onClick={() => setEdited(null)}
+            onClick={onRestoreDefault}
             className="mt-2 min-h-9 rounded-full px-2.5 text-xs text-muted underline decoration-white/25 underline-offset-4 transition-colors hover:text-ink pointer-coarse:min-h-11"
           >
             {labels.summary.restoreDefault}

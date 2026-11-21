@@ -8,7 +8,7 @@ import { analytics } from '@/lib/analytics';
 import { ariaCurrentFor } from '@/lib/nav';
 import { paths } from '@/lib/routes';
 import { accentStyle, formatIndex } from '@/lib/style';
-import { RequestCountBadge, useConfiguratorName } from '@/components/request/RequestCount';
+import { ConfiguratorLinkText, useRequestSummary } from '@/components/request/RequestCount';
 import { primaryButton } from '@/components/ui/styles';
 import { sceneNodeId } from '@/scene/node-ids';
 import { useSceneStore } from '@/store/scene';
@@ -34,7 +34,7 @@ const MD_QUERY = '(min-width: 48rem)';
 export function MobileMenu({ categories, studioName, className }: MobileMenuProps) {
   const t = useTranslations('hud');
   const { pathname } = useHudLocation();
-  const configurator = useConfiguratorName();
+  const request = useRequestSummary();
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
   const dialogId = useId();
@@ -164,19 +164,17 @@ export function MobileMenu({ categories, studioName, className }: MobileMenuProp
             <ul className="mt-4 flex flex-col border-t border-white/[0.06] pt-4">
               {(
                 [
-                  [paths.portfolio(), t('portfolio'), 0, undefined],
-                  [paths.configurator(), t('configurator'), configurator.count, configurator.name],
+                  [paths.portfolio(), t('portfolio'), 0, ''],
+                  [paths.configurator(), t('configurator'), request.count, request.label],
                 ] as const
-              ).map(([href, label, count, name]) => (
+              ).map(([href, label, count, countLabel]) => (
                 <li key={href}>
                   <Link
                     href={href}
                     aria-current={ariaCurrentFor(pathname, href)}
-                    aria-label={name}
                     className="flex min-h-12 items-center gap-2 rounded-xl px-3 text-base text-muted transition-colors duration-150 hover:bg-white/[0.06] hover:text-ink active:bg-white/10 aria-[current]:text-ink"
                   >
-                    {label}
-                    <RequestCountBadge count={count} />
+                    <ConfiguratorLinkText text={label} count={count} countLabel={countLabel} />
                   </Link>
                 </li>
               ))}

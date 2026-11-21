@@ -17,6 +17,9 @@
  * - adds per-locale font preloads for the subsets each locale always needs
  *   (perf P-05; see preloadLocaleFonts);
  * - verifies that the files GitHub Pages needs exist, failing loudly otherwise;
+ * - fails when any exported page, metadata file or payload contains a
+ *   localhost URL or an unreplaced site.config placeholder (url-guard.mjs);
+ *   outside `build:preview` also the reserved `.invalid` preview origin;
  * - prints a short summary.
  *
  * Dependency-free and cross-platform (Node ≥ 20.9).
@@ -32,6 +35,7 @@ import {
 } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { findForbiddenUrls } from './lib/url-guard.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const outDir = join(root, 'out');
@@ -241,6 +245,36 @@ function walk(dir) {
 
 const files = walk(outDir);
 const toPosix = (file) => relative(outDir, file).split(sep).join('/');
+
+/*
+ * No localhost or placeholder may reach a deploy: canonical, hreflang, Open
+ * Graph, sitemap, robots and JSON-LD are all absolute URLs. CI runs this
+ * same script, so the Pages deploy fails instead of shipping them.
+ */
+const isPreview = process.env.PREVIEW_BUILD === '1';
+const extraRules = isPreview ? [] : [{ label: 'kabaninno.invalid', pattern: /kabaninno\.invalid/ }];
+const forbidden = files.flatMap((file) => {
+  const path = toPosix(file);
+  if (!/\.(html|xml|txt|json|webmanifest|m?js)$/i.test(path)) return [];
+  return findForbiddenUrls(path, readFileSync(file, 'utf8'), extraRules);
+});
+if (forbidden.length > 0) {
+  const byFile = new Map();
+  for (const hit of forbidden) byFile.set(hit.path, [...(byFile.get(hit.path) ?? []), hit]);
+  const lines = [...byFile.entries()]
+    .slice(0, 25)
+    .map(
+      ([path, hits]) =>
+        `  - ${path}: ${hits.map((hit) => `${hit.label} (…${hit.excerpt}…)`).join('; ')}`,
+    );
+  const more = byFile.size > 25 ? '\n  …' : '';
+  fail(
+    `out/ contains localhost URLs or unreplaced placeholders in ${byFile.size} file(s):\n` +
+      `${lines.join('\n')}${more}\n` +
+      'Set NEXT_PUBLIC_SITE_URL (the Pages workflow sets it from actions/configure-pages base_url) ' +
+      'or a real domain in site.config.ts, and replace the placeholders in site.config.ts.',
+  );
+}
 const htmlPages = files.filter((file) => file.endsWith('.html')).map(toPosix);
 const totalBytes = files.reduce((sum, file) => sum + statSync(file).size, 0);
 const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
@@ -260,4 +294,5 @@ console.log(
 console.log(`  root page   : minimal redirect (${rootRedirectBytes} B)`);
 console.log(`  font preload: ${localeFontPreloads.join('; ') || '(none)'}`);
 console.log(`  CNAME       : ${cname || '(not written; PAGES_CNAME is empty)'}`);
-console.log(`  checked     : ${required.join(', ')}\n`);
+console.log(`  checked     : ${required.join(', ')}`);
+console.log(`  url guard   : no localhost or placeholders${isPreview ? ' (preview build)' : ''}\n`);

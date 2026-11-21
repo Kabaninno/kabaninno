@@ -110,16 +110,28 @@ void main() {
 }
 `;
 
-/** Moons (instanced): small lit bodies, DNA-tinted, with a rim in the glow colour. */
+/**
+ * Moons (instanced): faceted bodies with a hologram look — dark DNA-tinted
+ * core, a bright rim and glowing facet edges in the glow colour, slow scan
+ * bands (MJ-F3-01: plain glossy spheres read as stock assets).
+ */
 export const moonFragment = /* glsl */ `
 ${planetFragmentHead}
 
 void main() {
   Surface s = surface();
   vec3 r = reflect(-s.v, s.n);
-  vec3 color = uColor * (0.12 + 0.75 * s.light) + envColor(r, s.l) * 0.35;
-  color += uGlow * fresnel(s.n, s.v, 2.5) * 0.8;
-  color += uCoreColor * pow(max(dot(r, s.l), 0.0), 50.0) * 1.5;
+  float f = fresnel(s.n, s.v, 2.0);
+  // Moons are all hard-edged; the threshold keeps tiny ones from lighting up whole.
+  float edge = facetEdge(s.n, 1.0);
+#ifdef LOW_QUALITY
+  float bands = 0.5;
+#else
+  float bands = 0.5 + 0.5 * sin(vObjPos.y * 18.0 - uTime * 1.6 + uSeed);
+#endif
+  vec3 color = uColor * (0.08 + 0.4 * s.light) + envColor(r, s.l) * 0.15;
+  color += uGlow * (f * 1.1 + edge * 0.85 + bands * 0.14);
+  color += uCoreColor * pow(max(dot(r, s.l), 0.0), 50.0) * 0.9;
   gl_FragColor = finishOpaque(color);
   #include <colorspace_fragment>
 }
@@ -219,7 +231,9 @@ void main() {
   gl_PointSize = attenuatedPointSize(uCoreRadius * mix(0.16, 0.05, age), -mv.z, uScale, 1.4 * uPixelRatio, 18.0 * uPixelRatio, energy);
   gl_Position = projectionMatrix * mv;
   vAge = age;
-  vAlpha = energy * pow(1.0 - age, 1.4) * smoothstep(0.0, 0.08, age) * uIntensity * fogFactor(-mv.z);
+  // Particles close to the camera fade out (MJ-F3-01: soft dots all over the frame).
+  float nearFade = smoothstep(0.4, 1.6, -mv.z);
+  vAlpha = energy * pow(1.0 - age, 1.4) * smoothstep(0.0, 0.08, age) * uIntensity * nearFade * fogFactor(-mv.z);
 }
 `;
 

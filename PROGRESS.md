@@ -23,9 +23,28 @@
    - scene-engineer (до 10 контрольних знімків): V5-01 (готовність архіву), MJ1, MJ2, кадр конфігуратора, L-04, мінори M3/M5, гейт `simpleMode`, `bootProgress`, інтро першого візиту.
 2. ✅ **F2:** e2e 91 пройдено / 0 збоїв / 6 пропущено (Telegram-плейсхолдер і 5 тестів чернеток — пройшли окремо на `--drafts`); axe 26 сканів — 0 порушень; HTML-перевірки (OG з basePath, JSON-LD лише на головних, hreflang і x-default, sitemap 84 URL, robots, inline-скрипт простого режиму, кореневий редирект) — ок. Скриншоти: `screenshots/F2/`, `F2-fix/`, `F2-drafts/`, `F2-rs/`. Сцена S1–S6: S2, S3, S4 виправлено на знімках; S1 (mobile Telegram) частково; S5 ні; S6 здебільшого (D111, D112).
    - ✅ scene-engineer довів S1 mobile, S5, S6 (D113), контрольні знімки `screenshots/F2-scene/`; 553 тести.
-3. ⏳ **F3:** аудит послідовно: perf-a11y (Lighthouse, gzip) → qa → visual. Звіти `reports/{perf-a11y,qa,visual}/F3.md`.
-4. **F4:** виправлення blocker і major, повторна перевірка.
-5. **F5:** REPORT.md, фінальне повідомлення.
+3. ⏳ **F3:** аудит послідовно (D114: один повний аудит).
+   - ✅ perf-a11y (`reports/perf-a11y/F3.md`): Lighthouse mobile — головна 70 (перший візит; діапазон 69–71), повторний 71, система 70, конфігуратор 71, простий режим 100; CLS 0; initial JS home 205,8 KiB gzip, конфігуратор 250,5 KiB (zod); сцена 323,6 KiB gzip лише lazy; bloom-чанк 39,2 KiB. 2 blocker (A-F3-01 `dl` у підсумку, A-F3-02 назва посилання з бейджем), 1 major (A-F3-03 фокус під sticky-футером і чипами). B2.6 → D115.
+   - ✅ ui-engineer виправив у коді A-F3-01..04, D115/D116, A-F3-06 (557 тестів; у браузері ще не перевірено) — D116–D118.
+   - ✅ qa-reviewer (`reports/qa/F3.md`): 0 blocker, 1 major (Q-F3-01: відредагований текст підсумку застаріває після зміни відповідей), 4 minor, 7 nit; e2e 90/1 (флейк свайпу Q-F3-03)/6; 0 console errors на ≈45 завантаженнях; таблиця DoD у звіті.
+   - ✅ content-writer вичитав ключі M4/M5/F1 (CONTENT_REVIEW.md: розділ і відкриті питання для замовника; OG-зображення перегенеровувати не треба).
+   - ✅ visual-reviewer (`reports/visual/F3.md`, `screenshots/F3/`): 1 blocker (BL-F3-01: сфокусована Telegram-планета «Sprzedaż i zamówienia» невидима — скло без оболонки), 3 major (MJ-F3-01 customer-support у фокусі дешевий + частинки хвоста комети; MJ-F3-02 «привиди»-диски на орбітах у системах; MJ-F3-03 дрібні планети automation на телефоні), 21 minor, 7 nit → беклог REPORT.md.
+   - ⏳ scene-engineer: BL-F3-01, MJ-F3-01..03 (до 10 контрольних знімків, `out/` не чіпати).
+   - ⏳ ui-engineer (лише код): адреса сайту з env Pages, без localhost/[ДОМЕН] в `out/`, guard у postbuild.
+   - Превʼю для замовника: serve-out на 4173 (localhost і 192.168.100.83).
+4. ⏳ **F4 (перевірка лише виправленого, D114):**
+   - ✅ Ворота: lint, typecheck, 598 тестів, prettier; build:preview — guard без localhost/плейсхолдерів, абсолютні URL на `https://kabaninno.invalid/kabaninno` (немає remote; на деплої — URL Pages), D123.
+   - ✅ Telegram на свіжій збірці (pl/uk/en, `reports/qa/f4-telegram.mjs`): тексту «не налаштовано/іншим способом» немає; «Відкрити чат у Telegram» → `https://t.me/wa1demarr`; «Надіслати через Telegram» → `https://t.me/wa1demarr?text=…`, текст = поле повідомлення, 536–1306 символів; 0 console issues.
+   - e2e на свіжій збірці: 87 пройдено / 7 збоїв / 6 пропущено → ui-engineer виправляє (зайвий пробіл у доступних назвах «Konfigurator ,» і «Zmień :», favicon у guard, тест зміни мови з `?add=`, таймінги motion).
+   - ⏳ ui-engineer: «живий» простий режим за відгуком замовника (клікабельні вузли й планети, двобічне підсвічування зі списками, CSS/SVG-анімації лише transform/opacity, вимкнені при reduced motion, замір CPU).
+   - ⏳ visual-reviewer: повторна перевірка лише BL-F3-01, MJ-F3-01..03 → `reports/visual/F4.md`.
+   - Далі: REPORT.md.
+   - ⏳ ui-engineer (лише код): Q-F3-01, -02, -03, -05, -06, -12.
+   - ✅ Замовник дав Telegram username `wa1demarr` (D122): `site.config.ts` оновлено, профіль t.me існує, тест JSON-LD зроблено залежним від конфігу (566 тестів). Домену поки немає — `[ДОМЕН]` лишається.
+   - ⏳ Перевірити згенероване посилання з текстом: e2e «configured Telegram» у m4-configurator на свіжій збірці (після visual-аудиту).
+   - Потім F4: виправлення з visual-аудиту, перевірка лише виправлених пунктів (axe на нових станах, фокус у майстрі, e2e), build і тести, REPORT.md.
+5. **F4:** виправлення blocker і major; повний аудит НЕ повторюється — перевірка лише виправлених пунктів + build і тести (D114). Minor → беклог у REPORT.md.
+6. **F5:** REPORT.md, фінальне повідомлення.
 
 Підсумок M5 (`ca3c635`):
 
@@ -183,144 +202,6 @@
 - Не перевірено в M4: майстер у браузері (валідація, фокус, кроки 2/4/5/6, uk і mobile 1–6), нижня частина підсумку, копіювання в реальних браузерах, відкриття Telegram на пристроях, рух імпульсів, reduced motion.
 - L-04 (мережа притиснута вправо на 1440×900) — спільно scene + ui (safeRect огляду).
 - Скриншоти: `--only` матчить повний заголовок Playwright (`[desktop] › … › name`), тож `^` не працює — використовувати `(^|\s)(name1|name2)# PROGRESS
-
-Пам'ять проєкту. Оновлюється після кожного блоку. Якщо сесія перервалась або контекст стиснувся, продовжувати з розділу «Поточний блок».
-
-- Специфікація: [docs/BRIEF.md](docs/BRIEF.md). План: [docs/PLAN.md](docs/PLAN.md). Рішення: [DECISIONS.md](DECISIONS.md).
-- Команда агентів: `.claude/agents/`. Ролі: scene-engineer, ui-engineer, content-writer, qa-reviewer, visual-reviewer, perf-a11y-auditor.
-- Цикл якості після кожного блоку (BRIEF C3):
-  1. Ворота: build, lint, typecheck, test.
-  2. qa-reviewer і visual-reviewer, плюс perf-a11y-auditor для блоків зі сценою, мобільною версією і на фіналі.
-  3. Виправлення blocker і major, максимум 3 цикли.
-  4. Коміт і оновлення цього файлу.
-
-## Поточний блок
-
-**M3. Планетарні системи** (наступний). Режим — **легкий** (BRIEF C6, D57): не більше двох агентів, один сервер і один браузер, build лише перед комітом, після блоку один цикл (build, typecheck, lint, юніт-тести і visual-reviewer на 1 desktop + 1 mobile стані); виправляються лише blocker.
-
-Підсумок M2 (закомічено, див. `git log`):
-
-- Сцена: мережа з імпульсами, ядра в кольорі ДНК із мінімальним розміром, лейбли з виносками й ретиклом, CameraControls, GSAP-польоти й занурення, bloom, прогрів через чергу компіляції, рівні якості лише вниз, DPR як проп Canvas, етапний старт із таймером 1,5 с, контракти `flight` і `focus` (D48–D56, D65).
-- UI: Playwright (e2e, скриншоти, axe), індекс із 7 вузлів, hero й панелі чекають на політ, exit-привиди, Esc → батько, фокус після навігації, skip link, компактний desktop hero, мінімальна коренева сторінка, preload шрифтів за локаллю (D42–D47, D58–D64).
-- Перевірки: цикл 1 повних рецензій (`reports/{qa,visual,perf-a11y}/M2-1.md`), потім легкий режим. Фінальна легка visual-перевірка `reports/visual/M2-light.md`: 0 blocker, 6/6 станів на 4–5, скриншоти `screenshots/M2-light/`.
-- Відкладене — у розділі «Беклог фінального блоку».
-
-## Чекліст
-
-### M0. Підготовка
-
-- [x] Аналіз брифу, план і арт-дирекшн затверджені замовником
-- [x] Версії пакетів перевірено (2026-11-21); документацію Telegram deep links перевірено
-- [x] `git init -b main`, `npm install`
-- [x] docs/BRIEF.md, docs/PLAN.md, DECISIONS.md (арт-дирекшн, D01–D19), PROGRESS.md
-- [x] Команда агентів у `.claude/agents/`
-
-### M1. Каркас
-
-- [x] Конфіги:
-  - next.config.ts: export, trailingSlash, images.unoptimized, basePath з env, next-intl plugin;
-  - tsconfig (strict), ESLint 9 flat, Prettier, PostCSS (Tailwind 4), Vitest.
-- [x] site.config.ts (KABANINNO; Telegram і домен — плейсхолдери)
-- [x] content/:
-  - schema.ts (zod: ДНК, планети, кейси, текстові схеми);
-  - categories.ts (5 категорій × 4 послуги з ДНК);
-  - projects.ts (4 чернетки);
-  - index.ts (валідація, перехресні посилання, `shouldShowDrafts`).
-- [x] messages/*/content.json для pl, en, uk (чернетки) і CONTENT_REVIEW.md. Розділ UI-рядків ще не заповнений.
-- [x] messages/*/ui.json для pl, en, uk (чернетки)
-- [x] src/i18n: routing, navigation, messages (серверні словники, pickMessages), request; src/types/next-intl.d.ts
-- [x] src/lib: base-path, site-url, routes, route-state, content-text, metadata, analytics, storage, webgl, scene-manifest
-- [x] src/scene: types, layout, random; src/store/scene.ts
-- [x] src/app/globals.css (токени Tailwind 4, glass, eyebrow, reduced-motion), fonts.ts (variable, subsets; стратегія preload — D21)
-- [x] src/app:
-  - кореневий layout (passthrough + CSS);
-  - `/` — redirect-сторінка (meta refresh, JS, canonical);
-  - not-found (404.html, три мови).
-- [x] src/app/[locale]:
-  - layout (html lang, шрифти, NextIntlClientProvider з вибраними просторами імен, skip link, HUD, SceneRoot, main);
-  - сторінки home, category, service, портфоліо (опційний catch-all, D20), configurator з generateStaticParams і metadata.
-- [x] sitemap.ts і robots.ts (force-static, hreflang)
-- [x] HUD: лого, Послуги (disclosure), Портфоліо, Конфігуратор, PL/EN/UK, CTA, мобільне меню (`<dialog>`)
-- [x] SceneRoot (dynamic, ssr:false, детекція WebGL) і заглушка Experience (зорі, вузли, камера з URL, пауза в прихованій вкладці, маркер `data-scene-instance`, `?debug=1`)
-- [x] scripts (плюс `vitest.mjs`, D23, і обхід бага експорту Next на Windows, D22):
-  - postbuild (.nojekyll, CNAME з PAGES_CNAME, перевірка out/);
-  - build-preview (basePath `/kabaninno`);
-  - serve-out (статичний сервер під basePath, 404.html).
-- [x] .github/workflows/deploy.yml (configure-pages → build → upload-pages-artifact → deploy-pages) і README (запуск, деплой, увімкнення Pages)
-- [x] Тести: route-state, base-path, site-url, metadata, nav, content integrity (схеми, тексти для всіх сутностей, паритет ключів між мовами), layout, плюс тести сцени (goals, damp, model, node-ids)
-- [x] Ворота зелені; out/ перевірено з basePath (404, sitemap, robots, redirect, ассети)
-- [x] Рецензії qa і visual (3 цикли); виправлення; коміт
-
-### M2. Всесвіт
-
-- [x] Шари зір із паралаксом, туман, мережа вузлів і ліній з пульсацією та імпульсами даних
-- [x] 5 вузлів категорій, вузол портфоліо (скупчення), вузол конфігуратора (маяк)
-- [x] Hover і фокус (синхронізація з HTML-навігацією), HTML-лейбли (aria-hidden у canvas)
-- [x] CameraControls (інерція, обмеження, touch), автоповорот у спокої (вимкнений при reduced-motion)
-- [x] Політ і «занурення» (GSAP, FOV-punch, спалах bloom), postprocessing bloom
-- [x] Прогрів (idle, touchstart, hover), debug-хук `?debug=1`
-- [x] Playwright: скріншоти станів з out/ під basePath, e2e deep links і «назад», збір console errors
-- [x] Ворота, рецензії qa, visual і perf-a11y (цикл 1), легка visual-перевірка, коміт
-
-### M3. Планетарні системи
-
-- [ ] Ядра (prism, strata, forge, neural, comet), реєстр форм і матеріалів, кільця, супутники, шлейфи
-- [ ] Орбіти, hover (підсвічування, сповільнення, назва), фокус камери на планеті
-- [ ] Панелі послуг (desktop збоку, mobile — bottom sheet), «Додати до запиту», пов'язані кейси
-- [ ] Стрілки, свайп, Esc, «← Всесвіт»; монтування лише активної системи та системи в прогріві, dispose
-- [ ] Ворота, рецензії, коміт
-
-### M4. Конфігуратор і Telegram
-
-- [ ] Схеми кроків (zod), дані функцій за типом, бюджети в PLN (валюта з конфігу), терміни
-- [ ] Майстер із 7 кроків: прогрес, валідація, перехід на будь-який крок, чернетка в localStorage, передзаповнення
-- [ ] Реакція сцени на вибір (підсвічування категорій, маяк)
-- [ ] Генератор повідомлення (чиста функція, тести pl/en/uk, кодування, ліміти)
-- [ ] LeadSubmitter, TelegramLinkSubmitter, заготовка ApiSubmitter (NEXT_PUBLIC_API_URL); fallback-кнопки копіювання й відкриття чату
-- [ ] Ворота, рецензії, коміт
-
-### M5. Портфоліо
-
-- [ ] Скупчення-обсерваторія у сцені, фільтр за категорією, картки-об'єкти
-- [ ] Сторінка кейсу (задача, рішення, результат, стек, галерея), демо: iframe (lazy), відео, мокап
-- [ ] Стан «coming soon», коли немає опублікованих кейсів
-- [ ] Ворота, рецензії, коміт
-
-### M6. Мобільні, продуктивність, доступність
-
-- [ ] Bottom sheet, hit-зони, touch (обертання, pinch, tap)
-- [ ] PerformanceMonitor, AdaptiveDpr, рівні якості, DPR не більше 2, frameloop demand
-- [ ] Простий режим: перемикач у HUD, автоматичне ввімкнення без WebGL, без «блимання»
-- [ ] Reduced-motion; інтро до 3 с лише при першому візиті з можливістю пропустити; екран завантаження з прогресом
-- [ ] Виміри (бандли, Lighthouse, TBT); рішення щодо відкладеного 3D у DECISIONS.md
-- [ ] Ворота, рецензії (включно з perf-a11y), коміт
-
-### M7. SEO, полішинг, фінал
-
-- [ ] Метадані, Open Graph (зображення), hreflang, sitemap і robots — фінальна перевірка
-- [ ] Полішинг за беклогом; README (запуск, деплой, як додати послугу, кейс або мову)
-- [ ] Повний аудит трьома рецензентами, виправлення, повторний прогін
-- [ ] REPORT.md і фінальне повідомлення
-- [ ] (опційно) ambient-звук
-
-## Результати останніх перевірок
-
-| Дата       | Блок                                | lint                                                                               | typecheck | test                     | build                                      | Примітки                                                                                                                                                                    |
-| ---------- | ----------------------------------- | ---------------------------------------------------------------------------------- | --------- | ------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-11-21 | M2 (легкий режим, перед комітом)    | ✅                                                                                 | ✅        | ✅ 31 файл, 328 тестів   | ✅ build:preview, 86 сторінок; prettier ✅ | visual M2-light: 0 blocker, 6/6 станів 4–5. Цикл 1 до легкого режиму: e2e 50/50, axe 0, Lighthouse mobile home 69 (без WebGL 100)                                           |
-| 2026-11-21 | M1 (фінал, цикл 3)                  | ✅                                                                                 | ✅        | ✅ 18 файлів, 219 тестів | ✅ 86 сторінок; preview ✅; prettier ✅    | QA M1-3: 0/0 (104/104 перевірок N1); visual M1-3: 0/0, усі стани 4/5                                                                                                        |
-| 2026-11-21 | M1 (повний каркас)                  | ✅                                                                                 | ✅        | ✅ 11 файлів, 163 тести  | ✅ 88 сторінок; preview з `/kabaninno` ✅  | ui-engineer: 81/81 HTTP-перевірок і 32/32 перевірок у headless Chrome; initial JS на `/pl/` ≈ 194 KB gzip; three.js лише в lazy-чанку (941 KB raw); preload шрифтів 88,4 KB |
-| 2026-11-21 | M1 (базова перевірка наявного коду) | ✅ (попередження «Pages directory cannot be found» зникне, коли з'явиться src/app) | ✅        | — (тестів ще немає)      | — (немає src/app)                          | лише конфіги, content, i18n і lib                                                                                                                                           |
-
-## Беклог фінального блоку (легкий режим відклав)
-
-- Повний прогін e2e (останній повний був до етапного старту). Очікувані зміни: тест no-WebGL має перевіряти «canvas не лишається і немає console errors», а не «чанк сцени не запитується» (D55); перевірити QA-M2-02/03/05, тест воріт панелі, `data-scene-focus` на маршрутах планет.
-- Візуально не перевірені зміни M2 (код і юніт-тести є): компактний hero й правило колонки (D58) на 1280/1366/1536/1600/1920; затухання вузлів поза вільною областю; нова розкладка лейблів; поріг 18 px; OKLCH-маяк; ворота панелі 0,35; HUD на всю ширину.
-- Повторний Lighthouse (gzip-сервер `serve-out --gzip`) і рішення щодо B2.6 (відкладений 3D на мобільних). До легкого режиму: home 69, без WebGL 100.
-- Перемикання medium→low раз за сесію перекомпілює все (≈210 мс при 4×).
-- Нестабільне попередження SwiftShader «GPU stall due to ReadPixels» на деяких холодних стартах — стежити, якщо guard почне падати на warnings.
-- Повторний axe і набір скриншотів M2-fix1.
-  .
 
 ## Беклог (minor і ідеї)
 

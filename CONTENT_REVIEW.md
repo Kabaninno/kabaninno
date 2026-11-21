@@ -151,7 +151,7 @@
 | `system`                                       | панель категорії: надзаголовок «System 01 / 05», заголовок списку послуг                                                                                                                         | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `service`                                      | панель послуги: заголовки розділів, терміни (з множиною), «Додати до запиту», навігація між послугами                                                                                            | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `portfolio`                                    | список кейсів, сторінка кейсу, стан «Незабаром»; бейдж «Чернетка» видно лише в dev-збірці або з `SHOW_DRAFTS=true`                                                                               | TODO: вичитати | TODO: вичитати | TODO: вичитати |
-| `configurator`                                 | сторінка конфігуратора: назви 7 кроків майстра; `comingSoon` — тимчасова заглушка до M4                                                                                                          | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator`                                 | сторінка конфігуратора: надзаголовок, заголовок, лід, назви 7 кроків майстра (`steps`); решту ключів майстра описано в розділі «Нові ключі M4, M5 і фінального блоку»                            | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `notFound`                                     | сторінка 404, показує всі три мови одразу                                                                                                                                                        | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `portfolio.emptyCta`, `portfolio.emptyExplore` | порожнє портфоліо: кнопка CTA під «Незабаром» і заголовок над списком категорій (нові ключі, M1)                                                                                                 | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `error`                                        | екран помилки: панель замість вмісту сторінки (HUD і 3D лишаються) і повноекранна заглушка, якщо впав увесь layout (`global-error.tsx`, тексти вбудовуються під час збірки, D34); нові ключі, M1 | TODO: вичитати | TODO: вичитати | TODO: вичитати |
@@ -215,7 +215,7 @@
 | Ключ                           | pl             | en             | uk             |
 | ------------------------------ | -------------- | -------------- | -------------- |
 | `hud.requestCount`             | TODO: вичитати | TODO: вичитати | TODO: вичитати |
-| `service.addedToRequest`       | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `service.addedToRequest`       | ключ прибрано  | ключ прибрано  | ключ прибрано  |
 | `service.requestAddedStatus`   | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `service.requestRemovedStatus` | TODO: вичитати | TODO: вичитати | TODO: вичитати |
 | `service.goToRequest`          | TODO: вичитати | TODO: вичитати | TODO: вичитати |
@@ -224,7 +224,7 @@
 **Де видно**
 
 - `hud.requestCount` на екрані не показується. Коли в запиті є послуги, код дописує його до назви посилання «Конфігуратор» у HUD і мобільному меню для екранних читачів: «Konfigurator, 2 usługi w zapytaniu» / «Configurator, 2 services in your request» / «Конфігуратор, 2 послуги в запиті». На екрані видно лише значок із числом. Форми множини: pl і uk — one/few/many/other (1 usługa, 2 usługi, 5 usług; 1 послуга, 2 послуги, 5 послуг), en — one/other. Форма `other` потрібна лише для дробових чисел і на практиці не трапляється.
-- `service.addedToRequest` — напис на кнопці після додавання послуги: «✓ Dodano do zapytania» / «✓ Added to request» / «✓ Додано до запиту». Безособова форма, тож гендерно-нейтральна (D14).
+- `service.addedToRequest` — колишній напис на кнопці після додавання послуги. У M4 кнопка стала перемикачем (`RequestToggle`): напис «Dodaj do zapytania» / «Add to request» / «Додати до запиту» не змінюється, а стан «додано» показує сам перемикач. Ключа в словниках більше немає.
 - `service.requestAddedStatus`, `service.requestRemovedStatus` — невидимі оголошення для екранних читачів після натискання кнопки. `{service}` — назва послуги. Вона стоїть після двокрапки в називному відмінку, тож у pl і uk не треба її відмінювати.
 - `service.goToRequest` — друге посилання поруч із кнопкою, веде в конфігуратор. З’являється, поки послуга є в запиті.
 - `panel.sheetToggle` — доступна назва ручки нижньої панелі на телефоні. Стан («розгорнуто» / «згорнуто») екранний читач оголошує сам, тому в назві лише іменник, без дієслова.
@@ -239,6 +239,146 @@
 
 - Код складає її з `hud.languageNames` і коду мови: «Polski, PL», «English, EN», «Українська, UK». Читається мовою самого посилання (атрибут `lang`). Формат природний у всіх трьох мовах, змін не пропоную: спершу зрозуміла назва мови, потім видимий код, потрібний для голосового керування («натиснути PL»).
 - Відкрите питання щодо видимого коду «UK» — див. «Відкриті питання UI».
+
+### Нові ключі M4, M5 і фінального блоку (чернетка ui-engineer, вичитано content-writer)
+
+| Ключі                                                 | pl             | en             | uk             |
+| ----------------------------------------------------- | -------------- | -------------- | -------------- |
+| `configurator.hints.*`, `progress`, `stepsNav`        | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.nav.*`, `fields.*`, `yes`, `no`         | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.extras.*`                               | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.industries.*`, `sizes.*`, `timelines.*` | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.budget.*`                               | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.errors.*`                               | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.prefilled`                              | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `configurator.summary.*`                              | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `lead.*`                                              | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `portfolio.filterLabel`, `filterAll`, `resultCount`   | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `portfolio.previous`, `next`, `siblingsNav`           | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `portfolio.gallery`, `galleryImage`                   | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `portfolio.demo*`, `newTab`                           | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `portfolio.mockups.*`                                 | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `hud.simpleMode`, `hud.simpleModeForced`              | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `hud.skipIntro`                                       | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+| `meta.ogImageAlt`                                     | TODO: вичитати | TODO: вичитати | TODO: вичитати |
+
+**Де видно**
+
+- `configurator.hints.*`, `progress`, `stepsNav`: підказка під заголовком кроку майстра; «Krok 3 z 7»; aria-мітка рядка кроків.
+- `configurator.nav.*`, `fields.*`, `yes`, `no`: кнопки «Назад / Далі / До підсумку», «Змінити» в підсумку, «Почати заново» з підтвердженням; підписи й підказки полів.
+- `configurator.extras.*`: 16 додаткових функцій у кроці «Функції», в одному списку з назвами послуг із `content.json`.
+- `configurator.industries.*`, `sizes.*`, `timelines.*`: варіанти відповідей у кроках «Ваш бізнес» і «Терміни». Ті самі слова потрапляють у повідомлення.
+- `configurator.budget.*`: варіанти бюджету. Суми й валюту підставляє код: «5 000–15 000 PLN», «PLN 5,000–15,000».
+- `configurator.errors.*`: помилки під полями; ліміти з формами множини («2 znaki», «80 characters», «1000 символів»).
+- `configurator.prefilled`: примітка, коли послуги, додані кнопкою «Додати до запиту», уже позначені в майстрі.
+- `configurator.summary.*`: крок «Підсумок»: кнопки, статуси копіювання й надсилання, примітки про скорочений текст і неналаштований Telegram.
+- `lead.*`: текст повідомлення, яке відвідувач надсилає студії в Telegram (приклад нижче).
+- `portfolio.filterLabel`, `filterAll`, `resultCount`: фільтр кейсів за категорією і лічильник під ним.
+- `portfolio.previous`, `next`, `siblingsNav`: навігація між кейсами внизу сторінки кейсу.
+- `portfolio.gallery`, `galleryImage`: галерея кейсу; alt зображень («Назва кейсу: ilustracja 2 z 4»).
+- `portfolio.demo*`, `newTab`: блок демо на сторінці кейсу: iframe (вантажиться лише після кліку), відео, мокап.
+- `portfolio.mockups.*`: тексти інтерактивних мокапів: чат-бот, дашборд, бронювання, магазин.
+- `hud.simpleMode`, `hud.simpleModeForced`: перемикач «2D» у HUD і рядок у мобільному меню; пояснення, чому 3D недоступне (для екранного читача і як підказка при наведенні).
+- `hud.skipIntro`: кнопка під час інтро першого візиту.
+- `meta.ogImageAlt`: alt картинки Open Graph (прев’ю посилання в месенджерах і соцмережах).
+
+**Як виглядає повідомлення в Telegram** (pl, повний формат; приклад відповідей):
+
+```
+Zapytanie ze strony KABANINNO
+
+Obszary: Strony i aplikacje, Boty Telegram
+Funkcje:
+• Sklepy internetowe
+• Płatności online
+Firma: Gastronomia, 1 osoba
+Ma stronę WWW: nie · Korzysta z CRM: nie
+Budżet: 5 000–15 000 PLN
+Termin: Do miesiąca
+Imię: Anna
+
+Komentarz:
+(власні слова відвідувача)
+```
+
+- Код лише складає підписи з `lead.*` і відповіді з `configurator.*` та `content.json`. Тому кожен варіант відповіді має добре читатися і в майстрі, і після двокрапки в повідомленні.
+- Якщо текст не вміщується в посилання Telegram (ліміт довжини URL), код переходить на компактний формат: кожен розділ в один рядок, а коментар за потреби скорочується. Повний текст завжди можна скопіювати. Польські літери з діакритикою й кирилиця в посиланні займають більше місця, ніж латиниця, тож підписи `lead.*` навмисно короткі.
+
+**Що змінено в чернетці**
+
+Усі мови:
+
+- `lead.website`, `lead.crm`: рядок «Strona WWW: tak · CRM: nie» був двозначним: сайт уже є чи його треба зробити? Тепер «Ma stronę WWW: nie · Korzysta z CRM: tak» / «Has a website: no · Uses a CRM: yes» / «Має сайт: ні · Користується CRM: так». Дієслова в теперішньому часі не мають роду (D14).
+- `timelines.flexible`: у повідомленні виходив повтор «Termin: Termin jest elastyczny» / «Терміни: Гнучкі терміни». Тепер pl «Bez pośpiechu», uk «Без поспіху»: це ще й відповідь на питання кроку «Kiedy…? / Коли…?». en «Flexible» без змін.
+- `industries.other`: «Inna / Other / Інша» → «Inna branża / Other industry / Інша галузь». У повідомленні рядок «Firma: Inna, 2–10 osób» був незрозумілим.
+- `sizes.solo`: «Jednoosobowa / One-person business / Одна особа» → «1 osoba / 1 person / 1 особа», у тому самому стилі, що й «2–10 osób». В en зник повтор «Business: …, One-person business».
+- `errors.requiredText`: додано «lub nazwę firmy / or company name / або назву компанії», бо підказка поля дозволяє вписати назву компанії.
+- `summary.openChat`: додано «w Telegramie / in Telegram / у Telegram», бо кнопка стоїть окремо від основних дій.
+- `summary.unconfigured`: технічне «czat nie jest skonfigurowany» → «Wysyłka przez Telegram nie jest jeszcze dostępna. Skopiuj tekst i wyślij go nam w inny sposób.» (en, uk так само).
+- `hud.simpleModeForced` узагальнено: тепер він охоплює не лише браузери без WebGL 2, а й ті, де WebGL є, але не працює (GPU в чорному списку, WebGL вимкнено). pl «Grafika 3D jest niedostępna w tej przeglądarce, dlatego strona działa w trybie prostym 2D.», en «3D is not available in this browser, so the site runs in simple 2D mode.», uk «У цьому браузері 3D-графіка недоступна, тому сайт працює в простому режимі 2D.»
+- `meta.ogImageAlt`: alt тепер передає текст на самій картинці: назву студії, слоган (`home.title`) і назви категорій із чипів. Наприклад, pl «KABANINNO. Łączymy Twój biznes w jeden system: strony i aplikacje, CRM, automatyzacja, AI i boty Telegram». Якщо зміниться `home.title` або назви категорій, alt треба оновити разом із картинками (`npm run og:images`).
+
+pl:
+
+- `fields.hasWebsite`, `fields.hasCrm`: «Czy firma…» → «Czy Twoja firma…», як у назві кроку «Twoja firma».
+- `extras`: «Panel do edycji treści» → «Panel do edycji treści (CMS)», за зразком «Pozycjonowanie (SEO)». «Obsługa głosowa» → «Komunikacja głosowa»: «obsługa» читається як обслуговування клієнтів. «Przekazanie rozmowy do człowieka» → «Przekazanie rozmowy człowiekowi» (граматично точніше; «konsultantowi» — чоловічий рід). «Wysyłka komunikatów» → «Wysyłka wiadomości do klientów»: «komunikat» звучить канцелярськи.
+- `summary.send`: «Wyślij w Telegramie» → «Wyślij przez Telegram» (глосарій: Telegram як канал — «przez Telegram»).
+- `summary.truncated`: «wklej go w czacie» → «wklej go na czacie» (усталене поєднання).
+- `summary.sendFailed`: «inną drogą» → «w inny sposób», як в `unconfigured`.
+
+en:
+
+- `extras` у Title Case, як назви послуг у тому самому списку («Company Websites», «Online Stores»). «Voice support» → «Voice Interaction»: «support» читається як служба підтримки. «Handover to a person» → «Handover to a Human».
+- `industries.beauty-health`: «Beauty and health» → «Health and beauty» (усталений порядок).
+- `nav.toSummary`: «To the summary» → «Go to summary».
+- `fields.hasWebsite`, `fields.hasCrm`: «the business» → «your business».
+- `lead.business`: «Business» → «Company», як у «Company size».
+- `summary.copied` → «Copied to clipboard.», `copyFailed` → «Couldn't copy. Select the text and copy it manually.», `sendFailed` → «Your request could not be sent. …».
+- `portfolio.demoMockupHint`: «An interactive mockup: …» → «Interactive mockup: …» (це підпис, артикль зайвий).
+
+uk:
+
+- `hints.budget`: «Можна обрати й…» → «Можна також обрати…».
+- `hints.summary`: «через Telegram» → «у Telegram», як у глосарії.
+- `nav.startOver`: «Почати спочатку» (плеоназм) → «Почати заново»; так само `portfolio.mockups.chat.reset` → «Почати розмову заново».
+- `fields.hasWebsite` → «Чи вже є у вашої компанії сайт?», `fields.hasCrm` → «Чи ваша компанія вже користується CRM?» (звертання до відвідувача і природніший порядок слів).
+- `extras`: «Кілька мов» → «Мовні версії» (як pl «Wersje językowe»); додано «(CMS)»; «Онлайн-оплати» → «Онлайн-оплата»; «Електронні рахунки» → «Електронні рахунки-фактури», бо «рахунок» без уточнення легко сплутати з банківським.
+- `industries`: «Краса і здоров’я» → «Краса й здоров’я» (милозвучність). «Гастрономія» → «Ресторани й кафе»: українською «гастрономія» — це радше кулінарія чи делікатеси, а в значенні галузі це полонізм.
+- `errors.tooShort`: «Щонайменше …» → «Введіть щонайменше …» (повне речення, як у pl і en).
+- `summary.restoreDefault`: «Повернути стандартний текст» → «Повернути початковий текст».
+- `lead.business`: «Бізнес» → «Компанія», як у «Розмір компанії».
+- `portfolio.demoMockupHint`: «спробуйте кнопки» (калька) → «спробуйте натиснути кнопки».
+- `portfolio.mockups`: «Зробити замовлення» → «Оформити замовлення»; «буде приблизно за 30 хвилин» → «прибуде приблизно за 30 хвилин»; `booking.time` «Година» → «Час» (поле вибору часу; «година» тут звучить як одиниця виміру).
+
+Без змін: `progress`, `stepsNav`, `budget.*`, `prefilled`, `lead.title`, `hud.skipIntro`, решта ключів `nav`, `hints`, `fields`, `extras`, `industries`, `timelines`, `summary` і `portfolio.*`. `hud.simpleMode` («Tryb prosty 2D» / «Simple 2D mode» / «Простий режим 2D») теж без змін: він містить видимий підпис «2D», тож доступна назва перемикача збігається з тим, що видно на екрані.
+
+**Рядки, закріплені тестами.** Їх можна змінити лише разом із тестами (це робота ui-engineer):
+
+- `lead.title` у pl і uk (перший рядок повідомлення);
+- `configurator.progress` у pl і uk («Krok 3 z 7», «Крок 7 з 7»);
+- `configurator.errors.tooShort` і `tooLong` у pl, `tooLong` в en («Wpisz co najmniej 2 znaki.», «Maksymalnie 1000 znaków.», «Up to 80 characters.»);
+- `configurator.budget.*` у pl і en («15 000–40 000 PLN», «up to PLN 5,000»).
+
+**Що перевірити носієві мови**
+
+- Повідомлення в Telegram цілком, у кожній мові: чи читається воно як звичайний ввічливий запит від клієнта.
+- Форми множини. `errors.tooShort` і `tooLong`: pl «2 znaki», «5 znaków»; uk «2 символи», «5 символів». `portfolio.resultCount`: pl «1 realizacja», «2 realizacje», «5 realizacji»; uk «1 кейс», «2 кейси», «5 кейсів»; при нулі — окреме речення.
+- Назви 16 додаткових функцій поруч із назвами послуг: чи не дублюють вони одна одну і чи зрозумілі власнику малого бізнесу.
+- Тексти мокапів (чат-бот, дашборд, бронювання, магазин). Це демонстраційні вигадані дані, а не обіцянки студії.
+
+### Відкриті питання M4–фінал
+
+- **Вітання в повідомленні.** Зараз повідомлення починається із заголовка «Zapytanie ze strony KABANINNO» / «Request from the KABANINNO website» / «Запит із сайту KABANINNO», далі йдуть відповіді. Можна додати ввічливе вітання: «Dzień dobry! Zapytanie ze strony KABANINNO» / «Hello! Request from the KABANINNO website» / «Добрий день! Запит із сайту KABANINNO». Заголовок закріплений тестами, тому для цієї зміни потрібна правка тестів (або окремий ключ `lead.greeting` і правка генератора). Посилання стане довшим приблизно на 10–25 символів у pl і en і приблизно на 70 в uk (кирилиця в URL займає більше місця).
+- **Бюджет: нетто чи брутто?** У малому бізнесі в Польщі суми зазвичай називають нетто. Можна уточнити підказку: «Orientacyjna kwota netto w PLN».
+- **E-faktury і KSeF.** Для польських компаній актуальна система KSeF (Krajowy System e-Faktur). Варіант: «E-faktury (KSeF)» / «E-Invoicing (KSeF)» / «Електронні рахунки-фактури (KSeF)».
+- **«Bez pośpiechu» / «Без поспіху»** чи «Elastyczny termin» / «Гнучкі терміни»? Обрано перший варіант, щоб у повідомленні не повторювалося слово «termin/терміни».
+- **en: Title Case для додаткових функцій** узгоджено з назвами послуг. Якщо назви послуг колись перейдуть на sentence case («Company websites»), функції треба змінити так само.
+- **«W inny sposób» / «another way» / «іншим способом»** (`summary.unconfigured`, `summary.sendFailed`). Іншого контакту на сайті зараз немає. `unconfigured` з’являється лише доти, доки в конфігу не вказано Telegram-акаунт студії, а `sendFailed` — лише для майбутньої відправки через API. Чи додати на сайт e-mail або телефон як запасний канал?
+- **Інтро:** pl «Pomiń intro» чи «Pomiń wstęp»; uk «Пропустити інтро» чи «Пропустити вступ». Поки що залишено «intro/інтро» як коротке і звичне слово.
+- **pl «Tryb prosty 2D»** чи «Tryb uproszczony 2D»? Обидва природні, «uproszczony» трохи формальніший.
+- **uk «Ресторани й кафе»** чи «Заклади харчування»? en «Food and hospitality» охоплює ще й готелі, pl «Gastronomia» — ні.
+- **pl «1 osoba»** чи «Jednoosobowa działalność» (JDG)? Цифра узгоджена з рештою варіантів («2–10 osób»), а JDG — юридична форма, яка не завжди збігається з кількістю людей.
+- **pl «Przekazanie rozmowy człowiekowi»** — нейтральний варіант. Звичніше в галузі «…konsultantowi», але це чоловічий рід (D14).
 
 ### Нотатки щодо термінів UI
 
@@ -271,7 +411,7 @@
 | Головна CTA                  | Utwórz zapytanie              | Build your request                            | Сформувати запит                         | однаково в HUD, на головній і в конфігураторі                                                                                  |
 | Запит                        | zapytanie                     | request                                       | запит                                    | не «zamówienie», не «order»                                                                                                    |
 | Додати до запиту             | Dodaj do zapytania            | Add to request                                | Додати до запиту                         | кнопка на планеті                                                                                                              |
-| Додано до запиту             | Dodano do zapytania           | Added to request                              | Додано до запиту                         | стан кнопки після додавання                                                                                                    |
+| Додано до запиту             | Dodano do zapytania           | Added to request                              | Додано до запиту                         | лише в оголошенні для екранних читачів (`service.requestAddedStatus`); на кнопці стан показує галочка                          |
 | Перейти до запиту            | Przejdź do zapytania          | Go to your request                            | Перейти до запиту                        | посилання в конфігуратор поруч із кнопкою                                                                                      |
 | Панель вмісту                | Panel treści                  | Content panel                                 | Панель вмісту                            | ручка нижньої панелі на телефоні (aria-мітка)                                                                                  |
 | Головна (3D)                 | Wszechświat                   | Universe                                      | Всесвіт                                  | підпис «←»-посилання                                                                                                           |
@@ -289,4 +429,13 @@
 | Спробувати ще раз            | Spróbuj ponownie              | Try again                                     | Спробувати ще раз                        | кнопка на екрані помилки                                                                                                       |
 | Повернутися до всесвіту      | Wróć do wszechświata          | Back to the universe                          | Повернутися до всесвіту                  | 404 і екран помилки                                                                                                            |
 | Звертання                    | Ty, Twoja firma (з великої)   | you                                           | ви (з малої)                             | гендерно-нейтрально (D14)                                                                                                      |
+| Сфера проєкту (крок 1)       | obszar                        | area                                          | сфера                                    | категорія послуг у майстрі й у повідомленні                                                                                    |
+| Підсумок (крок 7)            | Podsumowanie                  | Summary                                       | Підсумок                                 | «Do podsumowania» / «Go to summary» / «До підсумку»                                                                            |
+| Почати заново                | Zacznij od nowa               | Start over                                    | Почати заново                            | очищення майстра з підтвердженням                                                                                              |
+| Надіслати в Telegram         | Wyślij przez Telegram         | Send via Telegram                             | Надіслати в Telegram                     | головна дія підсумку                                                                                                           |
+| Скопіювати текст             | Skopiuj tekst                 | Copy text                                     | Скопіювати текст                         | запасна дія підсумку                                                                                                           |
+| Живе демо                    | demo na żywo                  | live demo                                     | живе демо                                | iframe на сторінці кейсу                                                                                                       |
+| Інтерактивний макет          | interaktywna makieta          | interactive mockup                            | інтерактивний макет                      | демо-мокап на сторінці кейсу                                                                                                   |
+| Простий режим 2D             | Tryb prosty 2D                | Simple 2D mode                                | Простий режим 2D                         | перемикач «2D» у HUD; назва має містити «2D»                                                                                   |
+| Пропустити інтро             | Pomiń intro                   | Skip intro                                    | Пропустити інтро                         | кнопка під час інтро першого візиту                                                                                            |
 | Апостроф                     | —                             | `'` у скороченнях (it's, don't)               | `’` (U+2019): Ім’я, з’явиться, пов’язані | D38; в uk не `'` (U+0027, escape-символ ICU) і не `ʼ` (U+02BC, немає гарантії в шрифтах). В en `'` не ставити поруч із `{`/`}` |

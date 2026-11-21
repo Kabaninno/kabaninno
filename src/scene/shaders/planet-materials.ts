@@ -10,6 +10,10 @@ import { planetFragmentHead } from './planet-common';
 /** Glass: refraction tinted by the DNA colour, fresnel reflections, glinting facet edges. */
 export const glassFragment = /* glsl */ `
 ${planetFragmentHead}
+/** Minimum look (registry entry look): alpha floor and fresnel rim strength. */
+uniform float uMinOpacity;
+uniform float uRim;
+uniform float uFacetEdges;
 
 void main() {
   Surface s = surface();
@@ -18,14 +22,16 @@ void main() {
   vec3 t = refract(-s.v, s.n, 0.78);
   vec3 refl = envColor(r, s.l);
   vec3 refr = envColor(t, s.l) * mix(vec3(1.0), uColor, 0.8);
-  // Facet edges (flat-shaded shapes): normal discontinuities light up.
-  float edge = clamp(length(fwidth(s.n)) * 5.0, 0.0, 1.0);
+  // Facet edges (hard-edged shapes only): normal discontinuities light up.
+  float edge = facetEdge(s.n, uFacetEdges);
   float spec = pow(max(dot(r, s.l), 0.0), 70.0) * 2.6;
-  vec3 color = refr * 0.6 + uColor * pow(s.facing, 2.0) * 0.18 * s.light;
+  vec3 color = refr * 0.6 + uColor * (0.1 + pow(s.facing, 2.0) * 0.18 * s.light);
   color += refl * (0.22 + 0.95 * f);
-  color += uGlow * (edge * 0.75 + pow(f, 2.2) * (0.45 + 0.6 * uHover));
+  // A rim in the glow colour and glowing facet edges keep clear glass readable
+  // against deep space (BL-F3-01).
+  color += uGlow * (edge * 0.95 + pow(f, 1.6) * uRim * (1.0 + 0.6 * uHover));
   color += uCoreColor * spec;
-  float alpha = 0.3 + 0.62 * f + edge * 0.35 + spec;
+  float alpha = max(uMinOpacity, 0.3 + 0.62 * f + edge * 0.45 + spec);
   gl_FragColor = finishTransparent(color, alpha);
   #include <colorspace_fragment>
 }
@@ -65,6 +71,8 @@ void main() {
 export const hologramFragment = /* glsl */ `
 ${planetFragmentHead}
 uniform float uOpacity;
+uniform float uMinOpacity;
+uniform float uRim;
 
 void main() {
   Surface s = surface();
@@ -79,7 +87,9 @@ void main() {
   float flicker = 1.0 - glitch * 0.45 * (0.5 + 0.5 * sin(vObjPos.y * 140.0));
 #endif
   vec3 color = mix(uColor, uGlow, f) * (0.3 + 1.2 * f + 0.4 * scan + 0.5 * dots);
-  float alpha = (0.1 + 0.8 * f + 0.16 * scan + 0.25 * dots) * flicker * (1.0 + 0.4 * uHover);
+  color += uGlow * pow(f, 1.5) * uRim * 0.5;
+  float alpha = max((0.1 + 0.8 * f + 0.16 * scan + 0.25 * dots) * flicker, uMinOpacity);
+  alpha *= 1.0 + 0.4 * uHover;
   gl_FragColor = finishTransparent(color, alpha * uOpacity);
   #include <colorspace_fragment>
 }
@@ -113,6 +123,7 @@ void main() {
 /** Emissive: a self-lit energy body with flowing bands and a slow pulse (HDR, blooms). */
 export const emissiveFragment = /* glsl */ `
 ${planetFragmentHead}
+uniform float uFacetEdges;
 #ifndef LOW_QUALITY
 ${simplexNoise3d}
 #endif
@@ -124,11 +135,17 @@ void main() {
 #else
   float n = snoise(vObjPos * 2.6 + vec3(0.0, uTime * 0.55, uSeed)) * 0.5 + 0.5;
 #endif
+  // 60 % less noise (MJ-F3-01: blotchy): the bands carry the energy flow.
+  n = 0.5 + (n - 0.5) * 0.4;
   float bands = 0.5 + 0.5 * sin(vObjPos.y * 14.0 + uTime * 2.0 + n * 4.0);
   float pulse = 0.85 + 0.15 * sin(uTime * 2.4 + uSeed);
   vec3 color = mix(uColor * 0.45, uGlow * 1.9, smoothstep(0.3, 0.95, n * 0.6 + bands * 0.4));
   color *= pulse * (1.0 + 0.3 * uHover);
-  color += uGlow * fresnel(s.n, s.v, 2.5) * 1.1;
+  // Facet edges light up on hard-edged shapes (the dart): a crisp, cut body.
+  float edge = facetEdge(s.n, uFacetEdges);
+  color += uGlow * (fresnel(s.n, s.v, 2.5) * 1.1 + edge * 1.3);
+  // Never past the accent (MJ-F4-01: a white blown-out body lost its hue and bands).
+  color = min(color, max(uColor, uGlow) * 1.15);
   gl_FragColor = finishOpaque(color);
   #include <colorspace_fragment>
 }

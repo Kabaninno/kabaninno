@@ -6,7 +6,7 @@
     "portfolioDescription": "Projects by {studio}: the task, the solution, the result and the tech stack.",
     "configuratorTitle": "Build your request",
     "configuratorDescription": "Choose the type of solution, features, budget and timeline, then send a ready-made message via Telegram.",
-    "ogImageAlt": "{studio} — websites, CRM, automation, AI and Telegram bots"
+    "ogImageAlt": "{studio}. We bring your business together in one system: web development, CRM, automation, AI and Telegram bots"
   },
   "common": {
     "skipToContent": "Skip to content",
@@ -30,8 +30,10 @@
     },
     "requestCount": "{count, plural, one {# service} other {# services}} in your request",
     "simpleMode": "Simple 2D mode",
-    "simpleModeForced": "This browser does not support WebGL 2, so the site runs in simple 2D mode.",
-    "skipIntro": "Skip intro"
+    "simpleModeForced": "3D is not available in this browser, so the site runs in simple 2D mode.",
+    "skipIntro": "Skip intro",
+    "universeMap": "Map of services",
+    "systemMap": "Planets of the {name} system"
   },
   "home": {
     "eyebrow": "Digital studio for small companies",
@@ -94,7 +96,7 @@
     "demoOpen": "Open in a new tab",
     "demoFrameTitle": "Live demo: {title}",
     "demoVideo": "Video: {title}",
-    "demoMockupHint": "An interactive mockup: try the buttons.",
+    "demoMockupHint": "Interactive mockup: try the buttons.",
     "newTab": "opens in a new tab",
     "mockups": {
       "chat": {
@@ -168,7 +170,7 @@
     "nav": {
       "back": "Back",
       "next": "Next",
-      "toSummary": "To the summary",
+      "toSummary": "Go to summary",
       "edit": "Change",
       "startOver": "Start over",
       "startOverConfirm": "Clear all answers?",
@@ -180,8 +182,8 @@
       "features": "Features",
       "industry": "Industry",
       "size": "Company size",
-      "hasWebsite": "Does the business already have a website?",
-      "hasCrm": "Does the business already use a CRM?",
+      "hasWebsite": "Does your business already have a website?",
+      "hasCrm": "Does your business already use a CRM?",
       "budget": "Budget",
       "timeline": "Timeline",
       "name": "Name",
@@ -192,37 +194,37 @@
     "yes": "Yes",
     "no": "No",
     "extras": {
-      "multilingual": "Multiple languages",
-      "cms": "Content editing panel",
-      "seo": "Search engine optimisation (SEO)",
-      "online-payments": "Online payments",
-      "data-migration": "Data migration",
-      "team-training": "Team training",
-      "telephony": "Phone system integration",
-      "mobile-access": "Mobile access",
-      "e-invoicing": "E-invoicing",
-      "erp-integration": "ERP integration",
-      "scheduled-reports": "Scheduled reports",
-      "knowledge-base": "AI knowledge base",
-      "voice": "Voice support",
-      "human-handoff": "Handover to a person",
-      "crm-sync": "CRM sync",
-      "broadcasts": "Broadcast messages"
+      "multilingual": "Multiple Languages",
+      "cms": "Content Editing Panel (CMS)",
+      "seo": "Search Engine Optimisation (SEO)",
+      "online-payments": "Online Payments",
+      "data-migration": "Data Migration",
+      "team-training": "Team Training",
+      "telephony": "Phone System Integration",
+      "mobile-access": "Mobile Access",
+      "e-invoicing": "E-Invoicing",
+      "erp-integration": "ERP Integration",
+      "scheduled-reports": "Scheduled Reports",
+      "knowledge-base": "AI Knowledge Base",
+      "voice": "Voice Interaction",
+      "human-handoff": "Handover to a Human",
+      "crm-sync": "CRM Sync",
+      "broadcasts": "Broadcast Messages"
     },
     "industries": {
       "retail": "Retail",
       "services": "Services",
-      "beauty-health": "Beauty and health",
+      "beauty-health": "Health and beauty",
       "food": "Food and hospitality",
       "education": "Education",
       "real-estate": "Real estate",
       "logistics": "Logistics and transport",
       "manufacturing": "Manufacturing",
       "it": "IT and technology",
-      "other": "Other"
+      "other": "Other industry"
     },
     "sizes": {
-      "solo": "One-person business",
+      "solo": "1 person",
       "2-10": "2–10 people",
       "11-50": "11–50 people",
       "51-200": "51–200 people",
@@ -244,7 +246,7 @@
     "errors": {
       "requiredMulti": "Choose at least one option.",
       "requiredOne": "Choose one of the options.",
-      "requiredText": "Enter your name.",
+      "requiredText": "Enter your name or company name.",
       "tooShort": "Enter at least {min, plural, one {# character} other {# characters}}.",
       "tooLong": "Up to {max, plural, one {# character} other {# characters}}.",
       "unknown": "This option is no longer available. Choose another one."
@@ -257,23 +259,26 @@
       "restoreDefault": "Restore the default text",
       "send": "Send via Telegram",
       "copy": "Copy text",
-      "copied": "Copied to the clipboard.",
-      "copyFailed": "Copying failed. Select the text and copy it manually.",
-      "openChat": "Open the chat",
+      "copied": "Copied to clipboard.",
+      "copyFailed": "Couldn't copy. Select the text and copy it manually.",
+      "openChat": "Open chat in Telegram",
       "newTab": "opens in a new tab",
       "truncated": "The message is long, so Telegram will show a shortened version. Copy the full text and paste it into the chat.",
-      "unconfigured": "The Telegram chat is not set up yet. Copy the text and send it to us.",
+      "unconfigured": "Sending via Telegram is not available yet. Copy the text and send it to us another way.",
+      "staleNotice": "Your answers changed after you edited the message. It still contains your version.",
+      "staleUpdate": "Update the message",
+      "staleKeep": "Keep my text",
       "sent": "Your request has been sent.",
-      "sendFailed": "The request could not be sent. Copy the text and send it to us another way."
+      "sendFailed": "Your request could not be sent. Copy the text and send it to us another way."
     }
   },
   "lead": {
     "title": "Request from the {studio} website",
     "types": "Areas",
     "features": "Features",
-    "business": "Business",
-    "website": "Website",
-    "crm": "CRM",
+    "business": "Company",
+    "website": "Has a website",
+    "crm": "Uses a CRM",
     "budget": "Budget",
     "timeline": "Timeline",
     "name": "Name",

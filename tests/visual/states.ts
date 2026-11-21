@@ -212,6 +212,26 @@ export const STATES: CaptureState[] = [
     tags: ['simple'],
   },
   {
+    name: `simple-mode-planet-${first.id}-${first.services[0]!.slug}-pl`,
+    path: pl(first.services[0]!.path),
+    scene: false,
+    init: (page) => withSimpleMode(page),
+    tags: ['simple'],
+  },
+  {
+    // A map node hovered (desktop) / focused (touch): node, lines and index item lit.
+    name: `simple-mode-hover-${first.id}-pl`,
+    path: pl(paths.home()),
+    scene: false,
+    init: (page) => withSimpleMode(page),
+    tags: ['simple', 'hover'],
+    prepare: async (page, { viewport }) => {
+      const link = page.locator(`nav[data-simple-map] a[href="${sitePath(pl(first.path))}"]`);
+      if (viewport === 'mobile') await link.focus();
+      else await link.hover();
+    },
+  },
+  {
     name: 'simple-mode-auto-pl',
     path: pl(paths.home()),
     scene: false,
@@ -331,7 +351,7 @@ export const STATES: CaptureState[] = [
     tags: ['configurator', 'wizard', 'sheet'],
     init: seedConfigurator('summary'),
   },
-  // Portfolio with cases (SHOW_DRAFTS builds only, see above).
+  // Portfolio with cases (drafts builds only, see above).
   ...(filterCategory
     ? [
         {
