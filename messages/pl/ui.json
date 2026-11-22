@@ -4,8 +4,8 @@
     "homeDescription": "Strony WWW, systemy CRM, automatyzacje, rozwiązania AI i boty Telegram dla małych firm. Opisz projekt w kilku krokach i wyślij zapytanie.",
     "portfolioTitle": "Portfolio",
     "portfolioDescription": "Realizacje studia {studio}: zadanie, rozwiązanie, efekt i użyte technologie.",
-    "configuratorTitle": "Utwórz zapytanie",
-    "configuratorDescription": "Wybierz rodzaj rozwiązania, funkcje, budżet i termin, a na koniec wyślij gotową wiadomość przez Telegram.",
+    "configuratorTitle": "Dobierz rozwiązanie",
+    "configuratorDescription": "Odpowiedz na kilka prostych pytań o swój biznes, a dobierzemy rozwiązanie i wyjaśnimy je prostymi słowami. Na koniec wyślij nam wiadomość przez Telegram.",
     "ogImageAlt": "{studio}. Łączymy Twój biznes w jeden system: strony i aplikacje, CRM, automatyzacja, AI i boty Telegram"
   },
   "common": {
@@ -148,71 +148,151 @@
   },
   "configurator": {
     "eyebrow": "Konfigurator",
-    "title": "Utwórz zapytanie",
-    "lead": "Kilka prostych kroków, a na końcu gotowa wiadomość, którą wyślesz nam przez Telegram.",
+    "title": "Dobierz rozwiązanie",
+    "lead": "Odpowiedz na kilka prostych pytań o swój biznes. Dobierzemy rozwiązanie i prostymi słowami wyjaśnimy, do czego służy każda jego część.",
     "steps": {
-      "type": "Rodzaj rozwiązania",
-      "features": "Funkcje",
-      "business": "Twoja firma",
-      "budget": "Budżet",
-      "timeline": "Termin",
-      "contact": "Imię i komentarz",
-      "summary": "Podsumowanie"
+      "goals": "Cele",
+      "details": "Pytania",
+      "solution": "Rozwiązanie",
+      "plan": "Budżet i termin",
+      "contact": "Kontakt"
+    },
+    "titles": {
+      "goals": "Co chcesz poprawić?",
+      "details": "Kilka krótkich pytań",
+      "solution": "Twoje rozwiązanie",
+      "plan": "Budżet i termin",
+      "contact": "Kontakt i podsumowanie"
     },
     "hints": {
-      "type": "Zaznacz jeden lub kilka obszarów, których dotyczy projekt.",
-      "features": "Wybierz, co ma się znaleźć w rozwiązaniu. Lista zależy od wybranych obszarów.",
-      "business": "Kilka informacji o firmie pomoże nam dobrać rozwiązanie.",
-      "budget": "Orientacyjna kwota netto w PLN, dopasowana do wybranych usług. Możesz też wybrać „Jeszcze nie wiem”.",
-      "timeline": "Kiedy rozwiązanie powinno zacząć działać?",
-      "contact": "Jak mamy się do Ciebie zwracać? Komentarz jest opcjonalny.",
-      "summary": "Sprawdź wiadomość, w razie potrzeby popraw ją i wyślij przez Telegram."
+      "goals": "Nie musisz znać się na technologii. Powiedz, co chcesz poprawić w swoim biznesie.",
+      "details": "Po jednym prostym pytaniu o każdy cel i jedno o to, co już masz.",
+      "solution": "Oto, co proponujemy i do czego służy każda część. Możesz coś usunąć albo dodać.",
+      "plan": "Wybierz orientacyjny budżet netto w PLN, dopasowany do usług, i powiedz, kiedy chcesz ruszyć.",
+      "contact": "Jak mamy się do Ciebie zwracać? Sprawdź wiadomość, w razie potrzeby popraw ją i wyślij przez Telegram."
     },
     "progress": "Krok {current} z {total}",
-    "stepsNav": "Kroki zapytania",
+    "stepsNav": "Kroki doboru rozwiązania",
     "nav": {
       "back": "Wstecz",
       "next": "Dalej",
-      "toSummary": "Do podsumowania",
       "edit": "Zmień",
       "startOver": "Zacznij od nowa",
       "startOverConfirm": "Wyczyścić wszystkie odpowiedzi?",
       "startOverYes": "Tak, wyczyść",
       "startOverNo": "Anuluj"
     },
-    "fields": {
-      "types": "Obszary projektu",
-      "features": "Funkcje",
-      "industry": "Branża",
-      "size": "Wielkość firmy",
-      "hasWebsite": "Czy Twoja firma ma już stronę WWW?",
-      "hasCrm": "Czy Twoja firma korzysta już z CRM?",
+    "goals": {
+      "legend": "Cele",
+      "hint": "Wybierz do {max}.",
+      "unsure": "Jeszcze nie wiem — doradźcie",
+      "knowIt": "Wiem, czego potrzebuję",
+      "unknownOption": "Nie wiem",
+      "items": {
+        "more-clients": {
+          "name": "Więcej klientów z internetu",
+          "question": "Skąd klienci mają się o Tobie dowiadywać?",
+          "options": {
+            "google": "Z Google",
+            "social-ads": "Z Instagrama, Facebooka lub z reklam",
+            "messengers": "Z komunikatorów i poleceń"
+          }
+        },
+        "online-orders": {
+          "name": "Przyjmować zamówienia i płatności online",
+          "question": "Ile masz produktów lub usług?",
+          "options": {
+            "up-to-20": "Do 20",
+            "20-200": "20–200",
+            "over-200": "Ponad 200"
+          }
+        },
+        "booking": {
+          "name": "Rezerwacje i zapisy online",
+          "question": "Jak klienci zapisują się teraz?",
+          "options": {
+            "phone": "Telefonicznie",
+            "messengers": "W komunikatorach",
+            "website-inconvenient": "Przez stronę, ale to niewygodne"
+          }
+        },
+        "client-order": {
+          "name": "Porządek w klientach i zleceniach",
+          "question": "Gdzie teraz trzymasz klientów i zlecenia?",
+          "options": {
+            "head-notebook": "W głowie albo w notesie",
+            "spreadsheets": "W Excelu lub w arkuszach",
+            "program-inconvenient": "W programie, ale jest niewygodny"
+          }
+        },
+        "less-routine": {
+          "name": "Mniej rutyny",
+          "question": "Co zabiera najwięcej czasu?",
+          "options": {
+            "documents": "Dokumenty i faktury",
+            "reminders": "Przypomnienia dla klientów",
+            "data-transfer": "Przenoszenie danych między programami",
+            "emails-requests": "Maile i zgłoszenia"
+          }
+        },
+        "fast-replies": {
+          "name": "Szybko odpowiadać klientom",
+          "question": "Jak klienci zwykle się z Tobą kontaktują?",
+          "options": {
+            "telegram": "W Telegramie",
+            "website-chat": "Na stronie lub w czacie",
+            "many-channels": "W kilku komunikatorach i mailem",
+            "repeated-questions": "Wciąż z tymi samymi pytaniami"
+          }
+        },
+        "see-numbers": {
+          "name": "Widzieć liczby i raporty",
+          "question": "Co chcesz widzieć w liczbach?",
+          "options": {
+            "sales-clients": "Sprzedaż i klientów",
+            "team-processes": "Pracę zespołu i procesy",
+            "feedback": "Opinie i wiadomości klientów"
+          }
+        }
+      }
+    },
+    "have": {
+      "legend": "Co już masz?",
+      "hint": "Możesz zaznaczyć kilka.",
+      "items": {
+        "website": "Stronę WWW",
+        "social": "Media społecznościowe",
+        "tracking": "Program do obsługi klientów lub arkusze",
+        "none": "Nic z tego"
+      }
+    },
+    "details": {
+      "unsureNote": "Skoro jeszcze nie wiesz, czego potrzebujesz, wystarczy jedno pytanie. Resztę ustalimy razem."
+    },
+    "solution": {
+      "fits": "Polecamy: {combo}",
+      "consultation": "Dobierzemy rozwiązanie razem na krótkiej, bezpłatnej konsultacji.",
+      "remove": "Usuń",
+      "removeNamed": "Usuń: {service}",
+      "addMore": "Dodaj kolejne usługi",
+      "hideList": "Ukryj listę",
+      "listLegend": "Wszystkie usługi",
+      "manualHint": "Usługi wybierasz samodzielnie.",
+      "backToGuided": "Nie masz pewności? Odpowiedz na kilka pytań"
+    },
+    "plan": {
       "budget": "Budżet",
-      "timeline": "Termin",
+      "timeline": "Kiedy chcesz ruszyć?",
+      "industry": "Branża",
+      "industryHint": "Opcjonalnie — pomoże nam lepiej dopasować rozwiązanie.",
+      "industryOther": "Jaka to branża?",
+      "industryOtherHint": "Do {max} znaków."
+    },
+    "fields": {
       "name": "Imię",
       "nameHint": "Wystarczy imię albo nazwa firmy.",
       "comment": "Komentarz (opcjonalnie)",
       "commentHint": "Do {max} znaków. Opisz krótko, czego potrzebujesz."
-    },
-    "yes": "Tak",
-    "no": "Nie",
-    "extras": {
-      "multilingual": "Wersje językowe",
-      "cms": "Panel do edycji treści (CMS)",
-      "seo": "Pozycjonowanie (SEO)",
-      "online-payments": "Płatności online",
-      "data-migration": "Przeniesienie danych",
-      "team-training": "Szkolenie zespołu",
-      "telephony": "Integracja z telefonią",
-      "mobile-access": "Dostęp mobilny",
-      "e-invoicing": "E-faktury",
-      "erp-integration": "Integracja z ERP",
-      "scheduled-reports": "Raporty wysyłane automatycznie",
-      "knowledge-base": "Baza wiedzy dla AI",
-      "voice": "Komunikacja głosowa",
-      "human-handoff": "Przekazanie rozmowy człowiekowi",
-      "crm-sync": "Synchronizacja z CRM",
-      "broadcasts": "Wysyłka wiadomości do klientów"
     },
     "industries": {
       "retail": "Handel",
@@ -226,13 +306,6 @@
       "it": "IT i technologie",
       "other": "Inna branża"
     },
-    "sizes": {
-      "solo": "1 osoba",
-      "2-10": "2–10 osób",
-      "11-50": "11–50 osób",
-      "51-200": "51–200 osób",
-      "200-plus": "Ponad 200 osób"
-    },
     "timelines": {
       "asap": "Jak najszybciej",
       "1-month": "Do miesiąca",
@@ -244,7 +317,7 @@
       "upTo": "do {max} {currency} netto",
       "range": "{min}–{max} {currency} netto",
       "from": "ponad {min} {currency} netto",
-      "notSure": "Jeszcze nie wiem",
+      "notSure": "Jeszcze nie wiem — pomóżcie oszacować",
       "reset": "Wybór usług się zmienił, więc zakres budżetu został wyczyszczony. Wybierz go ponownie."
     },
     "errors": {
@@ -273,22 +346,29 @@
       "staleUpdate": "Zaktualizuj wiadomość",
       "staleKeep": "Zostaw mój tekst",
       "sent": "Zapytanie zostało wysłane.",
-      "sendFailed": "Nie udało się wysłać zapytania. Skopiuj tekst i wyślij go nam w inny sposób."
+      "sendFailed": "Nie udało się wysłać zapytania. Skopiuj tekst i wyślij go nam w inny sposób.",
+      "rowGoals": "Cele",
+      "rowHave": "Co już masz",
+      "rowServices": "Usługi",
+      "rowBudget": "Budżet",
+      "rowTimeline": "Termin",
+      "rowIndustry": "Branża",
+      "rowConsultation": "Do dobrania na konsultacji"
     }
   },
   "lead": {
     "title": "Zapytanie ze strony {studio}",
-    "types": "Obszary",
-    "features": "Funkcje",
-    "business": "Firma",
-    "website": "Ma stronę WWW",
-    "crm": "Korzysta z CRM",
+    "goals": "Cele",
+    "have": "Co już mamy",
+    "solution": "Rozwiązanie",
+    "services": "Usługi",
+    "industry": "Branża",
     "budget": "Budżet",
     "timeline": "Termin",
     "name": "Imię",
     "comment": "Komentarz",
-    "yes": "tak",
-    "no": "nie"
+    "unsure": "jeszcze nie wiemy, prosimy o poradę",
+    "consultation": "do dobrania na bezpłatnej konsultacji"
   },
   "notFound": {
     "title": "Ten sektor jest pusty",

@@ -1,48 +1,79 @@
+import type { ConfiguratorStepId } from '../configurator-steps';
 import { sceneNodeId } from '@/scene/node-ids';
-import { prefillDraft, type ConfiguratorDraft } from './draft';
-import { findFeature, type ConfiguratorModel } from './model';
+import { prefillDraft, emptyDraft, servicesOf, type ConfiguratorDraft } from './draft';
+import type { ConfiguratorModel } from './model';
+import { categoriesOf } from './recommend';
 
 /**
  * Glue between the wizard, the request draft (D66) and the scene (D81).
  * Pure; the wizard component calls these.
  */
 
-/** Scene emphasis for the draft (D81): the selected solution types as category nodes. */
-export function emphasisForDraft(draft: Pick<ConfiguratorDraft, 'types'>): string[] {
-  return draft.types.map((type) => sceneNodeId.category(type));
-}
-
-/** Service refs selected in the draft (the request draft mirrors them). */
-export function serviceRefsOf(draft: ConfiguratorDraft, model: ConfiguratorModel): string[] {
-  return draft.features.filter((id) => findFeature(model, id)?.kind === 'service');
+/**
+ * Scene emphasis for the draft (D81): the categories of the services the
+ * request is about so far, so the universe answers the visitor's answers.
+ */
+export function emphasisForDraft(draft: ConfiguratorDraft, model: ConfiguratorModel): string[] {
+  return categoriesOf(model, servicesOf(draft, model)).map((type) => sceneNodeId.category(type));
 }
 
 /**
- * The draft the wizard starts with: the stored one (or empty) plus the
- * services from the request draft and the `?add=` query. `added` lists the
- * refs that were not selected before, for the "already selected" notice.
- * Idempotent: the request draft mirrors the wizard's service choices, so a
- * service deselected in the wizard is gone from the request too and does not
- * come back on the next visit.
+ * Service refs the request draft mirrors: the services the visitor picked
+ * themselves (planet pages, "Add more", manual mode), not the recommended
+ * ones, which follow the answers and are not "added to the request".
  */
-export function startingDraft(
-  base: ConfiguratorDraft,
-  refs: readonly string[],
-  model: ConfiguratorModel,
-): { draft: ConfiguratorDraft; added: string[] } {
-  const draft = prefillDraft(base, refs, model);
-  const added = draft.features.filter((id) => !base.features.includes(id));
-  return { draft, added };
+export function serviceRefsOf(draft: Pick<ConfiguratorDraft, 'added'>): string[] {
+  return draft.added;
 }
 
-/** What the request draft must change to mirror the wizard's services. */
-export function requestSync(
-  previous: ConfiguratorDraft,
-  next: ConfiguratorDraft,
+/** What the wizard starts with. */
+export interface StartingState {
+  draft: ConfiguratorDraft;
+  step: ConfiguratorStepId;
+  message: MessageEdit | null;
+  /** Refs that were not picked before (the "already selected" notice). */
+  added: string[];
+}
+
+/**
+ * The state the wizard starts with: the stored one (or an empty draft on the
+ * first step) plus the services from the request draft and the `?add=` query.
+ * Idempotent: the request draft mirrors the wizard's picked services, so a
+ * service dropped in the wizard is gone from the request too and does not come
+ * back on the next visit.
+ *
+ * A visitor who arrives with services picked on the planet pages and has not
+ * answered any goal knows what they want: they continue in the manual mode, on
+ * the solution step (D150).
+ */
+export function startingState(
+  stored: {
+    draft: ConfiguratorDraft;
+    step: ConfiguratorStepId;
+    message: MessageEdit | null;
+  } | null,
+  refs: readonly string[],
   model: ConfiguratorModel,
+): StartingState {
+  const base = stored?.draft ?? emptyDraft();
+  const draft = prefillDraft(base, refs, model);
+  const added = draft.added.filter((id) => !base.added.includes(id));
+  let step: ConfiguratorStepId = stored?.step ?? 'goals';
+  let next = draft;
+  if (added.length > 0 && base.goals.length === 0 && step === 'goals') {
+    next = { ...draft, mode: 'manual' };
+    step = 'solution';
+  }
+  return { draft: next, step, message: stored?.message ?? null, added };
+}
+
+/** What the request draft must change to mirror the wizard's picked services. */
+export function requestSync(
+  previous: Pick<ConfiguratorDraft, 'added'>,
+  next: Pick<ConfiguratorDraft, 'added'>,
 ): { add: string[]; remove: string[] } {
-  const before = serviceRefsOf(previous, model);
-  const after = serviceRefsOf(next, model);
+  const before = serviceRefsOf(previous);
+  const after = serviceRefsOf(next);
   return {
     add: after.filter((ref) => !before.includes(ref)),
     remove: before.filter((ref) => !after.includes(ref)),

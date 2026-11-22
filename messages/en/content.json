@@ -41,6 +41,7 @@
       "corporate-websites": {
         "title": "Company Websites",
         "summary": "A modern website that clearly says what you do, builds trust and turns visitors into inquiries.",
+        "benefit": "A company site customers can find on Google and trust.",
         "audience": "For service businesses, clinics, workshops and offices that want to look professional online and get more inquiries.",
         "features": [
           "Design tailored to your brand",
@@ -55,6 +56,7 @@
       "online-stores": {
         "title": "Online Stores",
         "summary": "An online store with a convenient catalogue, payments and delivery — ready to sell from day one.",
+        "benefit": "You sell online and take payments around the clock.",
         "audience": "For producers, brick-and-mortar shops and brands that want to sell online without order chaos.",
         "features": [
           "Catalogue with filters and product variants",
@@ -68,6 +70,7 @@
       "landing-pages": {
         "title": "Landing Pages",
         "summary": "One page focused on one goal: selling a product, collecting event sign-ups or gathering leads from a campaign.",
+        "benefit": "One page that turns visitors into inquiries.",
         "audience": "For businesses launching ads, a new product or a promotion that want to quickly test whether it works.",
         "features": [
           "Conversion-focused structure",
@@ -81,6 +84,7 @@
       "web-apps": {
         "title": "Web Applications",
         "summary": "A browser-based app built around your processes: a client portal, booking system, calculator or internal tool.",
+        "benefit": "Your own online tool built around how you work.",
         "audience": "For businesses that have outgrown off-the-shelf tools or want to give clients convenient online access to their services.",
         "features": [
           "Built around your process, not vice versa",
@@ -96,6 +100,7 @@
       "crm-implementation": {
         "title": "CRM Implementation",
         "summary": "We choose and configure an off-the-shelf CRM, migrate your data and train your team, so the system actually gets used.",
+        "benefit": "Clients and orders in one place, so nothing gets lost.",
         "audience": "For businesses that track clients in Excel, a notebook or their heads and feel that things slip through the cracks.",
         "features": [
           "System choice to fit budget and needs",
@@ -109,6 +114,7 @@
       "custom-crm": {
         "title": "Custom CRM",
         "summary": "Your own system built for your industry and workflow, without unnecessary features or per-user fees.",
+        "benefit": "A client system built around your business, with no features you don't need.",
         "audience": "For businesses with non-standard processes that find off-the-shelf CRMs too rigid or too expensive at scale.",
         "features": [
           "Modules only for your processes",
@@ -122,6 +128,7 @@
       "sales-funnels": {
         "title": "Sales Funnels",
         "summary": "We map the customer journey from first contact to purchase and set it up in your CRM, so no lead gets lost.",
+        "benefit": "You see where every client stands and who to follow up with.",
         "audience": "For businesses that get inquiries but don't know at which stage they lose customers.",
         "features": [
           "Map of sales stages",
@@ -135,6 +142,7 @@
       "reports-dashboards": {
         "title": "Reports & Dashboards",
         "summary": "Your key numbers on one screen: sales, customer sources, team performance — up to date and easy to read.",
+        "benefit": "The numbers that matter about your sales, on one screen.",
         "audience": "For owners and managers who want to make decisions based on data, not gut feeling.",
         "features": [
           "Dashboards from CRM and other sources",
@@ -150,6 +158,7 @@
       "api-integrations": {
         "title": "API Integrations",
         "summary": "We connect your tools — store, CRM, accounting, payments, calendar — so data flows on its own, without retyping.",
+        "benefit": "Your tools exchange data on their own, with no retyping.",
         "audience": "For businesses that use several programs and lose time moving information between them by hand.",
         "features": [
           "Connections to popular services",
@@ -163,6 +172,7 @@
       "document-automation": {
         "title": "Document Automation",
         "summary": "Contracts, quotes, invoices and handover forms generated automatically from your data — in seconds and without typos.",
+        "benefit": "Contracts, quotes and invoices are created automatically, in seconds.",
         "audience": "For businesses that prepare similar documents every day and copy the same data from place to place.",
         "features": [
           "Templates for contracts, quotes and forms",
@@ -176,6 +186,7 @@
       "notifications-reminders": {
         "title": "Notifications & Reminders",
         "summary": "Automatic texts, emails and messenger messages: reminders about appointments, payments and deadlines.",
+        "benefit": "Clients and your team get reminders on time, without you lifting a finger.",
         "audience": "For clinics, repair shops and service businesses that lose money on no-shows and late payments.",
         "features": [
           "Appointment and deadline reminders",
@@ -189,6 +200,7 @@
       "data-processing": {
         "title": "Data Processing",
         "summary": "We collect, clean and organise data from different sources so it's ready for reports, analysis and further automation.",
+        "benefit": "Data from different sources gets tidied up automatically.",
         "audience": "For businesses whose data is spread across spreadsheets and systems and can't be used quickly.",
         "features": [
           "Import from spreadsheets, files and systems",
@@ -204,6 +216,7 @@
       "ai-assistants": {
         "title": "AI Assistants & Chatbots",
         "summary": "An assistant that knows your offer and answers customers on your website or in messengers, handing tricky cases to a human.",
+        "benefit": "Answers customers at any hour, nights included.",
         "audience": "For businesses that get many repetitive questions and want to reply fast, including evenings and weekends.",
         "features": [
           "Answers based on your knowledge",
@@ -217,6 +230,7 @@
       "ai-document-processing": {
         "title": "AI Document Processing",
         "summary": "AI reads invoices, contracts and forms, extracts the data you need and passes it to your systems.",
+        "benefit": "Reads invoices and documents for you and pulls out what matters.",
         "audience": "For businesses that retype data from documents by hand: logistics, accounting firms, trading and service companies.",
         "features": [
           "Reads scans, photos and PDF files",
@@ -230,6 +244,7 @@
       "content-generation": {
         "title": "Content Generation",
         "summary": "AI drafts product descriptions, posts, newsletters and replies in your brand's voice — you just approve them.",
+        "benefit": "Descriptions, posts and replies ready in minutes, not hours.",
         "audience": "For stores and businesses that need lots of content but lack the time or a dedicated copywriter.",
         "features": [
           "Product descriptions at scale",
@@ -243,6 +258,7 @@
       "ai-analytics": {
         "title": "AI Analytics",
         "summary": "AI analyses sales, reviews and customer requests, spots trends and answers questions about your data in plain language.",
+        "benefit": "Clear conclusions from your data, explained in plain language.",
         "audience": "For businesses that have data but lack the time or an analyst to draw conclusions from it.",
         "features": [
           "Ask about your data in plain language",
@@ -258,6 +274,7 @@
       "sales-orders": {
         "title": "Sales & Orders",
         "summary": "A Telegram bot with a catalogue, cart and payment that takes orders around the clock.",
+        "benefit": "Customers order in Telegram in a few taps.",
         "audience": "For restaurants, bakeries, local shops and brands whose customers already write to them in messengers.",
         "features": [
           "Catalogue and cart in the chat",
@@ -271,6 +288,7 @@
       "booking": {
         "title": "Bookings & Appointments",
         "summary": "A bot where customers choose the service, time and specialist themselves, then get a reminder.",
+        "benefit": "Clients book on their own, so you stop answering calls.",
         "audience": "For beauty salons, clinics, schools, trainers and anyone who books clients for specific times.",
         "features": [
           "Real-time availability",
@@ -284,6 +302,7 @@
       "customer-support": {
         "title": "Customer Support",
         "summary": "A bot answers common questions, collects requests and routes them to the right person on your team.",
+        "benefit": "Quick answers to common questions right in the messenger.",
         "audience": "For businesses where customer questions get lost in employees' private messages.",
         "features": [
           "Answers to frequent questions",
@@ -297,6 +316,7 @@
       "mini-apps": {
         "title": "Telegram Mini Apps",
         "summary": "A full-fledged app that opens inside Telegram: a store, loyalty card, calendar or client portal — no installation needed.",
+        "benefit": "A small app inside Telegram: catalogue, orders, client account.",
         "audience": "For businesses that want their own customer app without the cost and barriers of app stores.",
         "features": [
           "Native-app-like interface",

@@ -4,6 +4,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { ROOT, sitePath, VIEWPORTS, type ViewportName } from '../support/env';
 import { sceneFocusFor, waitForFlightSettled, waitForFonts, waitForScene } from '../support/scene';
+import { CONFIGURATOR_KEY, DRAFT, storedConfigurator } from '../support/configurator';
 import { categories, localized, paths, ui, type TestLocale } from '../support/site';
 
 /**
@@ -28,16 +29,6 @@ interface Route {
   init?: (page: Page) => Promise<void>;
   prepare?: (page: Page, locale: TestLocale) => Promise<void>;
 }
-
-/** A complete configurator draft (ids from content and `content/configurator.ts`). */
-const DRAFT = {
-  types: ['web', 'crm'],
-  features: ['web/online-stores', 'web/seo', 'crm/custom-crm'],
-  business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
-  budget: '5000-10000',
-  timeline: '1-3-months',
-  contact: { name: 'Łucja Żółkiewska', comment: 'Sklep z integracją CRM.' },
-};
 
 /** Seeds localStorage before the page loads. */
 function seed(key: string, value: unknown) {
@@ -70,16 +61,22 @@ const ROUTES: Route[] = [
   {
     name: 'wizard-summary',
     path: (l) => localized(l, paths.configurator()),
-    init: seed('kabaninno.configurator.v1', { v: 1, step: 'summary', draft: DRAFT }),
+    init: seed(CONFIGURATOR_KEY, storedConfigurator('contact')),
+  },
+  {
+    name: 'wizard-solution',
+    path: (l) => localized(l, paths.configurator()),
+    init: seed(CONFIGURATOR_KEY, storedConfigurator('solution')),
+  },
+  {
+    name: 'wizard-plan',
+    path: (l) => localized(l, paths.configurator()),
+    init: seed(CONFIGURATOR_KEY, storedConfigurator('plan')),
   },
   {
     name: 'wizard-errors',
     path: (l) => localized(l, paths.configurator()),
-    init: seed('kabaninno.configurator.v1', {
-      v: 1,
-      step: 'business',
-      draft: { ...DRAFT, business: { industry: null, size: null, hasWebsite: null, hasCrm: null } },
-    }),
+    init: seed(CONFIGURATOR_KEY, storedConfigurator('details', { ...DRAFT, answers: {} })),
     prepare: async (page, locale) => {
       await page
         .locator('main [data-route-ui]')

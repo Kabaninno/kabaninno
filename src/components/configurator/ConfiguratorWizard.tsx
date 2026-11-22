@@ -3,25 +3,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { primaryButton, secondaryButton } from '@/components/ui/styles';
 import { analytics } from '@/lib/analytics';
-import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '@/lib/configurator-steps';
+import { stepsFor, type ConfiguratorStepId } from '@/lib/configurator-steps';
 import {
   canEnterStep,
+  chooseGuided,
+  chooseManual,
   emptyDraft,
+  isStepValid,
+  neighbourStep,
   refsFromSearch,
-  toggleFeature,
-  toggleType,
+  removeService,
+  servicesOf,
+  toggleService,
   validateStep,
   type ConfiguratorDraft,
   type StepErrors,
 } from '@/lib/configurator/draft';
 import { errorText, type WizardLabels } from '@/lib/configurator/labels';
-import { budgetIds, featuresFor, type ConfiguratorModel } from '@/lib/configurator/model';
+import type { ConfiguratorModel } from '@/lib/configurator/model';
 import {
   editMessage,
   emphasisForDraft,
   keepEdit,
   requestSync,
-  startingDraft,
+  startingState,
   urlWithoutPrefill,
   type MessageEdit,
 } from '@/lib/configurator/session';
@@ -29,17 +34,13 @@ import { clearConfigurator, loadConfigurator, saveConfigurator } from '@/lib/con
 import { TelegramLinkSubmitter } from '@/lib/configurator/submitters';
 import { useRequestStore } from '@/store/request';
 import { useSceneStore } from '@/store/scene';
-import {
-  FieldError,
-  OptionGroup,
-  YesNoGroup,
-  describedBy,
-  fieldDomId,
-  focusField,
-  inputBorder,
-  inputClass,
-} from './fields';
+import { ContactFields } from './ContactFields';
+import { DetailsStep } from './DetailsStep';
+import { focusField } from './fields';
+import { GoalsStep } from './GoalsStep';
+import { PlanStep } from './PlanStep';
 import { ProgressNav } from './ProgressNav';
+import { SolutionStep } from './SolutionStep';
 import { SummaryActions, SummaryStep, useLeadHandoff } from './SummaryStep';
 
 interface ConfiguratorWizardProps {
@@ -73,25 +74,28 @@ function whenRequestHydrated(callback: () => void): () => void {
 }
 
 /**
- * The request wizard (BRIEF «Конфігуратор запиту»), inside the configurator
- * panel (side panel on desktop, bottom sheet on phones).
+ * The solution finder (D149), inside the configurator panel (side panel on
+ * desktop, bottom sheet on phones): a short diagnostic for visitors who do not
+ * know the technology.
  *
- * - Seven steps with a progress indicator; earlier steps are always
- *   reachable, later ones once the previous are valid (`canEnterStep`).
+ * - Five steps: goals → details → solution → budget and timing → contact and
+ *   summary. "I know what I need" (manual mode) skips the details step.
+ *   Earlier steps are always reachable, later ones once the previous are valid
+ *   (`canEnterStep`).
  * - Errors appear after "Next" (not while typing), with `aria-invalid`,
  *   `aria-describedby`, and focus on the first invalid field.
  * - The draft is saved (debounced) to localStorage and restored on return;
  *   "Start over" clears it after an inline confirmation.
- * - Prefill: services from the request draft (D66) and `?add=` are selected
- *   on entry, with a polite notice. The request draft mirrors the wizard's
- *   service choices from then on (deselecting removes it there too).
- * - Scene (D81): the selected solution types are emphasised while the
- *   configurator is open; cleared on unmount.
+ * - Prefill: services from the request draft (D66) and `?add=` are picked on
+ *   entry, with a polite notice; a visitor who answered no goal yet continues in
+ *   the manual mode on the solution step (D150). The request draft mirrors the
+ *   services the visitor picked themselves from then on.
+ * - Scene (D81): the categories of the current services are emphasised while
+ *   the configurator is open; cleared on unmount.
  * - Compact chrome (visual MJ-1): the panel header (h1 `configurator-title`)
  *   shows its lead on the first step only, the steps are one scrollable row
- *   of chips, and Back / Next (on the summary: Send / Copy) sit in a sticky
- *   glass footer at the bottom of the panel, so the step content and the
- *   actions share the first screen.
+ *   of chips, and Back / Next (on the last step: Send / Copy) sit in a sticky
+ *   glass footer at the bottom of the panel.
  * - All texts arrive pre-formatted in `labels` (server).
  */
 export function ConfiguratorWizard({
@@ -102,12 +106,12 @@ export function ConfiguratorWizard({
   header,
 }: ConfiguratorWizardProps) {
   const [draft, setDraft] = useState<ConfiguratorDraft>(emptyDraft);
-  const [step, setStep] = useState<ConfiguratorStepId>('type');
+  const [step, setStep] = useState<ConfiguratorStepId>('goals');
   const [attempted, setAttempted] = useState<Partial<Record<ConfiguratorStepId, true>>>({});
   const [notice, setNotice] = useState('');
   const [ready, setReady] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  // The budget range was cleared because the selection moved to another level (D138).
+  // The budget range was cleared because the services moved to another level (D138).
   const [budgetReset, setBudgetReset] = useState(false);
   // The visitor's edit of the summary message and the default it was based on (Q-F3-01).
   const [message, setMessage] = useState<MessageEdit | null>(null);
@@ -121,6 +125,9 @@ export function ConfiguratorWizard({
     [telegramUsername],
   );
 
+  const steps = stepsFor(draft.mode);
+  const services = useMemo(() => servicesOf(draft, model), [draft, model]);
+
   // Restore the stored draft and apply the prefill once the request draft is known.
   useEffect(
     () =>
@@ -130,16 +137,16 @@ export function ConfiguratorWizard({
           ...useRequestStore.getState().items,
           ...refsFromSearch(window.location.search),
         ];
-        const { draft: start, added } = startingDraft(stored?.draft ?? emptyDraft(), refs, model);
+        const start = startingState(stored, refs, model);
         const request = useRequestStore.getState();
-        for (const ref of requestSync(emptyDraft(), start, model).add) request.add(ref);
-        draftRef.current = start;
-        setDraft(start);
-        if (stored) setStep(stored.step);
-        if (stored?.message) setMessage(stored.message);
-        if (added.length > 0) setNotice(labels.prefilled);
+        for (const ref of requestSync(emptyDraft(), start.draft).add) request.add(ref);
+        draftRef.current = start.draft;
+        setDraft(start.draft);
+        setStep(start.step);
+        if (start.message) setMessage(start.message);
+        if (start.added.length > 0) setNotice(labels.prefilled);
         // Applied once: drop `?add=` so a reload or Back does not re-add a
-        // service deselected since (Q-F3-02). Keeps other params and the hash.
+        // service dropped since (Q-F3-02). Keeps other params and the hash.
         const cleaned = urlWithoutPrefill(window.location.href);
         if (cleaned) window.history.replaceState(window.history.state, '', cleaned);
         setReady(true);
@@ -168,10 +175,10 @@ export function ConfiguratorWizard({
     [],
   );
 
-  // Scene emphasis of the selected solution types (D81).
+  // Scene emphasis of the categories the request is about so far (D81).
   useEffect(() => {
-    useSceneStore.getState().setEmphasis(emphasisForDraft(draft));
-  }, [draft]);
+    useSceneStore.getState().setEmphasis(emphasisForDraft(draft, model));
+  }, [draft, model]);
   useEffect(() => () => useSceneStore.getState().setEmphasis([]), []);
 
   // The sticky footer's height becomes the panel's bottom scroll padding, so
@@ -203,24 +210,22 @@ export function ConfiguratorWizard({
     analytics.track('configurator_step', { step });
   }, [step]);
 
-  const update = useCallback(
-    (next: ConfiguratorDraft) => {
-      const sync = requestSync(draftRef.current, next, model);
-      const request = useRequestStore.getState();
-      for (const ref of sync.add) request.add(ref);
-      for (const ref of sync.remove) request.remove(ref);
-      // A changed selection can drop the chosen range: say so on the budget step.
-      if (draftRef.current.budget !== null && next.budget === null) setBudgetReset(true);
-      else if (next.budget !== null) setBudgetReset(false);
-      draftRef.current = next;
-      setDraft(next);
-    },
-    [model],
-  );
+  const update = useCallback((next: ConfiguratorDraft) => {
+    const sync = requestSync(draftRef.current, next);
+    const request = useRequestStore.getState();
+    for (const ref of sync.add) request.add(ref);
+    for (const ref of sync.remove) request.remove(ref);
+    // A changed selection can drop the chosen range: say so on the budget step.
+    if (draftRef.current.budget !== null && next.budget === null) setBudgetReset(true);
+    else if (next.budget !== null) setBudgetReset(false);
+    draftRef.current = next;
+    setDraft(next);
+  }, []);
 
-  const goTo = (target: ConfiguratorStepId) => {
-    const index = CONFIGURATOR_STEPS.indexOf(target);
-    if (index > CONFIGURATOR_STEPS.indexOf(step) && !canEnterStep(target, draft, model)) return;
+  const goTo = (target: ConfiguratorStepId, from: ConfiguratorDraft = draft) => {
+    const order = stepsFor(from.mode);
+    if (!order.includes(target)) return;
+    if (order.indexOf(target) > order.indexOf(step) && !canEnterStep(target, from, model)) return;
     moved.current = true;
     setConfirmReset(false);
     setStep(target);
@@ -228,6 +233,7 @@ export function ConfiguratorWizard({
 
   const handoff = useLeadHandoff({
     draft,
+    services,
     labels,
     submitter,
     locale,
@@ -241,22 +247,40 @@ export function ConfiguratorWizard({
     return code ? errorText(field, code, labels.errors) : undefined;
   };
 
-  const next = () => {
-    const found = validateStep(step, draft, model);
+  /** Marks the step as attempted and focuses its first invalid field; true when it is valid. */
+  const requireValid = (target: ConfiguratorStepId): boolean => {
+    const found = validateStep(target, draft, model);
     const fields = Object.keys(found);
-    if (fields.length > 0) {
-      setAttempted((current) => ({ ...current, [step]: true }));
-      // Wait for the error markup, then focus the first invalid field.
-      window.requestAnimationFrame(() => focusField(fields[0]!));
-      return;
-    }
-    const target = CONFIGURATOR_STEPS[CONFIGURATOR_STEPS.indexOf(step) + 1];
+    if (fields.length === 0) return true;
+    setAttempted((current) => ({ ...current, [target]: true }));
+    // Wait for the error markup, then focus the first invalid field.
+    window.requestAnimationFrame(() => focusField(fields[0]!));
+    return false;
+  };
+
+  const next = () => {
+    if (!requireValid(step)) return;
+    const target = neighbourStep(draft, step, 1);
     if (target) goTo(target);
   };
 
   const back = () => {
-    const target = CONFIGURATOR_STEPS[CONFIGURATOR_STEPS.indexOf(step) - 1];
+    const target = neighbourStep(draft, step, -1);
     if (target) goTo(target);
+  };
+
+  /** "I know what I need": the manual mode, on the solution step, no questions. */
+  const knowWhatINeed = () => {
+    const manual = chooseManual(draft, model);
+    update(manual);
+    goTo('solution', manual);
+  };
+
+  /** Back from the manual mode to the questions. */
+  const backToGuided = () => {
+    const guided = chooseGuided(draft);
+    update(guided);
+    goTo('goals', guided);
   };
 
   const startOver = () => {
@@ -270,13 +294,13 @@ export function ConfiguratorWizard({
     setMessage(null);
     setConfirmReset(false);
     moved.current = true;
-    setStep('type');
+    setStep('goals');
     headingRef.current?.focus();
   };
 
-  const index = CONFIGURATOR_STEPS.indexOf(step);
-  const isLast = step === 'summary';
-  const option = (value: string, label: string) => ({ value, label });
+  const index = steps.indexOf(step);
+  const isLast = index === steps.length - 1;
+  const progress = labels.progress[draft.mode === 'manual' ? 'manual' : 'guided'][index] ?? '';
 
   return (
     <div>
@@ -287,8 +311,9 @@ export function ConfiguratorWizard({
       >
         {header.title}
       </h1>
-      {step === 'type' ? (
-        <p className="mt-2 text-body leading-relaxed text-muted">{header.lead}</p>
+      {step === 'goals' ? (
+        // Phones: the step's own hint says the same, and the first screen belongs to the goals.
+        <p className="mt-2 text-body leading-relaxed text-muted max-md:sr-only">{header.lead}</p>
       ) : null}
       {/* Always rendered, so screen readers announce the notice when it appears. */}
       <p role="status" className="text-sm text-muted [&:not(:empty)]:mt-2">
@@ -296,11 +321,12 @@ export function ConfiguratorWizard({
       </p>
 
       <ProgressNav
+        steps={steps}
         current={step}
         canEnter={(target) => canEnterStep(target, draft, model)}
         onSelect={goTo}
         names={labels.steps}
-        progress={labels.progress[index] ?? ''}
+        progress={progress}
         label={labels.stepsNav}
       />
 
@@ -320,195 +346,75 @@ export function ConfiguratorWizard({
           tabIndex={-1}
           className="font-display text-xl leading-snug font-medium text-ink"
         >
-          {labels.steps[step]}
+          {labels.titles[step]}
         </h2>
         <p className="mt-1.5 mb-5 text-sm leading-relaxed text-muted">{labels.hints[step]}</p>
 
-        {step === 'type' ? (
-          <OptionGroup
-            field="types"
-            legend={labels.fields.types}
-            type="checkbox"
-            options={model.types.map((id) => ({
-              value: id,
-              label: labels.categories[id]?.name ?? id,
-              accent: labels.categories[id]?.color,
-            }))}
-            selected={draft.types}
-            onToggle={(id) => update(toggleType(draft, id, model))}
-            error={errorFor('types')}
+        {step === 'goals' ? (
+          <GoalsStep
+            model={model}
+            labels={labels}
+            draft={draft}
+            update={update}
+            error={errorFor('goals')}
+            onKnowIt={knowWhatINeed}
           />
         ) : null}
 
-        {step === 'features' ? (
-          <div className="flex flex-col gap-5">
-            {draft.types.map((type) => (
-              <OptionGroup
-                key={type}
-                field={type === draft.types[0] ? 'features' : `features-${type}`}
-                legend={labels.categories[type]?.name ?? type}
-                type="checkbox"
-                options={featuresFor(model, [type]).map((feature) =>
-                  option(feature.id, labels.features[feature.id] ?? feature.key),
-                )}
-                selected={draft.features}
-                onToggle={(id) => update(toggleFeature(draft, id, model))}
-                error={type === draft.types[0] ? errorFor('features') : undefined}
-              />
-            ))}
-          </div>
+        {step === 'details' ? (
+          <DetailsStep
+            model={model}
+            labels={labels}
+            draft={draft}
+            update={update}
+            errorFor={errorFor}
+          />
         ) : null}
 
-        {step === 'business' ? (
-          <div className="flex flex-col gap-6">
-            <OptionGroup
-              field="business.industry"
-              legend={labels.fields.industry}
-              type="radio"
-              columns={2}
-              options={model.industries.map((id) => option(id, labels.industries[id] ?? id))}
-              selected={draft.business.industry ? [draft.business.industry] : []}
-              onToggle={(id) => update({ ...draft, business: { ...draft.business, industry: id } })}
-              error={errorFor('business.industry')}
-            />
-            <OptionGroup
-              field="business.size"
-              legend={labels.fields.size}
-              type="radio"
-              columns={2}
-              options={model.companySizes.map((id) => option(id, labels.sizes[id] ?? id))}
-              selected={draft.business.size ? [draft.business.size] : []}
-              onToggle={(id) => update({ ...draft, business: { ...draft.business, size: id } })}
-              error={errorFor('business.size')}
-            />
-            <YesNoGroup
-              field="business.hasWebsite"
-              legend={labels.fields.hasWebsite}
-              value={draft.business.hasWebsite}
-              onChange={(value) =>
-                update({ ...draft, business: { ...draft.business, hasWebsite: value } })
-              }
-              yes={labels.yes}
-              no={labels.no}
-              error={errorFor('business.hasWebsite')}
-            />
-            <YesNoGroup
-              field="business.hasCrm"
-              legend={labels.fields.hasCrm}
-              value={draft.business.hasCrm}
-              onChange={(value) =>
-                update({ ...draft, business: { ...draft.business, hasCrm: value } })
-              }
-              yes={labels.yes}
-              no={labels.no}
-              error={errorFor('business.hasCrm')}
-            />
-          </div>
+        {step === 'solution' ? (
+          <SolutionStep
+            model={model}
+            labels={labels}
+            services={services}
+            manual={draft.mode === 'manual'}
+            onRemove={(id) => update(removeService(draft, id, model))}
+            onToggle={(id) => update(toggleService(draft, id, model))}
+            onBackToGuided={backToGuided}
+          />
         ) : null}
 
-        {step === 'budget' ? (
-          <OptionGroup
-            field="budget"
-            legend={labels.fields.budget}
-            type="radio"
-            options={budgetIds(model, draft).map((id) => option(id, labels.budgets[id] ?? id))}
-            selected={draft.budget ? [draft.budget] : []}
-            onToggle={(id) => update({ ...draft, budget: id })}
-            error={errorFor('budget')}
-          >
-            {budgetReset && draft.budget === null ? (
-              <p role="status" className="mb-3 text-sm leading-relaxed text-[#ffd79a]">
-                {labels.budgetReset}
-              </p>
-            ) : null}
-          </OptionGroup>
-        ) : null}
-
-        {step === 'timeline' ? (
-          <OptionGroup
-            field="timeline"
-            legend={labels.fields.timeline}
-            type="radio"
-            options={model.timelines.map((id) => option(id, labels.timelines[id] ?? id))}
-            selected={draft.timeline ? [draft.timeline] : []}
-            onToggle={(id) => update({ ...draft, timeline: id })}
-            error={errorFor('timeline')}
+        {step === 'plan' ? (
+          <PlanStep
+            model={model}
+            labels={labels}
+            draft={draft}
+            services={services}
+            update={update}
+            errorFor={errorFor}
+            budgetReset={budgetReset}
           />
         ) : null}
 
         {step === 'contact' ? (
-          <div className="flex flex-col gap-5">
-            <div>
-              <label
-                htmlFor={fieldDomId('contact.name')}
-                className="text-body font-medium text-ink"
-              >
-                {labels.fields.name}
-              </label>
-              <p id={`${fieldDomId('contact.name')}-hint`} className="mt-1 text-sm text-muted">
-                {labels.fields.nameHint}
-              </p>
-              <input
-                id={fieldDomId('contact.name')}
-                type="text"
-                autoComplete="name"
-                maxLength={model.limits.nameMax}
-                value={draft.contact.name}
-                onChange={(event) =>
-                  update({ ...draft, contact: { ...draft.contact, name: event.target.value } })
-                }
-                aria-invalid={errorFor('contact.name') ? true : undefined}
-                aria-describedby={describedBy(
-                  `${fieldDomId('contact.name')}-hint`,
-                  errorFor('contact.name') && `${fieldDomId('contact.name')}-error`,
-                )}
-                className={`${inputClass} mt-2 min-h-11 ${inputBorder(errorFor('contact.name'))}`}
-              />
-              <FieldError field="contact.name" message={errorFor('contact.name')} />
-            </div>
-            <div>
-              <label
-                htmlFor={fieldDomId('contact.comment')}
-                className="text-body font-medium text-ink"
-              >
-                {labels.fields.comment}
-              </label>
-              <p id={`${fieldDomId('contact.comment')}-hint`} className="mt-1 text-sm text-muted">
-                {labels.fields.commentHint}
-              </p>
-              <textarea
-                id={fieldDomId('contact.comment')}
-                rows={5}
-                maxLength={model.limits.commentMax}
-                value={draft.contact.comment}
-                onChange={(event) =>
-                  update({ ...draft, contact: { ...draft.contact, comment: event.target.value } })
-                }
-                aria-invalid={errorFor('contact.comment') ? true : undefined}
-                aria-describedby={describedBy(
-                  `${fieldDomId('contact.comment')}-hint`,
-                  errorFor('contact.comment') && `${fieldDomId('contact.comment')}-error`,
-                )}
-                className={`${inputClass} mt-2 resize-y ${inputBorder(errorFor('contact.comment'))}`}
-              />
-              <p aria-hidden="true" className="mt-1 text-right mono-index text-faint">
-                {Array.from(draft.contact.comment).length} / {model.limits.commentMax}
-              </p>
-              <FieldError field="contact.comment" message={errorFor('contact.comment')} />
-            </div>
+          <div className="flex flex-col gap-8">
+            <ContactFields
+              model={model}
+              labels={labels}
+              draft={draft}
+              update={update}
+              errorFor={errorFor}
+            />
+            <SummaryStep
+              draft={draft}
+              services={services}
+              labels={labels}
+              handoff={handoff}
+              onEdit={goTo}
+              onEdited={(text) => setMessage((current) => editMessage(current, text, handoff.full))}
+              onRestoreDefault={() => setMessage(null)}
+              onKeepEdit={() => setMessage((current) => current && keepEdit(current, handoff.full))}
+            />
           </div>
-        ) : null}
-
-        {isLast ? (
-          <SummaryStep
-            draft={draft}
-            labels={labels}
-            handoff={handoff}
-            onEdit={goTo}
-            onEdited={(text) => setMessage((current) => editMessage(current, text, handoff.full))}
-            onRestoreDefault={() => setMessage(null)}
-            onKeepEdit={() => setMessage((current) => current && keepEdit(current, handoff.full))}
-          />
         ) : null}
       </form>
 
@@ -528,7 +434,7 @@ export function ConfiguratorWizard({
             className={`${secondaryButton} min-h-12 min-w-12 shrink-0 px-4 text-sm sm:px-5`}
           >
             <span aria-hidden="true">←</span>
-            {/* Icon-only on narrow summary footers, where three buttons share the row. */}
+            {/* Icon-only on narrow last-step footers, where three buttons share the row. */}
             <span className={isLast ? 'max-sm:sr-only' : undefined}>{labels.nav.back}</span>
           </button>
         ) : null}
@@ -538,11 +444,16 @@ export function ConfiguratorWizard({
             form={FORM_ID}
             className={`${primaryButton} min-h-12 flex-1 px-6 text-sm sm:flex-none`}
           >
-            {index === CONFIGURATOR_STEPS.length - 2 ? labels.nav.toSummary : labels.nav.next}
+            {labels.nav.next}
             <span aria-hidden="true">→</span>
           </button>
         ) : (
-          <SummaryActions handoff={handoff} labels={labels} />
+          <SummaryActions
+            handoff={handoff}
+            labels={labels}
+            contactValid={isStepValid('contact', draft, model)}
+            onBlocked={() => requireValid('contact')}
+          />
         )}
       </div>
 

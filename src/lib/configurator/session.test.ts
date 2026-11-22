@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyDraft, toggleFeature, toggleType } from './draft';
+import { addService, emptyDraft, removeService, setAnswer, toggleGoal } from './draft';
 import { getConfiguratorModel } from './model';
 import {
   MESSAGE_EDIT_MAX,
@@ -11,59 +11,96 @@ import {
   parseMessageEdit,
   requestSync,
   serviceRefsOf,
-  startingDraft,
+  startingState,
   urlWithoutPrefill,
 } from './session';
 
 const model = getConfiguratorModel();
 
 describe('emphasisForDraft (D81)', () => {
-  it('maps the selected solution types to category node ids', () => {
-    expect(emphasisForDraft({ types: ['web', 'ai'] })).toEqual(['category:web', 'category:ai']);
-    expect(emphasisForDraft(emptyDraft())).toEqual([]);
+  it('maps the categories of the services so far to category node ids', () => {
+    expect(emphasisForDraft(emptyDraft(), model)).toEqual([]);
+    let draft = toggleGoal(emptyDraft(), 'booking', model);
+    draft = setAnswer(draft, 'booking', 'phone', model);
+    expect(emphasisForDraft(draft, model)).toEqual(['category:automation', 'category:telegram']);
+    draft = addService(draft, 'web/landing-pages', model);
+    expect(emphasisForDraft(draft, model)).toEqual([
+      'category:web',
+      'category:automation',
+      'category:telegram',
+    ]);
   });
 });
 
-describe('startingDraft (prefill)', () => {
-  it('adds request services and ?add= refs and reports what was new', () => {
-    const { draft, added } = startingDraft(
-      emptyDraft(),
+describe('startingState (prefill)', () => {
+  it('picks request services and ?add= refs, reports what was new and continues manually', () => {
+    const start = startingState(
+      null,
       ['crm/custom-crm', 'web/landing-pages', 'web/landing-pages', 'nope/x'],
       model,
     );
-    expect(draft.types).toEqual(['web', 'crm']);
-    expect(draft.features).toEqual(['crm/custom-crm', 'web/landing-pages']);
-    expect(added).toEqual(['crm/custom-crm', 'web/landing-pages']);
+    expect(start.draft.added).toEqual(['crm/custom-crm', 'web/landing-pages']);
+    expect(start.added).toEqual(['crm/custom-crm', 'web/landing-pages']);
+    // The visitor answered no goal: they know what they want (D150).
+    expect(start.draft.mode).toBe('manual');
+    expect(start.step).toBe('solution');
+    expect(start.message).toBeNull();
+  });
+
+  it('starts on the goals step with an empty draft when there is nothing to add', () => {
+    const start = startingState(null, [], model);
+    expect(start).toEqual({ draft: emptyDraft(), step: 'goals', message: null, added: [] });
   });
 
   it('is idempotent: nothing new on a stored draft that already has them', () => {
-    const base = startingDraft(emptyDraft(), ['crm/custom-crm'], model).draft;
-    const again = startingDraft(base, ['crm/custom-crm'], model);
-    expect(again.draft).toEqual(base);
+    const first = startingState(null, ['crm/custom-crm'], model);
+    const stored = { draft: first.draft, step: first.step, message: null };
+    const again = startingState(stored, ['crm/custom-crm'], model);
+    expect(again.draft).toEqual(first.draft);
     expect(again.added).toEqual([]);
+    expect(again.step).toBe('solution');
+  });
+
+  it('does not take over a guided draft: the visitor keeps their goals and step', () => {
+    let draft = toggleGoal(emptyDraft(), 'booking', model);
+    draft = setAnswer(draft, 'booking', 'phone', model);
+    const start = startingState(
+      { draft, step: 'details', message: null },
+      ['web/landing-pages'],
+      model,
+    );
+    expect(start.draft.mode).toBe('guided');
+    expect(start.draft.goals).toEqual(['booking']);
+    expect(start.draft.added).toEqual(['web/landing-pages']);
+    expect(start.step).toBe('details');
   });
 
   it('keeps the visitor’s other answers', () => {
     const base = { ...emptyDraft(), budget: 'not-sure', timeline: 'asap' };
-    const { draft } = startingDraft(base, ['ai/ai-assistants'], model);
+    const { draft } = startingState(
+      { draft: base, step: 'plan', message: null },
+      ['ai/ai-assistants'],
+      model,
+    );
     expect(draft.budget).toBe('not-sure');
     expect(draft.timeline).toBe('asap');
   });
 });
 
-describe('requestSync (D66 mirrors the wizard’s services)', () => {
-  it('adds selected services and removes deselected ones; extras are not services', () => {
-    let draft = toggleType(emptyDraft(), 'web', model);
+describe('requestSync (D66 mirrors the services the visitor picked)', () => {
+  it('adds picked services and removes dropped ones; recommended ones are not mirrored', () => {
+    let draft = toggleGoal(emptyDraft(), 'booking', model);
+    draft = setAnswer(draft, 'booking', 'phone', model);
+    expect(serviceRefsOf(draft)).toEqual([]);
     const before = draft;
-    draft = toggleFeature(draft, 'web/landing-pages', model);
-    draft = toggleFeature(draft, 'web/seo', model);
-    expect(serviceRefsOf(draft, model)).toEqual(['web/landing-pages']);
-    expect(requestSync(before, draft, model)).toEqual({ add: ['web/landing-pages'], remove: [] });
-    const deselected = toggleType(draft, 'web', model);
-    expect(requestSync(draft, deselected, model)).toEqual({
-      add: [],
-      remove: ['web/landing-pages'],
-    });
+    draft = addService(draft, 'web/landing-pages', model);
+    expect(serviceRefsOf(draft)).toEqual(['web/landing-pages']);
+    expect(requestSync(before, draft)).toEqual({ add: ['web/landing-pages'], remove: [] });
+    // Dropping a recommended service does not touch the request draft.
+    const droppedRecommended = removeService(draft, 'telegram/booking', model);
+    expect(requestSync(draft, droppedRecommended)).toEqual({ add: [], remove: [] });
+    const dropped = removeService(draft, 'web/landing-pages', model);
+    expect(requestSync(draft, dropped)).toEqual({ add: [], remove: ['web/landing-pages'] });
   });
 });
 

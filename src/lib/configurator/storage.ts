@@ -1,6 +1,6 @@
-import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '../configurator-steps';
+import { CONFIGURATOR_STEPS, stepsFor, type ConfiguratorStepId } from '../configurator-steps';
 import { safeStorage } from '../storage';
-import { canEnterStep, sanitizeDraft, type ConfiguratorDraft } from './draft';
+import { canEnterStep, sanitizeDraft, stepInMode, type ConfiguratorDraft } from './draft';
 import type { ConfiguratorModel } from './model';
 import { parseMessageEdit, type MessageEdit } from './session';
 
@@ -12,13 +12,13 @@ import { parseMessageEdit, type MessageEdit } from './session';
 
 /**
  * Bump the version when the stored shape changes incompatibly; older drafts
- * are ignored. Optional fields (`message`, Q-F3-05) keep v1: drafts saved
- * before them simply have none.
+ * are ignored. v2 (D149): the diagnostic flow (goals, answers, picked
+ * services); the v1 drafts of the old seven-step form are not migrated.
  */
-export const CONFIGURATOR_STORAGE_KEY = 'kabaninno.configurator.v1';
+export const CONFIGURATOR_STORAGE_KEY = 'kabaninno.configurator.v2';
 
 export interface StoredConfigurator {
-  v: 1;
+  v: 2;
   step: ConfiguratorStepId;
   draft: ConfiguratorDraft;
   /** The visitor's edit of the summary message, with its base. */
@@ -46,11 +46,12 @@ export function readStoredConfigurator(
 ): LoadedConfigurator | null {
   if (value === null || typeof value !== 'object') return null;
   const stored = value as Partial<StoredConfigurator>;
-  if (stored.v !== 1) return null;
+  if (stored.v !== 2) return null;
   const draft = sanitizeDraft(stored.draft, model);
-  let step: ConfiguratorStepId = isStep(stored.step) ? stored.step : 'type';
+  const steps = stepsFor(draft.mode);
+  let step: ConfiguratorStepId = stepInMode(draft, isStep(stored.step) ? stored.step : steps[0]!);
   while (!canEnterStep(step, draft, model)) {
-    step = CONFIGURATOR_STEPS[CONFIGURATOR_STEPS.indexOf(step) - 1] ?? 'type';
+    step = steps[steps.indexOf(step) - 1] ?? steps[0]!;
   }
   return { draft, step, message: parseMessageEdit(stored.message) };
 }
@@ -64,7 +65,7 @@ export function saveConfigurator(
   step: ConfiguratorStepId,
   message: MessageEdit | null = null,
 ): boolean {
-  const stored: StoredConfigurator = { v: 1, step, draft, ...(message ? { message } : {}) };
+  const stored: StoredConfigurator = { v: 2, step, draft, ...(message ? { message } : {}) };
   return safeStorage.setJSON(CONFIGURATOR_STORAGE_KEY, stored);
 }
 

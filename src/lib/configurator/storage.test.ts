@@ -31,9 +31,10 @@ function stubStorage(overrides: Partial<Storage> = {}) {
 
 const draft: ConfiguratorDraft = {
   ...emptyDraft(),
-  types: ['web'],
-  features: ['web/landing-pages'],
-  business: { industry: 'food', size: 'solo', hasWebsite: 'no', hasCrm: 'no' },
+  goals: ['more-clients'],
+  answers: { 'more-clients': 'social-ads' },
+  have: ['social'],
+  industry: 'food',
 };
 
 beforeEach(() => stubStorage());
@@ -41,25 +42,30 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('configurator storage', () => {
   it('round-trips the draft and the step under a versioned key', () => {
-    expect(saveConfigurator(draft, 'budget')).toBe(true);
-    expect(JSON.parse(data.get(CONFIGURATOR_STORAGE_KEY)!)).toMatchObject({ v: 1, step: 'budget' });
-    expect(loadConfigurator(model)).toEqual({ draft, step: 'budget', message: null });
+    expect(saveConfigurator(draft, 'details')).toBe(true);
+    expect(JSON.parse(data.get(CONFIGURATOR_STORAGE_KEY)!)).toMatchObject({
+      v: 2,
+      step: 'details',
+    });
+    expect(loadConfigurator(model)).toEqual({ draft, step: 'details', message: null });
   });
 
   it('round-trips the edited message with its base (Q-F3-05)', () => {
-    const draft = { ...emptyDraft(), types: ['web'] };
+    const draft = { ...emptyDraft(), goals: ['booking'] };
     const message = { text: 'Mój tekst', base: 'Domyślny tekst' };
-    expect(saveConfigurator(draft, 'type', message)).toBe(true);
+    expect(saveConfigurator(draft, 'goals', message)).toBe(true);
     expect(loadConfigurator(model)?.message).toEqual(message);
     expect(
-      readStoredConfigurator({ v: 1, step: 'type', draft, message: 'x' }, model)?.message,
+      readStoredConfigurator({ v: 2, step: 'goals', draft, message: 'x' }, model)?.message,
     ).toBeNull();
     clearConfigurator();
     expect(loadConfigurator(model)).toBeNull();
   });
 
   it('ignores other versions, garbage and corrupted JSON', () => {
-    expect(readStoredConfigurator({ v: 2, step: 'type', draft }, model)).toBeNull();
+    // The v1 draft of the old seven-step form is not migrated (D149).
+    expect(readStoredConfigurator({ v: 1, step: 'type', draft }, model)).toBeNull();
+    expect(readStoredConfigurator({ v: 3, step: 'goals', draft }, model)).toBeNull();
     expect(readStoredConfigurator('draft', model)).toBeNull();
     data.set(CONFIGURATOR_STORAGE_KEY, '{not json');
     expect(loadConfigurator(model)).toBeNull();
@@ -68,19 +74,28 @@ describe('configurator storage', () => {
   it('drops stale ids and moves the step back to the last enterable one', () => {
     const loaded = readStoredConfigurator(
       {
-        v: 1,
-        step: 'summary',
-        draft: { ...draft, features: ['web/removed'], budget: 'gone' },
+        v: 2,
+        step: 'contact',
+        draft: { ...draft, added: ['web/removed'], budget: 'gone' },
       },
       model,
     );
-    expect(loaded?.draft.features).toEqual([]);
+    expect(loaded?.draft.added).toEqual([]);
     expect(loaded?.draft.budget).toBeNull();
-    expect(loaded?.step).toBe('features');
+    // The cleared budget makes the plan step the furthest the visitor may enter.
+    expect(loaded?.step).toBe('plan');
   });
 
   it('falls back to the first step for an unknown step id', () => {
-    expect(readStoredConfigurator({ v: 1, step: 'nope', draft }, model)?.step).toBe('type');
+    expect(readStoredConfigurator({ v: 2, step: 'nope', draft }, model)?.step).toBe('goals');
+  });
+
+  it('a stored manual draft never lands on the details step', () => {
+    const manual = { ...emptyDraft(), mode: 'manual', added: ['web/landing-pages'] };
+    expect(readStoredConfigurator({ v: 2, step: 'details', draft: manual }, model)?.step).toBe(
+      'goals',
+    );
+    expect(readStoredConfigurator({ v: 2, step: 'plan', draft: manual }, model)?.step).toBe('plan');
   });
 
   it('works without storage (private mode, blocked access)', () => {
@@ -92,7 +107,7 @@ describe('configurator storage', () => {
         throw new DOMException('denied', 'SecurityError');
       },
     });
-    expect(saveConfigurator(draft, 'type')).toBe(false);
+    expect(saveConfigurator(draft, 'goals')).toBe(false);
     expect(loadConfigurator(model)).toBeNull();
     expect(() => clearConfigurator()).not.toThrow();
   });

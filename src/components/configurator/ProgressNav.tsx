@@ -1,23 +1,25 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '@/lib/configurator-steps';
+import type { ConfiguratorStepId } from '@/lib/configurator-steps';
 import { prefersReducedMotion } from '@/lib/motion';
 import { formatIndex } from '@/lib/style';
 
 interface ProgressNavProps {
+  /** The steps of the current mode, in order (the manual mode has no details step). */
+  steps: readonly ConfiguratorStepId[];
   current: ConfiguratorStepId;
   /** May the visitor jump to this step (earlier ones always; later ones per `canEnterStep`). */
   canEnter: (step: ConfiguratorStepId) => boolean;
   onSelect: (step: ConfiguratorStepId) => void;
   names: Record<ConfiguratorStepId, string>;
-  /** "Krok X z 7" for the current step. */
+  /** "Krok X z N" for the current step. */
   progress: string;
   label: string;
 }
 
 /**
- * Progress of the request wizard: "Krok X z 7", a thin bar and the list of
+ * Progress of the request wizard: "Krok X z N", a thin bar and the list of
  * steps. Reachable steps are buttons; the current one has
  * `aria-current="step"`; steps that cannot be entered yet are disabled.
  *
@@ -26,6 +28,7 @@ interface ProgressNavProps {
  * scrolled into view inside the row (never the panel) on every step change.
  */
 export function ProgressNav({
+  steps,
   current,
   canEnter,
   onSelect,
@@ -33,7 +36,7 @@ export function ProgressNav({
   progress,
   label,
 }: ProgressNavProps) {
-  const index = CONFIGURATOR_STEPS.indexOf(current);
+  const index = steps.indexOf(current);
   const rowRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
@@ -50,20 +53,20 @@ export function ProgressNav({
       <p className="flex items-center justify-between eyebrow">
         <span>{progress}</span>
         <span aria-hidden="true" className="mono-index text-faint">
-          {formatIndex(index + 1)} / {formatIndex(CONFIGURATOR_STEPS.length)}
+          {formatIndex(index + 1)} / {formatIndex(steps.length)}
         </span>
       </p>
       <div aria-hidden="true" className="mt-2 h-0.5 overflow-hidden rounded-full bg-white/[0.08]">
         <div
           className="h-full rounded-full bg-[var(--color-brand)] transition-[width] duration-300 ease-calm"
-          style={{ width: `${((index + 1) / CONFIGURATOR_STEPS.length) * 100}%` }}
+          style={{ width: `${((index + 1) / steps.length) * 100}%` }}
         />
       </div>
       <ol
         ref={rowRef}
         className="relative -mx-1 mt-2 flex scroll-thin gap-1 overflow-x-auto [mask-image:linear-gradient(to_right,transparent,#000_0.75rem,#000_calc(100%-0.75rem),transparent)] px-1 pt-0.5 pb-1.5"
       >
-        {CONFIGURATOR_STEPS.map((step, position) => {
+        {steps.map((step, position) => {
           const isCurrent = step === current;
           const enabled = isCurrent || position < index || canEnter(step);
           return (

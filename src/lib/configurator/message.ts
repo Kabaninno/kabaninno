@@ -1,4 +1,5 @@
 import type { ConfiguratorDraft } from './draft';
+import { GOAL_UNSURE } from './model';
 import { TELEGRAM_URL_BUDGET, fitTextToTelegramUrl, fitsTelegramBudget } from './telegram';
 import { graphemes, normalizeSpaces, truncateGraphemes } from './text';
 
@@ -10,31 +11,36 @@ import { graphemes, normalizeSpaces, truncateGraphemes } from './text';
  * generator only joins labels and the visitor's own words, so the wording
  * stays gender-neutral as long as the labels are (D14).
  *
- * The generated text is the default for the summary step; the visitor may
- * edit it, and the submitter sends whatever text it is given.
+ * The generated text is the default for the last step; the visitor may edit
+ * it, and the submitter sends whatever text it is given.
  */
 
 export interface LeadLabels {
   /** First line, e.g. "Zapytanie ze strony KABANINNO". */
   title: string;
   /** Section names. */
-  types: string;
-  features: string;
-  business: string;
-  website: string;
-  crm: string;
+  goals: string;
+  have: string;
+  solution: string;
+  services: string;
+  industry: string;
   budget: string;
   timeline: string;
   name: string;
   comment: string;
-  yes: string;
-  no: string;
+  /** The goal line of "I don't know yet, advise me". */
+  unsure: string;
+  /** In place of the services when there are none: to be chosen on a consultation. */
+  consultation: string;
   /** Option names by id; ids without a label are printed as they are. */
+  goalNames: Record<string, string>;
+  /** The chosen answer's wording, by goal id and option id. */
+  answers: Record<string, Record<string, string>>;
+  haveNames: Record<string, string>;
   categories: Record<string, string>;
-  /** By feature id `"<category>/<key>"`. */
-  featureNames: Record<string, string>;
+  /** By service id `"<category>/<slug>"`. */
+  serviceNames: Record<string, string>;
   industries: Record<string, string>;
-  sizes: Record<string, string>;
   /** By budget id, including "not-sure" (amounts already formatted). */
   budgets: Record<string, string>;
   timelines: Record<string, string>;
@@ -52,46 +58,50 @@ function collapse(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+/** The services a lead is about (`servicesOf`), resolved by the caller. */
 export function buildLeadMessage(
   draft: ConfiguratorDraft,
+  services: readonly string[],
   labels: LeadLabels,
   { format = 'full' }: { format?: LeadFormat } = {},
 ): string {
   const compact = format === 'compact';
-  const types = draft.types.map((id) => label(labels.categories, id));
-  const features = draft.features.map((id) => label(labels.featureNames, id));
-  const { industry, size, hasWebsite, hasCrm } = draft.business;
-  const company = [
-    industry !== null ? label(labels.industries, industry) : null,
-    size !== null ? label(labels.sizes, size) : null,
-  ].filter((part): part is string => part !== null);
-  const yesNo = (value: 'yes' | 'no') => (value === 'yes' ? labels.yes : labels.no);
-  const presence = [
-    hasWebsite !== null ? `${labels.website}: ${yesNo(hasWebsite)}` : null,
-    hasCrm !== null ? `${labels.crm}: ${yesNo(hasCrm)}` : null,
-  ].filter((part): part is string => part !== null);
+  const goals = draft.goals.map((id) => {
+    if (id === GOAL_UNSURE) return labels.unsure;
+    const answer = draft.answers[id];
+    const name = label(labels.goalNames, id);
+    return answer !== undefined ? `${name} (${label(labels.answers[id] ?? {}, answer)})` : name;
+  });
+  const have = draft.have.map((id) => label(labels.haveNames, id));
+  const categories = [
+    ...new Set(services.map((id) => label(labels.categories, id.split('/')[0] ?? ''))),
+  ];
+  const names = services.map((id) => label(labels.serviceNames, id));
+  const industryOther = collapse(draft.industryOther);
+  const industry =
+    draft.industry === null
+      ? null
+      : draft.industry === 'other' && industryOther
+        ? industryOther
+        : label(labels.industries, draft.industry);
   const name = collapse(draft.contact.name);
   const comment = draft.contact.comment.trim();
 
   const blocks: string[][] = [[labels.title]];
   const details: string[] = [];
-  if (types.length > 0) details.push(`${labels.types}: ${types.join(', ')}`);
-  if (features.length > 0) {
-    if (compact) details.push(`${labels.features}: ${features.join(', ')}`);
-    else details.push(`${labels.features}:`, ...features.map((feature) => `• ${feature}`));
+  if (goals.length > 0) {
+    if (compact) details.push(`${labels.goals}: ${goals.join('; ')}`);
+    else details.push(`${labels.goals}:`, ...goals.map((goal) => `• ${goal}`));
   }
-  if (company.length > 0 || presence.length > 0) {
-    if (compact) {
-      details.push(
-        [company.length > 0 ? `${labels.business}: ${company.join(', ')}` : null, ...presence]
-          .filter(Boolean)
-          .join('; '),
-      );
-    } else {
-      if (company.length > 0) details.push(`${labels.business}: ${company.join(', ')}`);
-      if (presence.length > 0) details.push(presence.join(' · '));
-    }
+  if (have.length > 0) details.push(`${labels.have}: ${have.join(', ')}`);
+  if (names.length > 0) {
+    details.push(`${labels.solution}: ${categories.join(' + ')}`);
+    if (compact) details.push(`${labels.services}: ${names.join(', ')}`);
+    else details.push(`${labels.services}:`, ...names.map((service) => `• ${service}`));
+  } else {
+    details.push(`${labels.solution}: ${labels.consultation}`);
   }
+  if (industry) details.push(`${labels.industry}: ${industry}`);
   const budget =
     draft.budget !== null ? `${labels.budget}: ${label(labels.budgets, draft.budget)}` : null;
   const timeline =
@@ -132,14 +142,15 @@ export interface FittedLeadMessage {
  */
 export function fitLeadMessage(
   draft: ConfiguratorDraft,
+  services: readonly string[],
   labels: LeadLabels,
   { username, maxUrlLength = TELEGRAM_URL_BUDGET }: { username: string; maxUrlLength?: number },
 ): FittedLeadMessage {
-  const full = buildLeadMessage(draft, labels, { format: 'full' });
+  const full = buildLeadMessage(draft, services, labels, { format: 'full' });
   if (fitsTelegramBudget(username, full, maxUrlLength)) {
     return { text: full, format: 'full', truncated: false };
   }
-  const compact = buildLeadMessage(draft, labels, { format: 'compact' });
+  const compact = buildLeadMessage(draft, services, labels, { format: 'compact' });
   if (fitsTelegramBudget(username, compact, maxUrlLength)) {
     return { text: compact, format: 'compact', truncated: false };
   }
@@ -150,6 +161,7 @@ export function fitLeadMessage(
         ...draft,
         contact: { ...draft.contact, comment: count > 0 ? truncateGraphemes(comment, count) : '' },
       },
+      services,
       labels,
       { format: 'compact' },
     );

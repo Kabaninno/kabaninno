@@ -3,6 +3,7 @@ import { sitePath, type ViewportName } from '../support/env';
 import { withSimpleMode, withoutWebGL, withoutWebGL2Api } from '../support/scene';
 import { getAllProjects } from '~/content';
 import { builtProjects, categories, localized, paths, type TestLocale } from '../support/site';
+import { CONFIGURATOR_KEY, storedConfigurator } from '../support/configurator';
 
 /**
  * Key states captured by `npm run screenshots` (BRIEF B2.7, C3). Data-driven:
@@ -59,25 +60,12 @@ export interface CaptureState {
 
 const pl = (path: string) => localized('pl', path);
 
-/** A complete configurator draft (valid ids from content and `content/configurator.ts`). */
-const CONFIGURATOR_DRAFT = {
-  types: ['web', 'crm'],
-  features: ['web/online-stores', 'web/seo', 'crm/custom-crm'],
-  business: { industry: 'retail', size: '2-10', hasWebsite: 'yes', hasCrm: 'no' },
-  budget: '5000-10000',
-  timeline: '1-3-months',
-  contact: {
-    name: 'Łucja Żółkiewska',
-    comment: 'Sklep z integracją CRM i płatnościami online. Zależy nam na terminie przed sezonem.',
-  },
-};
-
-/** Seeds the stored configurator draft (`kabaninno.configurator.v1`) on a given step. */
+/** Seeds the stored configurator draft (D149) on a given step. */
 function seedConfigurator(step: string) {
   return async (page: Page) => {
     await page.addInitScript(
-      (stored) => localStorage.setItem('kabaninno.configurator.v1', JSON.stringify(stored)),
-      { v: 1, step, draft: CONFIGURATOR_DRAFT },
+      (stored) => localStorage.setItem(CONFIGURATOR_KEY, JSON.stringify(stored)),
+      storedConfigurator(step),
     );
   };
 }
@@ -99,15 +87,7 @@ const demoCases = ['iframe', 'video', 'mockup'].flatMap((type) => {
   return project ? [{ type, slug: project.slug }] : [];
 });
 
-const CONFIGURATOR_STEP_IDS = [
-  'type',
-  'features',
-  'business',
-  'budget',
-  'timeline',
-  'contact',
-  'summary',
-] as const;
+const CONFIGURATOR_STEP_IDS = ['goals', 'details', 'solution', 'plan', 'contact'] as const;
 
 /** The home index link of a locale-less path. */
 function indexLink(page: Page, locale: TestLocale, path: string) {
@@ -338,18 +318,18 @@ export const STATES: CaptureState[] = [
     init: seedConfigurator(step),
   })),
   {
-    name: 'configurator-step-7-summary-uk',
+    name: 'configurator-step-5-contact-uk',
     path: localized('uk', paths.configurator()),
     viewports: ['desktop'],
     tags: ['configurator', 'wizard'],
-    init: seedConfigurator('summary'),
+    init: seedConfigurator('contact'),
   },
   {
-    name: 'configurator-summary-mobile-pl',
+    name: 'configurator-contact-mobile-pl',
     path: pl(paths.configurator()),
     viewports: ['mobile'],
     tags: ['configurator', 'wizard', 'sheet'],
-    init: seedConfigurator('summary'),
+    init: seedConfigurator('contact'),
   },
   // Portfolio with cases (drafts builds only, see above).
   ...(filterCategory

@@ -7,6 +7,7 @@ import { copyText } from '@/lib/clipboard';
 import type { ConfiguratorStepId } from '@/lib/configurator-steps';
 import type { ConfiguratorDraft } from '@/lib/configurator/draft';
 import type { WizardLabels } from '@/lib/configurator/labels';
+import { GOAL_UNSURE } from '@/lib/configurator/model';
 import { buildLeadMessage, fitLeadMessage } from '@/lib/configurator/message';
 import { editButtonName } from '@/lib/a11y-names';
 import { isEditStale, messageText, type MessageEdit } from '@/lib/configurator/session';
@@ -19,6 +20,8 @@ import { fieldDomId, inputClass } from './fields';
 
 interface HandoffInput {
   draft: ConfiguratorDraft;
+  /** The services the request is about (`servicesOf`). */
+  services: readonly string[];
   labels: WizardLabels;
   submitter: LeadSubmitter;
   locale: string;
@@ -60,16 +63,20 @@ export interface LeadHandoff {
  */
 export function useLeadHandoff({
   draft,
+  services,
   labels,
   submitter,
   locale,
   username,
   edit,
 }: HandoffInput): LeadHandoff {
-  const full = useMemo(() => buildLeadMessage(draft, labels.lead), [draft, labels.lead]);
+  const full = useMemo(
+    () => buildLeadMessage(draft, services, labels.lead),
+    [draft, services, labels.lead],
+  );
   const fitted = useMemo(
-    () => fitLeadMessage(draft, labels.lead, { username }),
-    [draft, labels.lead, username],
+    () => fitLeadMessage(draft, services, labels.lead, { username }),
+    [draft, services, labels.lead, username],
   );
   const [status, setStatus] = useState('');
   const text = messageText(edit, full);
@@ -113,21 +120,37 @@ export function useLeadHandoff({
  *   tab is never blocked. A hint under it says the text is already copied if
  *   Telegram did not prefill it (D135);
  * - "Send" for a non-link submitter (a future API);
- * - "Copy text" as the secondary action (the only one while Telegram is not
- *   configured, then styled as the primary one).
+ * - "Copy text" only while Telegram is not configured, then as the primary
+ *   one; otherwise it sits under the message (`SummaryStep`), together with the
+ *   hint, so the sticky footer stays one row tall on phones.
  */
 export function SummaryActions({
   handoff,
   labels,
+  contactValid,
+  onBlocked,
 }: {
   handoff: LeadHandoff;
   labels: WizardLabels;
+  /** The name is filled in: only then "Send" is the real Telegram link. */
+  contactValid: boolean;
+  /** "Send" pressed while the name is missing: show the error and focus the field. */
+  onBlocked: () => void;
 }) {
   const { prepared } = handoff;
   const copyIsPrimary = !prepared && !handoff.submits;
   return (
     <>
-      {prepared ? (
+      {prepared && !contactValid ? (
+        <button
+          type="button"
+          onClick={onBlocked}
+          className={`${primaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
+        >
+          {labels.summary.send}
+        </button>
+      ) : null}
+      {prepared && contactValid ? (
         <a
           href={prepared.url}
           target="_blank"
@@ -147,23 +170,20 @@ export function SummaryActions({
       {handoff.submits ? (
         <button
           type="button"
-          onClick={handoff.send}
+          onClick={contactValid ? handoff.send : onBlocked}
           className={`${primaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
         >
           {labels.summary.send}
         </button>
       ) : null}
-      <button
-        type="button"
-        onClick={handoff.copy}
-        className={`${copyIsPrimary ? primaryButton : secondaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
-      >
-        {labels.summary.copy}
-      </button>
-      {prepared ? (
-        <p id={SEND_HINT_ID} className="w-full text-xs leading-snug text-muted">
-          {labels.summary.sendHint}
-        </p>
+      {copyIsPrimary ? (
+        <button
+          type="button"
+          onClick={handoff.copy}
+          className={`${primaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
+        >
+          {labels.summary.copy}
+        </button>
       ) : null}
     </>
   );
@@ -174,6 +194,7 @@ const SEND_HINT_ID = 'cfg-send-hint';
 
 interface SummaryStepProps {
   draft: ConfiguratorDraft;
+  services: readonly string[];
   labels: WizardLabels;
   handoff: LeadHandoff;
   onEdit: (step: ConfiguratorStepId) => void;
@@ -186,7 +207,7 @@ interface SummaryStepProps {
 }
 
 /**
- * Step 7: the answers at a glance (each with "Change"), the message in an
+ * The last step's summary: the answers at a glance (each with "Change"), the message in an
  * editable textarea (the full default message, "Restore default"), notices
  * (shortened link, Telegram not configured) and the status of the last
  * copy/send (a polite live region: "Copied" after "Send via Telegram" too). The primary actions
@@ -199,6 +220,7 @@ interface SummaryStepProps {
  */
 export function SummaryStep({
   draft,
+  services,
   labels,
   handoff,
   onEdit,
@@ -208,39 +230,52 @@ export function SummaryStep({
 }: SummaryStepProps) {
   const messageId = fieldDomId('summary.message');
 
-  const answers: { step: ConfiguratorStepId; label: string; value: string }[] = [
-    {
-      step: 'type',
-      label: labels.steps.type,
-      value: draft.types.map((id) => labels.categories[id]?.name ?? id).join(', '),
-    },
-    {
-      step: 'features',
-      label: labels.steps.features,
-      value: draft.features.map((id) => labels.features[id] ?? id).join(', '),
-    },
-    {
-      step: 'business',
-      label: labels.steps.business,
-      value: [
-        draft.business.industry ? labels.industries[draft.business.industry] : null,
-        draft.business.size ? labels.sizes[draft.business.size] : null,
-      ]
-        .filter(Boolean)
+  const guided = draft.mode === 'guided';
+  const answers: { step: ConfiguratorStepId; label: string; value: string }[] = [];
+  if (guided && draft.goals.length > 0) {
+    answers.push({
+      step: 'goals',
+      label: labels.summary.rowGoals,
+      value: draft.goals
+        .map((id) => (id === GOAL_UNSURE ? labels.goals.unsure : (labels.goals.names[id] ?? id)))
         .join(', '),
-    },
+    });
+  }
+  if (guided && draft.have.length > 0) {
+    answers.push({
+      step: 'details',
+      label: labels.summary.rowHave,
+      value: draft.have.map((id) => labels.details.have[id] ?? id).join(', '),
+    });
+  }
+  answers.push({
+    step: 'solution',
+    label: labels.summary.rowServices,
+    value:
+      services.length > 0
+        ? services.map((id) => labels.services[id] ?? id).join(', ')
+        : labels.summary.rowConsultation,
+  });
+  answers.push(
     {
-      step: 'budget',
-      label: labels.steps.budget,
+      step: 'plan',
+      label: labels.summary.rowBudget,
       value: draft.budget ? (labels.budgets[draft.budget] ?? '') : '',
     },
     {
-      step: 'timeline',
-      label: labels.steps.timeline,
+      step: 'plan',
+      label: labels.summary.rowTimeline,
       value: draft.timeline ? (labels.timelines[draft.timeline] ?? '') : '',
     },
-    { step: 'contact', label: labels.fields.name, value: draft.contact.name.trim() },
-  ];
+  );
+  if (draft.industry) {
+    const other = draft.industry === 'other' ? draft.industryOther.trim() : '';
+    answers.push({
+      step: 'plan',
+      label: labels.summary.rowIndustry,
+      value: other || (labels.industries[draft.industry] ?? ''),
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -254,7 +289,7 @@ export function SummaryStep({
         */}
         <dl className="divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08]">
           {answers.map((answer) => (
-            <div key={answer.step} className="px-3.5 py-2.5">
+            <div key={answer.label} className="px-3.5 py-2.5">
               <dt className="text-xs text-muted">{answer.label}</dt>
               <dd className="mt-0.5 flex items-start justify-between gap-3">
                 <span className="min-w-0 text-sm text-ink">{answer.value || '—'}</span>
@@ -322,6 +357,20 @@ export function SummaryStep({
           >
             {labels.summary.restoreDefault}
           </button>
+        ) : null}
+        {handoff.prepared || handoff.submits ? (
+          <button
+            type="button"
+            onClick={handoff.copy}
+            className={`${secondaryButton} mt-3 min-h-11 px-5 text-sm`}
+          >
+            {labels.summary.copy}
+          </button>
+        ) : null}
+        {handoff.prepared ? (
+          <p id={SEND_HINT_ID} className="mt-2 text-sm leading-snug text-muted">
+            {labels.summary.sendHint}
+          </p>
         ) : null}
       </div>
 

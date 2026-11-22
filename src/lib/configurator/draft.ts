@@ -1,32 +1,54 @@
 import { z } from 'zod';
-import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '../configurator-steps';
-import { budgetIds, findFeature, type ConfiguratorModel } from './model';
+import {
+  CONFIGURATOR_STEPS,
+  stepsFor,
+  type ConfiguratorMode,
+  type ConfiguratorStepId,
+} from '../configurator-steps';
+import {
+  GOAL_UNSURE,
+  HAVE_NONE,
+  budgetIds,
+  findGoal,
+  findService,
+  type ConfiguratorModel,
+} from './model';
+import { selectedServices } from './recommend';
 
 /**
- * The configurator draft (BRIEF «Конфігуратор запиту»): what the visitor
- * chose so far, as ids from the model. Pure helpers only; persistence is in
- * `storage.ts`, the message in `message.ts`.
+ * The configurator draft (D149): what the visitor chose so far, as ids from
+ * the model. Pure helpers only; persistence is in `storage.ts`, the message in
+ * `message.ts`, the recommendation in `recommend.ts`.
+ *
+ * The services are not stored as one list. The recommendation is derived from
+ * the goals and answers, so changing an answer re-derives it; the visitor's own
+ * changes are kept apart: `removed` (recommended ones they dropped) and `added`
+ * (ones they picked, from a planet page, "Add more" or the manual mode).
  */
 
-export const yesNoSchema = z.enum(['yes', 'no']);
+/** Longest "other industry" text, in characters. */
+export const INDUSTRY_OTHER_MAX = 60;
 
 export const configuratorDraftSchema = z.object({
-  /** Step 1: category ids (multi-select). */
-  types: z.array(z.string()),
-  /** Step 2: feature ids `"<category>/<key>"` of the selected categories. */
-  features: z.array(z.string()),
-  /** Step 3. */
-  business: z.object({
-    industry: z.string().nullable(),
-    size: z.string().nullable(),
-    hasWebsite: yesNoSchema.nullable(),
-    hasCrm: yesNoSchema.nullable(),
-  }),
+  mode: z.enum(['guided', 'manual']),
+  /** Step 1: goal ids (up to `model.maxGoals`), or just `GOAL_UNSURE`. */
+  goals: z.array(z.string()),
+  /** Step 2: the chosen option id per goal id. */
+  answers: z.record(z.string(), z.string()),
+  /** Step 2: what the visitor already has (`have` ids; `HAVE_NONE` is exclusive). */
+  have: z.array(z.string()),
+  /** Step 3: recommended services the visitor dropped. */
+  removed: z.array(z.string()),
+  /** Step 3: services the visitor picked (`"<category>/<slug>"`). */
+  added: z.array(z.string()),
+  /** Step 4: an industry id (optional); `other` comes with free text. */
+  industry: z.string().nullable(),
+  industryOther: z.string(),
   /** Step 4: a budget range id or `BUDGET_NOT_SURE`. */
   budget: z.string().nullable(),
-  /** Step 5. */
+  /** Step 4. */
   timeline: z.string().nullable(),
-  /** Step 6. */
+  /** Step 5. */
   contact: z.object({ name: z.string(), comment: z.string() }),
 });
 
@@ -34,9 +56,14 @@ export type ConfiguratorDraft = z.infer<typeof configuratorDraftSchema>;
 
 export function emptyDraft(): ConfiguratorDraft {
   return {
-    types: [],
-    features: [],
-    business: { industry: null, size: null, hasWebsite: null, hasCrm: null },
+    mode: 'guided',
+    goals: [],
+    answers: {},
+    have: [],
+    removed: [],
+    added: [],
+    industry: null,
+    industryOther: '',
     budget: null,
     timeline: null,
     contact: { name: '', comment: '' },
@@ -45,12 +72,17 @@ export function emptyDraft(): ConfiguratorDraft {
 
 /** Validation error codes (labels: `configurator.errors.<code>`). */
 export type FieldError = 'required' | 'tooShort' | 'tooLong' | 'unknown';
-/** Errors by field path, e.g. `{ "business.industry": "required" }`; empty = valid. */
+/** Errors by field path, e.g. `{ "answers.booking": "required" }`; empty = valid. */
 export type StepErrors = Partial<Record<string, FieldError>>;
 
 /** Length in user-perceived characters (code points; good enough for limits). */
 function length(text: string): number {
   return Array.from(text).length;
+}
+
+/** The services the draft is about (`selectedServices`). */
+export function servicesOf(draft: ConfiguratorDraft, model: ConfiguratorModel): string[] {
+  return selectedServices(model, draft);
 }
 
 /** Validates one step of the draft. Pure; returns `{}` when the step is valid. */
@@ -61,34 +93,52 @@ export function validateStep(
 ): StepErrors {
   const errors: StepErrors = {};
   switch (step) {
-    case 'type':
-      if (draft.types.length === 0) errors.types = 'required';
-      else if (draft.types.some((type) => !model.types.includes(type))) errors.types = 'unknown';
-      break;
-    case 'features': {
-      const selected = draft.features.filter((id) => draft.types.includes(id.split('/')[0] ?? ''));
-      if (selected.length === 0) errors.features = 'required';
-      else if (draft.features.some((id) => !findFeature(model, id))) errors.features = 'unknown';
-      break;
-    }
-    case 'business': {
-      const { industry, size, hasWebsite, hasCrm } = draft.business;
-      if (industry === null) errors['business.industry'] = 'required';
-      else if (!model.industries.includes(industry)) errors['business.industry'] = 'unknown';
-      if (size === null) errors['business.size'] = 'required';
-      else if (!model.companySizes.includes(size)) errors['business.size'] = 'unknown';
-      if (hasWebsite === null) errors['business.hasWebsite'] = 'required';
-      if (hasCrm === null) errors['business.hasCrm'] = 'required';
+    case 'goals': {
+      if (draft.mode === 'manual') break;
+      const unsure = draft.goals.includes(GOAL_UNSURE);
+      const known = draft.goals.every(
+        (id) => id === GOAL_UNSURE || findGoal(model, id) !== undefined,
+      );
+      if (draft.goals.length === 0) errors.goals = 'required';
+      else if (
+        !known ||
+        draft.goals.length > model.maxGoals ||
+        (unsure && draft.goals.length > 1)
+      ) {
+        errors.goals = 'unknown';
+      }
       break;
     }
-    case 'budget':
+    case 'details': {
+      if (draft.mode === 'manual') break;
+      for (const id of draft.goals) {
+        const goal = findGoal(model, id);
+        if (!goal) continue;
+        const answer = draft.answers[id];
+        if (answer === undefined) errors[`answers.${id}`] = 'required';
+        else if (!goal.options.some((option) => option.id === answer)) {
+          errors[`answers.${id}`] = 'unknown';
+        }
+      }
+      if (draft.have.some((id) => !model.have.includes(id))) errors.have = 'unknown';
+      break;
+    }
+    case 'solution':
+      // Never blocks: no services means "let's pick together on a consultation".
+      if (draft.added.some((id) => !findService(model, id))) errors.services = 'unknown';
+      break;
+    case 'plan': {
+      const services = servicesOf(draft, model);
       if (draft.budget === null) errors.budget = 'required';
-      else if (!budgetIds(model, draft).includes(draft.budget)) errors.budget = 'unknown';
-      break;
-    case 'timeline':
+      else if (!budgetIds(model, services).includes(draft.budget)) errors.budget = 'unknown';
       if (draft.timeline === null) errors.timeline = 'required';
       else if (!model.timelines.includes(draft.timeline)) errors.timeline = 'unknown';
+      if (draft.industry !== null && !model.industries.includes(draft.industry)) {
+        errors.industry = 'unknown';
+      }
+      if (length(draft.industryOther.trim()) > INDUSTRY_OTHER_MAX) errors.industry = 'tooLong';
       break;
+    }
     case 'contact': {
       const name = length(draft.contact.name.trim());
       if (name === 0) errors['contact.name'] = 'required';
@@ -99,8 +149,6 @@ export function validateStep(
       }
       break;
     }
-    case 'summary':
-      break;
   }
   return errors;
 }
@@ -115,23 +163,44 @@ export function isStepValid(
 
 /**
  * Any earlier step is always reachable; a step is enterable once every step
- * before it is valid (so the progress indicator can jump forward too).
+ * before it (in the draft's mode) is valid, so the progress indicator can jump
+ * forward too.
  */
 export function canEnterStep(
   step: ConfiguratorStepId,
   draft: ConfiguratorDraft,
   model: ConfiguratorModel,
 ): boolean {
-  const index = CONFIGURATOR_STEPS.indexOf(step);
-  return CONFIGURATOR_STEPS.slice(0, index).every((before) => isStepValid(before, draft, model));
+  const steps = stepsFor(draft.mode);
+  const index = steps.indexOf(step);
+  if (index < 0) return false;
+  return steps.slice(0, index).every((before) => isStepValid(before, draft, model));
 }
 
-/** The first step that is not valid yet, or `null` when the whole draft is (summary included). */
+/** The step after (`delta` 1) or before (`delta` -1) this one in the draft's mode. */
+export function neighbourStep(
+  draft: Pick<ConfiguratorDraft, 'mode'>,
+  step: ConfiguratorStepId,
+  delta: 1 | -1,
+): ConfiguratorStepId | undefined {
+  const steps = stepsFor(draft.mode);
+  return steps[steps.indexOf(step) + delta];
+}
+
+/** The step to show for a stored one: itself when the mode has it, else the first step. */
+export function stepInMode(
+  draft: Pick<ConfiguratorDraft, 'mode'>,
+  step: ConfiguratorStepId,
+): ConfiguratorStepId {
+  return stepsFor(draft.mode).includes(step) ? step : CONFIGURATOR_STEPS[0];
+}
+
+/** The first step that is not valid yet, or `null` when the whole draft is. */
 export function firstInvalidStep(
   draft: ConfiguratorDraft,
   model: ConfiguratorModel,
 ): ConfiguratorStepId | null {
-  return CONFIGURATOR_STEPS.find((step) => !isStepValid(step, draft, model)) ?? null;
+  return stepsFor(draft.mode).find((step) => !isStepValid(step, draft, model)) ?? null;
 }
 
 /** The furthest step the visitor may be on (resume after a reload). */
@@ -139,7 +208,7 @@ export function furthestEnterableStep(
   draft: ConfiguratorDraft,
   model: ConfiguratorModel,
 ): ConfiguratorStepId {
-  return firstInvalidStep(draft, model) ?? 'summary';
+  return firstInvalidStep(draft, model) ?? stepsFor(draft.mode).at(-1)!;
 }
 
 /* ------------------------------------------------------------------ */
@@ -147,7 +216,7 @@ export function furthestEnterableStep(
 /* ------------------------------------------------------------------ */
 
 /**
- * Clears the budget when the ranges offered for the current selection no
+ * Clears the budget when the ranges offered for the current services no
  * longer include it (the complexity level moved, D138). "Not sure" always
  * stays. Returns the same draft when nothing changes.
  */
@@ -155,43 +224,117 @@ export function reconcileBudget(
   draft: ConfiguratorDraft,
   model: ConfiguratorModel,
 ): ConfiguratorDraft {
-  if (draft.budget === null || budgetIds(model, draft).includes(draft.budget)) return draft;
+  if (draft.budget === null) return draft;
+  if (budgetIds(model, servicesOf(draft, model)).includes(draft.budget)) return draft;
   return { ...draft, budget: null };
 }
 
-/** Keeps only features of selected categories (after the types change). */
-function pruneFeatures(draft: ConfiguratorDraft): ConfiguratorDraft {
-  return {
-    ...draft,
-    features: draft.features.filter((id) => draft.types.includes(id.split('/')[0] ?? '')),
-  };
-}
-
-/** Selects / deselects a category (deselecting drops its features). Unknown ids are ignored. */
-export function toggleType(
-  draft: ConfiguratorDraft,
-  type: string,
-  model: ConfiguratorModel,
-): ConfiguratorDraft {
-  if (!model.types.includes(type)) return draft;
-  const types = draft.types.includes(type)
-    ? draft.types.filter((item) => item !== type)
-    : model.types.filter((item) => item === type || draft.types.includes(item));
-  return reconcileBudget(pruneFeatures({ ...draft, types }), model);
-}
-
-/** Selects / deselects a feature of a selected category. Unknown or unselected ones are ignored. */
-export function toggleFeature(
+/**
+ * Selects / deselects a goal and switches to the guided mode. "Not sure" is
+ * exclusive: picking it clears the other goals, picking another goal clears it.
+ * At most `model.maxGoals` goals; the answer of a deselected goal is dropped.
+ * Unknown ids are ignored.
+ */
+export function toggleGoal(
   draft: ConfiguratorDraft,
   id: string,
   model: ConfiguratorModel,
 ): ConfiguratorDraft {
-  const feature = findFeature(model, id);
-  if (!feature || !draft.types.includes(feature.category)) return draft;
-  const features = draft.features.includes(id)
-    ? draft.features.filter((item) => item !== id)
-    : [...draft.features, id];
-  return reconcileBudget({ ...draft, features }, model);
+  if (id !== GOAL_UNSURE && !findGoal(model, id)) return draft;
+  let goals: string[];
+  if (draft.goals.includes(id)) goals = draft.goals.filter((goal) => goal !== id);
+  else if (id === GOAL_UNSURE) goals = [GOAL_UNSURE];
+  else {
+    const others = draft.goals.filter((goal) => goal !== GOAL_UNSURE);
+    if (others.length >= model.maxGoals) return draft;
+    goals = [...others, id];
+  }
+  const answers = Object.fromEntries(
+    Object.entries(draft.answers).filter(([goal]) => goals.includes(goal)),
+  );
+  return reconcileBudget({ ...draft, mode: 'guided', goals, answers }, model);
+}
+
+/** Answers a goal's question. Unknown goals (not selected) and options are ignored. */
+export function setAnswer(
+  draft: ConfiguratorDraft,
+  goalId: string,
+  optionId: string,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  const goal = findGoal(model, goalId);
+  if (!goal || !draft.goals.includes(goalId)) return draft;
+  if (!goal.options.some((option) => option.id === optionId)) return draft;
+  return reconcileBudget({ ...draft, answers: { ...draft.answers, [goalId]: optionId } }, model);
+}
+
+/** Toggles an item of "What do you already have?"; "nothing of these" is exclusive. */
+export function toggleHave(
+  draft: ConfiguratorDraft,
+  id: string,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  if (!model.have.includes(id)) return draft;
+  let have: string[];
+  if (draft.have.includes(id)) have = draft.have.filter((item) => item !== id);
+  else if (id === HAVE_NONE) have = [HAVE_NONE];
+  else have = [...draft.have.filter((item) => item !== HAVE_NONE), id];
+  return { ...draft, have: model.have.filter((item) => have.includes(item)) };
+}
+
+/** "I know what I need": the manual mode; goals and answers go, picked services stay. */
+export function chooseManual(
+  draft: ConfiguratorDraft,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  return reconcileBudget({ ...draft, mode: 'manual', goals: [], answers: {}, removed: [] }, model);
+}
+
+/** Back to the guided mode (the goals step); picked services stay. */
+export function chooseGuided(draft: ConfiguratorDraft): ConfiguratorDraft {
+  return { ...draft, mode: 'guided' };
+}
+
+/** Drops a service from the request, whether it was recommended or picked. Unknown ids are ignored. */
+export function removeService(
+  draft: ConfiguratorDraft,
+  id: string,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  if (!findService(model, id)) return draft;
+  const removed = draft.removed.includes(id) ? draft.removed : [...draft.removed, id];
+  return reconcileBudget(
+    { ...draft, removed, added: draft.added.filter((item) => item !== id) },
+    model,
+  );
+}
+
+/** Adds a service to the request (it stops being "removed"). Unknown ids are ignored. */
+export function addService(
+  draft: ConfiguratorDraft,
+  id: string,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  if (!findService(model, id)) return draft;
+  return reconcileBudget(
+    {
+      ...draft,
+      removed: draft.removed.filter((item) => item !== id),
+      added: draft.added.includes(id) ? draft.added : [...draft.added, id],
+    },
+    model,
+  );
+}
+
+/** Adds or drops a service, depending on whether the request has it now. */
+export function toggleService(
+  draft: ConfiguratorDraft,
+  id: string,
+  model: ConfiguratorModel,
+): ConfiguratorDraft {
+  return servicesOf(draft, model).includes(id)
+    ? removeService(draft, id, model)
+    : addService(draft, id, model);
 }
 
 /* ------------------------------------------------------------------ */
@@ -200,17 +343,14 @@ export function toggleFeature(
 
 const looseDraftSchema = z
   .object({
-    types: z.array(z.unknown()).catch([]),
-    features: z.array(z.unknown()).catch([]),
-    business: z
-      .object({
-        industry: z.unknown(),
-        size: z.unknown(),
-        hasWebsite: z.unknown(),
-        hasCrm: z.unknown(),
-      })
-      .partial()
-      .catch({}),
+    mode: z.unknown(),
+    goals: z.array(z.unknown()).catch([]),
+    answers: z.record(z.string(), z.unknown()).catch({}),
+    have: z.array(z.unknown()).catch([]),
+    removed: z.array(z.unknown()).catch([]),
+    added: z.array(z.unknown()).catch([]),
+    industry: z.unknown(),
+    industryOther: z.unknown(),
     budget: z.unknown(),
     timeline: z.unknown(),
     contact: z.object({ name: z.unknown(), comment: z.unknown() }).partial().catch({}),
@@ -219,9 +359,10 @@ const looseDraftSchema = z
 
 const pick = (value: unknown, allowed: readonly string[]): string | null =>
   typeof value === 'string' && allowed.includes(value) ? value : null;
-const yesNo = (value: unknown) => (value === 'yes' || value === 'no' ? value : null);
 const clip = (value: unknown, max: number): string =>
   typeof value === 'string' ? Array.from(value).slice(0, max).join('') : '';
+const strings = (values: readonly unknown[] | undefined): string[] =>
+  (values ?? []).filter((value): value is string => typeof value === 'string');
 
 /**
  * Turns anything (a stored draft from an older build, hand-edited storage)
@@ -232,41 +373,54 @@ export function sanitizeDraft(raw: unknown, model: ConfiguratorModel): Configura
   const parsed = looseDraftSchema.safeParse(raw);
   if (!parsed.success) return emptyDraft();
   const value = parsed.data;
-  const types = model.types.filter((type) => (value.types ?? []).includes(type));
-  const features = [
-    ...new Set(
-      (value.features ?? []).filter(
-        (id): id is string =>
-          typeof id === 'string' &&
-          findFeature(model, id) !== undefined &&
-          types.includes(id.split('/')[0] ?? ''),
-      ),
-    ),
+  const mode: ConfiguratorMode = value.mode === 'manual' ? 'manual' : 'guided';
+
+  let goals = [...new Set(strings(value.goals))].filter(
+    (id) => id === GOAL_UNSURE || findGoal(model, id) !== undefined,
+  );
+  if (goals.includes(GOAL_UNSURE)) goals = [GOAL_UNSURE];
+  goals = goals.slice(0, model.maxGoals);
+  if (mode === 'manual') goals = [];
+  const answers: Record<string, string> = {};
+  for (const id of goals) {
+    const option = findGoal(model, id)?.options.find((item) => item.id === value.answers?.[id]);
+    if (option) answers[id] = option.id;
+  }
+
+  let have = model.have.filter((id) => strings(value.have).includes(id));
+  if (have.includes(HAVE_NONE)) have = [HAVE_NONE];
+
+  const services = (ids: readonly unknown[] | undefined) => [
+    ...new Set(strings(ids).filter((id) => findService(model, id) !== undefined)),
   ];
-  const business = value.business ?? {};
+  const removed = mode === 'manual' ? [] : services(value.removed);
+  const added = services(value.added);
+
+  const industry = pick(value.industry, model.industries);
   const contact = value.contact ?? {};
-  return {
-    types,
-    features,
-    business: {
-      industry: pick(business.industry, model.industries),
-      size: pick(business.size, model.companySizes),
-      hasWebsite: yesNo(business.hasWebsite),
-      hasCrm: yesNo(business.hasCrm),
-    },
-    budget: pick(value.budget, budgetIds(model, { types, features })),
+  const draft: ConfiguratorDraft = {
+    mode,
+    goals,
+    answers,
+    have,
+    removed,
+    added,
+    industry,
+    industryOther: industry === 'other' ? clip(value.industryOther, INDUSTRY_OTHER_MAX) : '',
+    budget: null,
     timeline: pick(value.timeline, model.timelines),
     contact: {
       name: clip(contact.name, model.limits.nameMax),
       comment: clip(contact.comment, model.limits.commentMax),
     },
   };
+  return { ...draft, budget: pick(value.budget, budgetIds(model, servicesOf(draft, model))) };
 }
 
 /**
  * Prefill from «Add to request» (D66 request refs and the `?add=` query):
- * each known service ref `"<category>/<slug>"` selects its category and the
- * service feature. Unknown refs and extra-feature ids are ignored.
+ * each known service ref `"<category>/<slug>"` becomes a picked service.
+ * Unknown refs are ignored.
  */
 export function prefillDraft(
   draft: ConfiguratorDraft,
@@ -275,10 +429,8 @@ export function prefillDraft(
 ): ConfiguratorDraft {
   let next = draft;
   for (const ref of refs) {
-    const feature = findFeature(model, ref);
-    if (!feature || feature.kind !== 'service') continue;
-    if (!next.types.includes(feature.category)) next = toggleType(next, feature.category, model);
-    if (!next.features.includes(ref)) next = toggleFeature(next, ref, model);
+    if (!findService(model, ref) || next.added.includes(ref)) continue;
+    next = addService(next, ref, model);
   }
   return next;
 }

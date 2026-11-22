@@ -1,19 +1,26 @@
 /**
  * Request configurator options (ids only). Labels live in
- * `messages/<locale>/ui.json` → `configurator.*`; service names come from the
- * content texts. Validated and combined with the categories in
- * `src/lib/configurator/model.ts`.
+ * `messages/<locale>/ui.json` → `configurator.*`; service names and benefit
+ * lines come from the content texts. Validated and combined with the
+ * categories in `src/lib/configurator/model.ts`.
  *
- * - Step 1 (solution type) lists every category of `content/categories.ts`.
- * - Step 2 (features) lists the selected categories' services plus the extra
- *   features below. A category without an entry here simply has no extras,
- *   so adding a category needs no change in this file or in code.
- * - Extra feature ids are global label keys (`configurator.extras.<id>`) and
- *   must not repeat a service slug of the same category.
- * - Budgets follow the choice (D138): every service and extra feature has a
- *   complexity level 1–3 (`complexity`); the budget step offers the ranges of
- *   the highest level among the selected features (`budgetLevels`). All the
- *   numbers live here, in PLN netto; nothing in code needs to change to edit them.
+ * The configurator is a short diagnostic (D149): the visitor picks up to
+ * three goals, answers one plain question per goal, and the configurator
+ * recommends services; they can drop any of them or add others, then pick a
+ * budget and send the request.
+ *
+ * - `goals`: what the visitor wants to improve. Each goal has one question; each
+ *   answer (option) maps to the services recommended for it, as ids
+ *   `"<category>/<slug>"` of `content/categories.ts`. Every goal ends with an
+ *   `unknown` option ("Don't know") so nobody gets stuck. Texts:
+ *   `configurator.goals.items.<goal>.{name,question,options.<option>}`.
+ * - `have`: the shared question "What do you already have?". `none` is
+ *   exclusive. Texts: `configurator.have.items.<id>`.
+ * - Budgets follow the choice (D138): every service has a complexity level
+ *   1–3 (`complexity`); the budget step offers the ranges of the highest level
+ *   among the selected services (`budgetLevels`), and `consultationLevel` when
+ *   nothing is selected (a consultation request). All the numbers live here,
+ *   in PLN netto; nothing in code needs to change to edit them.
  */
 export type ComplexityLevel = 1 | 2 | 3;
 
@@ -23,14 +30,32 @@ export interface BudgetRangeInput {
   max?: number;
 }
 
+export interface GoalOptionInput {
+  id: string;
+  /** Recommended services (`"<category>/<slug>"`), most important first. */
+  services: readonly string[];
+}
+
+export interface GoalInput {
+  id: string;
+  options: readonly GoalOptionInput[];
+}
+
 export interface ConfiguratorDataInput {
-  /** Extra feature ids per category id; categories without an entry have none. */
-  extraFeatures: Record<string, readonly string[]>;
+  /** At most this many goals can be picked. */
+  maxGoals: number;
+  /** At most this many services are recommended at once. */
+  maxRecommended: number;
+  goals: readonly GoalInput[];
+  /** Ids of "What do you already have?"; `none` is the exclusive "nothing of these". */
+  have: readonly string[];
   /**
-   * Complexity level of every feature, by id `"<category>/<key>"` (services:
-   * their slug; extras: their id). Every service and extra must be listed.
+   * Complexity level of every service, by id `"<category>/<slug>"`. Every
+   * service of `content/categories.ts` must be listed.
    */
   complexity: Record<string, ComplexityLevel>;
+  /** The level of a request with no services yet (a consultation). */
+  consultationLevel: ComplexityLevel;
   /**
    * Budget ranges offered per complexity level (PLN netto), from the lowest
    * to the highest. A range's id is derived from its numbers (`up-to-1500`,
@@ -39,63 +64,132 @@ export interface ConfiguratorDataInput {
    */
   budgetLevels: Record<ComplexityLevel, readonly BudgetRangeInput[]>;
   industries: readonly string[];
-  companySizes: readonly string[];
   timelines: readonly string[];
   contact: { nameMin: number; nameMax: number; commentMax: number };
 }
 
+/** The ids shared by data, model and labels. */
+export const OPTION_UNKNOWN = 'unknown';
+
 export const configuratorData: ConfiguratorDataInput = {
-  extraFeatures: {
-    web: ['multilingual', 'cms', 'seo', 'online-payments'],
-    crm: ['data-migration', 'team-training', 'telephony', 'mobile-access'],
-    automation: ['e-invoicing', 'erp-integration', 'scheduled-reports'],
-    ai: ['knowledge-base', 'voice', 'human-handoff'],
-    telegram: ['online-payments', 'crm-sync', 'broadcasts'],
-  },
+  maxGoals: 3,
+  maxRecommended: 4,
+  goals: [
+    {
+      id: 'more-clients',
+      options: [
+        { id: 'google', services: ['web/corporate-websites'] },
+        { id: 'social-ads', services: ['web/landing-pages'] },
+        { id: 'messengers', services: ['telegram/sales-orders'] },
+        { id: OPTION_UNKNOWN, services: ['web/landing-pages'] },
+      ],
+    },
+    {
+      id: 'online-orders',
+      options: [
+        { id: 'up-to-20', services: ['telegram/sales-orders'] },
+        { id: '20-200', services: ['web/online-stores'] },
+        { id: 'over-200', services: ['web/online-stores', 'automation/api-integrations'] },
+        { id: OPTION_UNKNOWN, services: ['web/online-stores'] },
+      ],
+    },
+    {
+      id: 'booking',
+      options: [
+        {
+          id: 'phone',
+          services: ['telegram/booking', 'automation/notifications-reminders'],
+        },
+        { id: 'messengers', services: ['telegram/booking'] },
+        {
+          id: 'website-inconvenient',
+          services: ['web/web-apps', 'automation/notifications-reminders'],
+        },
+        { id: OPTION_UNKNOWN, services: ['telegram/booking'] },
+      ],
+    },
+    {
+      id: 'client-order',
+      options: [
+        { id: 'head-notebook', services: ['crm/crm-implementation'] },
+        {
+          id: 'spreadsheets',
+          services: ['crm/crm-implementation', 'automation/api-integrations'],
+        },
+        { id: 'program-inconvenient', services: ['crm/custom-crm'] },
+        { id: OPTION_UNKNOWN, services: ['crm/crm-implementation'] },
+      ],
+    },
+    {
+      id: 'less-routine',
+      options: [
+        { id: 'documents', services: ['automation/document-automation'] },
+        { id: 'reminders', services: ['automation/notifications-reminders'] },
+        { id: 'data-transfer', services: ['automation/api-integrations'] },
+        { id: 'emails-requests', services: ['ai/ai-document-processing'] },
+        { id: OPTION_UNKNOWN, services: ['automation/api-integrations'] },
+      ],
+    },
+    {
+      // Row cut off in the brief ("Швидко відповідати…"); completed by us (D149).
+      id: 'fast-replies',
+      options: [
+        { id: 'telegram', services: ['telegram/customer-support'] },
+        { id: 'website-chat', services: ['ai/ai-assistants'] },
+        {
+          id: 'many-channels',
+          services: ['ai/ai-assistants', 'automation/api-integrations'],
+        },
+        {
+          id: 'repeated-questions',
+          services: ['ai/ai-assistants', 'telegram/customer-support'],
+        },
+        { id: OPTION_UNKNOWN, services: ['ai/ai-assistants'] },
+      ],
+    },
+    {
+      // Not in the brief either: it makes the reporting and analytics services reachable (D149).
+      id: 'see-numbers',
+      options: [
+        { id: 'sales-clients', services: ['crm/reports-dashboards'] },
+        {
+          id: 'team-processes',
+          services: ['crm/reports-dashboards', 'automation/data-processing'],
+        },
+        { id: 'feedback', services: ['ai/ai-analytics'] },
+        { id: OPTION_UNKNOWN, services: ['crm/reports-dashboards'] },
+      ],
+    },
+  ],
+  have: ['website', 'social', 'tracking', 'none'],
   complexity: {
     // Websites and web apps
     'web/landing-pages': 1,
     'web/corporate-websites': 2,
     'web/online-stores': 2,
     'web/web-apps': 3,
-    'web/multilingual': 2,
-    'web/cms': 2,
-    'web/seo': 1,
-    'web/online-payments': 2,
     // CRM
     'crm/sales-funnels': 2,
     'crm/reports-dashboards': 2,
     'crm/crm-implementation': 3,
     'crm/custom-crm': 3,
-    'crm/data-migration': 2,
-    'crm/team-training': 1,
-    'crm/telephony': 3,
-    'crm/mobile-access': 2,
     // Automation
     'automation/document-automation': 1,
     'automation/notifications-reminders': 1,
     'automation/api-integrations': 2,
     'automation/data-processing': 2,
-    'automation/e-invoicing': 2,
-    'automation/erp-integration': 3,
-    'automation/scheduled-reports': 1,
     // AI
     'ai/content-generation': 2,
     'ai/ai-assistants': 3,
     'ai/ai-document-processing': 3,
     'ai/ai-analytics': 3,
-    'ai/knowledge-base': 3,
-    'ai/voice': 3,
-    'ai/human-handoff': 2,
     // Telegram bots
     'telegram/customer-support': 1,
     'telegram/booking': 2,
     'telegram/sales-orders': 2,
     'telegram/mini-apps': 3,
-    'telegram/online-payments': 2,
-    'telegram/crm-sync': 2,
-    'telegram/broadcasts': 1,
   },
+  consultationLevel: 2,
   budgetLevels: {
     // Landing page, simple bot, simple automation.
     1: [{ max: 1500 }, { min: 1500, max: 3000 }, { min: 3000 }],
@@ -116,7 +210,6 @@ export const configuratorData: ConfiguratorDataInput = {
     'it',
     'other',
   ],
-  companySizes: ['solo', '2-10', '11-50', '51-200', '200-plus'],
   timelines: ['asap', '1-month', '1-3-months', '3-plus-months', 'flexible'],
   contact: {
     /** Name length after trimming, in characters. */

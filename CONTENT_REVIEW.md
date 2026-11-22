@@ -451,3 +451,46 @@ uk:
 - `configurator.budget.*` — суми з «netto» / «net» / «нетто» («ponad {min} {currency} netto», «over {currency} {min} net», «понад {min} {currency} нетто»); `budget.reset` — підказка після скидання діапазону; `hints.budget` — «Orientacyjna kwota netto…».
 - Питання «бюджет нетто чи брутто» знято: нетто (рішення власника).
 - Питання «UK чи UA» знято: у видимому коді «UA».
+
+## Round 2: configurator texts
+
+Вичитано тексти переробленого конфігуратора («підбір рішення»): `configurator.*`, `lead.*`, `meta.configurator*` і нове поле `benefit` у 20 послугах (pl, en, uk). Ключі, їхній порядок і `{плейсхолдери}` не змінювалися. Слова власника українською (назви цілей, питання, варіанти відповідей, «Ще не знаю — допоможіть оцінити») лишилися без змін. Статус усього розділу: `TODO: вичитати` носієм мови.
+
+**Що змінено і чому**
+
+- **Чіпи й заголовки кроків.** `steps.details` / `titles.details`: en «Details» → «Questions», uk «Уточнення» → «Питання», «Кілька коротких питань» (pl, uk). Це прості слова, і вони збігаються з тим, що людина бачить у кроці. pl `titles.plan` «Budżet i terminy» → «Budżet i termin», як у чіпі `steps.plan`.
+- **`hints.plan` у всіх мовах** був уламком речення («…, i kiedy chcesz ruszyć»). Тепер повне речення з дієсловом: «Wybierz orientacyjny budżet…», «Pick a rough budget…», «Оберіть орієнтовний бюджет…». Також трохи виправлено `hints.details` і `hints.solution` (uk «Зайве можна прибрати, а потрібне додати»).
+- **`configurator.lead` і `meta.configuratorDescription`.** Прибрано «Sami / Ми самі», додано «простими словами / in plain words». Метаопис скорочено приблизно до 160 знаків і зроблено однаковим за змістом у трьох мовах.
+- **Telegram як канал (глосарій).** uk `hints.contact` і метаопис: «через Telegram» → «у / в Telegram».
+- **`solution.fits`.** pl «Pasuje do Ciebie: …» читалося так, ніби підходить людина, тож тепер «Polecamy: …». en «You will be well served by» → «We recommend: …». uk «Вам підійде: …» без змін.
+- **en, цілі й відповіді.** «More customers from the internet» → «More customers online»; «Keep clients and orders in order» → «…organised» (прибрано повтор і взято британський правопис); «Team work and processes» → «Team performance and processes»; «it is inconvenient» → «it's inconvenient».
+- **en, службові рядки.** `goals.unsure` «advise me» → «help me decide»; `have.hint` «Pick all that apply.»; `details.unsureNote` «Not sure yet? One question is enough…»; `rowHave` «What you already have» (як у `have.legend`); «on a consultation» → «at / during a consultation».
+- **uk, службові рядки.** `solution.addMore` «Додати ще» → «Додати ще послуги»; `backToGuided` «Відповісти…» → «Відповідьте…» (у реченні, як pl і en); `have.hint` «вибрати» → «обрати» (одне дієслово на весь майстер).
+- **Повідомлення в Telegram.** pl `lead.have` «Mamy już» → «Co już mamy»: після «Mamy już:» варіант «Nic z tego» читається недоладно. Щоб повідомлення було в одній особі, pl `lead.unsure` тепер «jeszcze nie wiemy, prosimy o poradę». uk `lead.have` «Уже є» → «Що вже є» (як `rowHave`). en без змін.
+- **`benefit`: виправлено неточні рядки.**
+  - `document-automation` у всіх мовах: було «звіти / reports / raporty», хоча послуга про договори, пропозиції й рахунки. Тепер «Договори, пропозиції й рахунки…», «Contracts, quotes and invoices…», «Umowy, oferty i faktury…».
+  - `ai-document-processing`: pl «listy» і en «emails» не збігалися з послугою (рахунки й документи). Тепер «faktury / invoices / рахунки».
+  - pl `corporate-websites`: «Firma, którą klienci znajdą…» описувало не послугу, а фірму → «Strona, dzięki której klienci znajdą Twoją firmę w Google i jej zaufają.»
+  - pl і uk `web-apps`: прибрано слово «procesy / процеси» («…działa tak, jak pracuje Twoja firma», «…створений під те, як ви працюєте»). pl і uk `custom-crm`: «System do klientów / Система для клієнтів» → «System do obsługi klientów / Система для роботи з клієнтами».
+  - en: `landing-pages` «enquiries» → «inquiries» (як на решті сайту); `ai-analytics` «Insights» → «Clear conclusions»; `data-processing` «sorts itself out» → «gets tidied up automatically»; `crm-implementation`, `booking`, `custom-crm` — дрібні граматичні правки.
+  - uk `ai-assistants`: «і вночі теж» → «навіть уночі».
+  - Усі 60 рядків мають ≤ 90 знаків; ті, що вже були простими, не чіпалися.
+- **CTA.** `hud.cta`, `home.cta`, `portfolio.emptyCta`, `configurator.title`, `meta.configuratorTitle` збігаються дослівно в кожній мові: «Dobierz rozwiązanie» / «Find your solution» / «Підібрати рішення». Без змін.
+- **Закріплено тестами, не змінювалося:** `goals.hint` pl «Wybierz do {max}.» і uk «Оберіть до {max}.», `lead.title`.
+
+**Прошу власника підтвердити**
+
+- **Питання про месенджери.** У цілі «Швидко відповідати клієнтам» питання «Де клієнти зазвичай вам пишуть?» не підходить до четвертого варіанта «Одні й ті самі питання повторюються»: це відповідь на «про що», а не «де». Слова власника не змінював. Пропоную питання «Де і про що клієнти зазвичай вам пишуть?» (pl «Gdzie i o co klienci zwykle do Ciebie piszą?», en «Where and about what do customers usually write to you?») або перенести четвертий варіант в окреме місце.
+- **`goals.knowIt` «Я знаю, що мені потрібно» / «Wiem, czego potrzebuję» / «I know what I need».** З напису не видно, що далі відкриється вибір послуг. Гендерно-нейтральна альтернатива: «Обрати послуги самостійно» / «Wybierz usługi samodzielnie» / «Pick the services myself». Лишив коротко, як було.
+- **Особа в повідомленні.** pl тепер звучить від «ми» («Co już mamy», «jeszcze nie wiemy, prosimy o poradę»), а uk («ще не знаю, прошу порадити») і en («not sure yet, please advise») — безособово або від «я». Якщо хочете однаково у всіх трьох, скажіть, у якій особі.
+- **`rowTimeline` і `lead.timeline`** (pl «Termin», uk «Терміни»). Відповіді («Якнайшвидше», «1–3 місяці») означають початок робіт, а «Termin / Терміни» можна прочитати як дедлайн. Можна «Початок» / «Start» / «Kiedy zacząć». Це старе рішення, не змінювалося.
+- **uk `stepsNav` «Кроки добору рішення».** Невидима aria-мітка. Кнопка каже «Підібрати», тож для однаковості можна «Кроки підбору рішення». Обидва варіанти нормативні, лишив як було.
+- **en «clients» чи «customers».** У майстрі змішано: «clients» (запис, CRM) і «customers» (продажі, реклама). Так само в решті сайту, тому не уніфіковано.
+- **«Wybierz do {max}.» / «Оберіть до {max}.»** (без слова «цілей») закріплено тестами. Для кращого звучання («Wybierz do 3 celów») потрібна правка тестів і коду.
+
+**Рішення після Round 2 (оркестратор):**
+
+- Питання цілі «Швидко відповідати клієнтам» переформульоване на «Як клієнти зазвичай до вас звертаються?» (pl «Jak klienci zwykle się z Tobą kontaktują?», en «How do customers usually contact you?»), а четвертий варіант — на «Здебільшого з однаковими питаннями». Ціль і питання не були в таблиці власника (D150), тож їх можна міняти.
+- `goals.knowIt` лишено дослівно за словами власника («Я знаю, що мені потрібно»).
+- Повідомлення в Telegram: «ще не знаю» у всіх трьох мовах від «ми» (pl «jeszcze nie wiemy, prosimy o poradę», uk «ще не знаємо, просимо порадити», en «we are not sure yet, please advise»); назви розділів («Уже є» тощо) безособові.
+- «Termin / Терміни», `stepsNav` («добору»), «clients/customers» — без змін (старі рішення, невидимі або несуттєві).

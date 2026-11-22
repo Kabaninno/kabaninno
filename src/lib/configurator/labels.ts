@@ -1,12 +1,21 @@
 import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '../configurator-steps';
+import { INDUSTRY_OTHER_MAX } from './draft';
 import type { LeadLabels } from './message';
-import { BUDGET_NOT_SURE, type BudgetRange, type ConfiguratorModel } from './model';
+import {
+  BUDGET_NOT_SURE,
+  OPTION_UNKNOWN,
+  allServices,
+  type BudgetRange,
+  type ConfiguratorModel,
+} from './model';
 
 /**
  * Every string the configurator wizard shows, resolved on the server for one
  * locale and passed to the client as plain props: the client never formats
  * ICU messages (no Intl initialisation during hydration, P-08) and never
- * imports dictionaries or the content layer (D05, D09).
+ * imports dictionaries or the content layer (D05, D09). The few texts with an
+ * argument that depends on the visitor's choices are templates with `{name}`
+ * placeholders, filled on the client by `fillTemplate`.
  */
 
 /** A translator for one namespace (next-intl's server `t`, or a test double). */
@@ -19,42 +28,80 @@ export interface CategoryLabel {
 }
 
 export interface WizardLabels {
+  /** Short names of the steps (the progress chips). */
   steps: Record<ConfiguratorStepId, string>;
+  /** The step's heading. */
+  titles: Record<ConfiguratorStepId, string>;
   hints: Record<ConfiguratorStepId, string>;
-  /** "Krok 3 z 7" per step index. */
-  progress: string[];
+  /** "Krok 3 z 5" per step index, for the guided flow and for the manual one (no details step). */
+  progress: { guided: string[]; manual: string[] };
   stepsNav: string;
   nav: {
     back: string;
     next: string;
-    toSummary: string;
     edit: string;
     startOver: string;
     startOverConfirm: string;
     startOverYes: string;
     startOverNo: string;
   };
-  fields: {
-    types: string;
-    features: string;
-    industry: string;
-    size: string;
-    hasWebsite: string;
-    hasCrm: string;
+  goals: {
+    legend: string;
+    /** "Pick up to 3." */
+    hint: string;
+    unsure: string;
+    /** The link under the list: skip the questions and pick services yourself. */
+    knowIt: string;
+    /** By goal id. */
+    names: Record<string, string>;
+  };
+  details: {
+    /** Under the title when the goal is "not sure": only the shared question follows. */
+    unsureNote: string;
+    /** The question of each goal, by goal id. */
+    questions: Record<string, string>;
+    /** Option labels by goal id and option id. */
+    options: Record<string, Record<string, string>>;
+    haveLegend: string;
+    haveHint: string;
+    have: Record<string, string>;
+  };
+  solution: {
+    /** Template "You'll be well served by: {combo}". */
+    fits: string;
+    /** Instead of services: the consultation. */
+    consultation: string;
+    /** "Remove", and its accessible name template "Remove: {service}". */
+    remove: string;
+    removeNamed: string;
+    addMore: string;
+    hideList: string;
+    /** Legend of the full list of services. */
+    listLegend: string;
+    /** Manual mode: the visitor picks, with a way back to the questions. */
+    manualHint: string;
+    backToGuided: string;
+    /** By service id `"<category>/<slug>"`: one line in plain words. */
+    benefits: Record<string, string>;
+  };
+  plan: {
     budget: string;
     timeline: string;
+    industry: string;
+    industryHint: string;
+    industryOther: string;
+    industryOtherHint: string;
+  };
+  fields: {
     name: string;
     nameHint: string;
     comment: string;
     commentHint: string;
   };
-  yes: string;
-  no: string;
   categories: Record<string, CategoryLabel>;
-  /** By feature id `"<category>/<key>"`. */
-  features: Record<string, string>;
+  /** By service id `"<category>/<slug>"`. */
+  services: Record<string, string>;
   industries: Record<string, string>;
-  sizes: Record<string, string>;
   budgets: Record<string, string>;
   timelines: Record<string, string>;
   /** Field error messages, already formatted with their limits. */
@@ -65,6 +112,7 @@ export interface WizardLabels {
     nameTooShort: string;
     nameTooLong: string;
     commentTooLong: string;
+    industryTooLong: string;
     unknown: string;
   };
   prefilled: string;
@@ -91,6 +139,15 @@ export interface WizardLabels {
     /** Results of a non-link submitter (`ApiSubmitter`, later). */
     sent: string;
     sendFailed: string;
+    /** Rows of the answers list. */
+    rowGoals: string;
+    rowHave: string;
+    rowServices: string;
+    rowBudget: string;
+    rowTimeline: string;
+    rowIndustry: string;
+    /** The consultation, when there are no services. */
+    rowConsultation: string;
   };
   /** Words of the lead message itself (`message.ts`). */
   lead: LeadLabels;
@@ -106,6 +163,13 @@ export interface WizardLabelSources {
   studio: string;
   category: (id: string) => CategoryLabel;
   serviceTitle: (categoryId: string, slug: string) => string;
+  /** One line "what this service gives you" (content text `benefit`). */
+  serviceBenefit: (categoryId: string, slug: string) => string;
+}
+
+/** Fills `{name}` placeholders of a pre-translated template (no ICU on the client). */
+export function fillTemplate(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
 }
 
 /** "5 000–15 000 PLN" style range label from the locale's templates. */
@@ -137,21 +201,20 @@ export function buildWizardLabels({
   studio,
   category,
   serviceTitle,
+  serviceBenefit,
 }: WizardLabelSources): WizardLabels {
   const steps = byId(CONFIGURATOR_STEPS, (step) => t(`steps.${step}`)) as WizardLabels['steps'];
-  const categories = Object.fromEntries(model.types.map((id) => [id, category(id)]));
-  const features = Object.fromEntries(
-    Object.values(model.features)
-      .flat()
-      .map((feature) => [
-        feature.id,
-        feature.kind === 'service'
-          ? serviceTitle(feature.category, feature.key)
-          : t(`extras.${feature.key}`),
-      ]),
+  const categories = Object.fromEntries(model.categories.map((id) => [id, category(id)]));
+  const services = Object.fromEntries(
+    allServices(model).map((service) => [service.id, serviceTitle(service.category, service.slug)]),
+  );
+  const benefits = Object.fromEntries(
+    allServices(model).map((service) => [
+      service.id,
+      serviceBenefit(service.category, service.slug),
+    ]),
   );
   const industries = byId(model.industries, (id) => t(`industries.${id}`));
-  const sizes = byId(model.companySizes, (id) => t(`sizes.${id}`));
   const timelines = byId(model.timelines, (id) => t(`timelines.${id}`));
   const budgets = {
     ...Object.fromEntries(
@@ -162,45 +225,91 @@ export function buildWizardLabels({
     ),
     [BUDGET_NOT_SURE]: t('budget.notSure'),
   };
-  const yes = t('yes');
-  const no = t('no');
+  const goalNames = byId(
+    model.goals.map((goal) => goal.id),
+    (id) => t(`goals.items.${id}.name`),
+  );
+  const questions = byId(
+    model.goals.map((goal) => goal.id),
+    (id) => t(`goals.items.${id}.question`),
+  );
+  // "I don't know" is one shared wording; the other options are the goal's own.
+  const options = Object.fromEntries(
+    model.goals.map((goal) => [
+      goal.id,
+      byId(
+        goal.options.map((option) => option.id),
+        (id) =>
+          id === OPTION_UNKNOWN
+            ? t('goals.unknownOption')
+            : t(`goals.items.${goal.id}.options.${id}`),
+      ),
+    ]),
+  );
+  const have = byId(model.have, (id) => t(`have.items.${id}`));
+  const progress = (total: number) =>
+    Array.from({ length: total }, (_, index) => t('progress', { current: index + 1, total }));
+  const guidedCount = CONFIGURATOR_STEPS.length;
   return {
     steps,
+    titles: byId(CONFIGURATOR_STEPS, (step) => t(`titles.${step}`)) as WizardLabels['titles'],
     hints: byId(CONFIGURATOR_STEPS, (step) => t(`hints.${step}`)) as WizardLabels['hints'],
-    progress: CONFIGURATOR_STEPS.map((_, index) =>
-      t('progress', { current: index + 1, total: CONFIGURATOR_STEPS.length }),
-    ),
+    progress: { guided: progress(guidedCount), manual: progress(guidedCount - 1) },
     stepsNav: t('stepsNav'),
     nav: {
       back: t('nav.back'),
       next: t('nav.next'),
-      toSummary: t('nav.toSummary'),
       edit: t('nav.edit'),
       startOver: t('nav.startOver'),
       startOverConfirm: t('nav.startOverConfirm'),
       startOverYes: t('nav.startOverYes'),
       startOverNo: t('nav.startOverNo'),
     },
+    goals: {
+      legend: t('goals.legend'),
+      hint: t('goals.hint', { max: model.maxGoals }),
+      unsure: t('goals.unsure'),
+      knowIt: t('goals.knowIt'),
+      names: goalNames,
+    },
+    details: {
+      unsureNote: t('details.unsureNote'),
+      questions,
+      options,
+      haveLegend: t('have.legend'),
+      haveHint: t('have.hint'),
+      have,
+    },
+    solution: {
+      // Templates for the client: the argument is given back as its own placeholder (see `fillTemplate`).
+      fits: t('solution.fits', { combo: '{combo}' }),
+      consultation: t('solution.consultation'),
+      remove: t('solution.remove'),
+      removeNamed: t('solution.removeNamed', { service: '{service}' }),
+      addMore: t('solution.addMore'),
+      hideList: t('solution.hideList'),
+      listLegend: t('solution.listLegend'),
+      manualHint: t('solution.manualHint'),
+      backToGuided: t('solution.backToGuided'),
+      benefits,
+    },
+    plan: {
+      budget: t('plan.budget'),
+      timeline: t('plan.timeline'),
+      industry: t('plan.industry'),
+      industryHint: t('plan.industryHint'),
+      industryOther: t('plan.industryOther'),
+      industryOtherHint: t('plan.industryOtherHint', { max: INDUSTRY_OTHER_MAX }),
+    },
     fields: {
-      types: t('fields.types'),
-      features: t('fields.features'),
-      industry: t('fields.industry'),
-      size: t('fields.size'),
-      hasWebsite: t('fields.hasWebsite'),
-      hasCrm: t('fields.hasCrm'),
-      budget: t('fields.budget'),
-      timeline: t('fields.timeline'),
       name: t('fields.name'),
       nameHint: t('fields.nameHint'),
       comment: t('fields.comment'),
       commentHint: t('fields.commentHint', { max: model.limits.commentMax }),
     },
-    yes,
-    no,
     categories,
-    features,
+    services,
     industries,
-    sizes,
     budgets,
     timelines,
     errors: {
@@ -210,6 +319,7 @@ export function buildWizardLabels({
       nameTooShort: t('errors.tooShort', { min: model.limits.nameMin }),
       nameTooLong: t('errors.tooLong', { max: model.limits.nameMax }),
       commentTooLong: t('errors.tooLong', { max: model.limits.commentMax }),
+      industryTooLong: t('errors.tooLong', { max: INDUSTRY_OTHER_MAX }),
       unknown: t('errors.unknown'),
     },
     prefilled: t('prefilled'),
@@ -232,26 +342,35 @@ export function buildWizardLabels({
       staleKeep: t('summary.staleKeep'),
       sent: t('summary.sent'),
       sendFailed: t('summary.sendFailed'),
+      rowGoals: t('summary.rowGoals'),
+      rowHave: t('summary.rowHave'),
+      rowServices: t('summary.rowServices'),
+      rowBudget: t('summary.rowBudget'),
+      rowTimeline: t('summary.rowTimeline'),
+      rowIndustry: t('summary.rowIndustry'),
+      rowConsultation: t('summary.rowConsultation'),
     },
     lead: {
       title: tLead('title', { studio }),
-      types: tLead('types'),
-      features: tLead('features'),
-      business: tLead('business'),
-      website: tLead('website'),
-      crm: tLead('crm'),
+      goals: tLead('goals'),
+      have: tLead('have'),
+      solution: tLead('solution'),
+      services: tLead('services'),
+      industry: tLead('industry'),
       budget: tLead('budget'),
       timeline: tLead('timeline'),
       name: tLead('name'),
       comment: tLead('comment'),
-      yes: tLead('yes'),
-      no: tLead('no'),
+      unsure: tLead('unsure'),
+      consultation: tLead('consultation'),
+      goalNames,
+      answers: options,
+      haveNames: have,
       categories: Object.fromEntries(
         Object.entries(categories).map(([id, label]) => [id, label.name]),
       ),
-      featureNames: features,
+      serviceNames: services,
       industries,
-      sizes,
       budgets,
       timelines,
     },
@@ -266,12 +385,13 @@ export function errorText(
 ): string {
   switch (code) {
     case 'required':
-      if (field === 'types' || field === 'features') return errors.requiredMulti;
+      if (field === 'goals') return errors.requiredMulti;
       if (field === 'contact.name') return errors.requiredText;
       return errors.requiredOne;
     case 'tooShort':
       return errors.nameTooShort;
     case 'tooLong':
+      if (field === 'industry') return errors.industryTooLong;
       return field === 'contact.comment' ? errors.commentTooLong : errors.nameTooLong;
     case 'unknown':
       return errors.unknown;

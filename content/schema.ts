@@ -221,6 +221,11 @@ export const categoryTextSchema = z.object({
 export const serviceTextSchema = z.object({
   title: z.string().min(1).max(32),
   summary: z.string().min(1).max(200),
+  /**
+   * One line in plain words: what this service gives the client. Shown next to
+   * each recommended service in the configurator (D149).
+   */
+  benefit: z.string().min(1).max(90),
   audience: z.string().min(1),
   features: z.array(z.string().min(1).max(60)).min(3).max(5),
   example: z.string().min(1),

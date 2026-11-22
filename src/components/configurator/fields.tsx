@@ -52,6 +52,12 @@ interface OptionGroupProps {
   onToggle: (value: string) => void;
   error?: string;
   columns?: 1 | 2;
+  /** A small caption above the legend, part of the group's name (the goal a question belongs to). */
+  kicker?: string;
+  /** The step's heading already asks the question: keep the legend for screen readers only. */
+  hideLegend?: boolean;
+  /** Option values that cannot be picked now (an unchecked one while a limit is reached). */
+  disabled?: readonly string[];
   /** Extra content under the legend (e.g. a category name in the features step). */
   children?: ReactNode;
 }
@@ -72,6 +78,9 @@ export function OptionGroup({
   onToggle,
   error,
   columns = 1,
+  disabled = [],
+  kicker,
+  hideLegend = false,
   children,
 }: OptionGroupProps) {
   const id = fieldDomId(field);
@@ -79,7 +88,10 @@ export function OptionGroup({
   const errorId = error ? `${id}-error` : undefined;
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-1 text-body font-medium text-ink">{legend}</legend>
+      <legend className={hideLegend ? 'sr-only' : 'mb-1 text-body font-medium text-ink'}>
+        {kicker ? <span className="mb-1 block eyebrow">{kicker}</span> : null}
+        {legend}
+      </legend>
       {hint ? (
         <p id={hintId} className="mb-3 text-sm leading-relaxed text-muted">
           {hint}
@@ -91,11 +103,14 @@ export function OptionGroup({
       >
         {options.map((option, index) => {
           const checked = selected.includes(option.value);
+          const blocked = !checked && disabled.includes(option.value);
           return (
             <label
               key={option.value}
               style={option.accent ? accentStyle(option.accent) : undefined}
-              className={`group flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors duration-150 ease-calm md:min-h-10 md:pointer-coarse:min-h-11 ${
+              className={`group flex min-h-11 items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors duration-150 ease-calm md:min-h-10 md:pointer-coarse:min-h-11 ${
+                blocked ? 'cursor-not-allowed opacity-45' : 'cursor-pointer'
+              } ${
                 checked
                   ? 'border-[color-mix(in_srgb,var(--accent,var(--color-brand))_60%,transparent)] bg-[color-mix(in_srgb,var(--accent,var(--color-brand))_12%,transparent)] text-ink'
                   : 'border-white/[0.08] text-ink/90 hover:border-white/20 hover:bg-white/[0.04]'
@@ -107,6 +122,7 @@ export function OptionGroup({
                 name={id}
                 value={option.value}
                 checked={checked}
+                disabled={blocked}
                 onChange={() => onToggle(option.value)}
                 aria-invalid={error ? true : undefined}
                 aria-describedby={describedBy(hintId, errorId)}
@@ -128,38 +144,63 @@ export function OptionGroup({
   );
 }
 
-/** Yes / no as a pair of radios. */
-export function YesNoGroup({
+/**
+ * Optional single choice as toggle chips (the industry): pressing the chosen
+ * chip again clears it. Plain buttons with `aria-pressed`, in a group named by
+ * the legend.
+ */
+export function ChipGroup({
   field,
   legend,
+  hint,
+  options,
   value,
   onChange,
-  yes,
-  no,
   error,
 }: {
   field: string;
   legend: string;
-  value: 'yes' | 'no' | null;
-  onChange: (value: 'yes' | 'no') => void;
-  yes: string;
-  no: string;
+  hint?: string;
+  options: readonly Option[];
+  value: string | null;
+  onChange: (value: string | null) => void;
   error?: string;
 }) {
+  const id = fieldDomId(field);
+  const hintId = hint ? `${id}-hint` : undefined;
   return (
-    <OptionGroup
-      field={field}
-      legend={legend}
-      type="radio"
-      columns={2}
-      options={[
-        { value: 'yes', label: yes },
-        { value: 'no', label: no },
-      ]}
-      selected={value ? [value] : []}
-      onToggle={(next) => onChange(next as 'yes' | 'no')}
-      error={error}
-    />
+    <div role="group" aria-labelledby={`${id}-legend`} aria-describedby={hintId}>
+      <p id={`${id}-legend`} className="text-body font-medium text-ink">
+        {legend}
+      </p>
+      {hint ? (
+        <p id={hintId} className="mt-1 text-sm leading-relaxed text-muted">
+          {hint}
+        </p>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {options.map((option, index) => {
+          const pressed = value === option.value;
+          return (
+            <button
+              key={option.value}
+              id={`${id}-${index}`}
+              type="button"
+              aria-pressed={pressed}
+              onClick={() => onChange(pressed ? null : option.value)}
+              className={`min-h-11 rounded-full border px-4 text-sm transition-colors duration-150 ease-calm ${
+                pressed
+                  ? 'border-[color-mix(in_srgb,var(--color-brand)_60%,transparent)] bg-[color-mix(in_srgb,var(--color-brand)_14%,transparent)] text-ink'
+                  : 'border-white/[0.12] text-ink/90 hover:border-white/25 hover:bg-white/[0.04] active:bg-white/[0.08]'
+              }`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      <FieldError field={field} message={error} />
+    </div>
   );
 }
 
@@ -172,3 +213,8 @@ export function inputBorder(error?: string): string {
 }
 
 export { describedBy };
+
+/** A quiet text-link look for in-form actions that are buttons (44 px tall). */
+export const linkButtonClass =
+  'min-h-11 rounded-full px-2 text-sm text-muted underline decoration-white/25 underline-offset-4 ' +
+  'transition-colors duration-150 hover:text-ink active:text-white';

@@ -4,8 +4,8 @@
     "homeDescription": "Websites, CRM systems, automation, AI solutions and Telegram bots for small businesses. Describe your project in a few steps and send us a request.",
     "portfolioTitle": "Portfolio",
     "portfolioDescription": "Projects by {studio}: the task, the solution, the result and the tech stack.",
-    "configuratorTitle": "Build your request",
-    "configuratorDescription": "Choose the type of solution, features, budget and timeline, then send a ready-made message via Telegram.",
+    "configuratorTitle": "Find your solution",
+    "configuratorDescription": "Answer a few simple questions about your business. We'll pick the solution and explain it in plain words. Then send us the ready-made message via Telegram.",
     "ogImageAlt": "{studio}. We bring your business together in one system: web development, CRM, automation, AI and Telegram bots"
   },
   "common": {
@@ -148,71 +148,151 @@
   },
   "configurator": {
     "eyebrow": "Configurator",
-    "title": "Build your request",
-    "lead": "A few quick steps, and you'll have a ready-made message to send us via Telegram.",
+    "title": "Find your solution",
+    "lead": "Answer a few simple questions about your business. We'll pick the solution and explain, in plain words, what each part is for.",
     "steps": {
-      "type": "Solution type",
-      "features": "Features",
-      "business": "Your business",
-      "budget": "Budget",
-      "timeline": "Timeline",
-      "contact": "Name and comment",
-      "summary": "Summary"
+      "goals": "Goals",
+      "details": "Questions",
+      "solution": "Solution",
+      "plan": "Budget & timing",
+      "contact": "Contact"
+    },
+    "titles": {
+      "goals": "What do you want to improve?",
+      "details": "A few quick questions",
+      "solution": "Your solution",
+      "plan": "Budget and timing",
+      "contact": "Contact and summary"
     },
     "hints": {
-      "type": "Select one or more areas your project covers.",
-      "features": "Choose what the solution should include. The list depends on the areas you picked.",
-      "business": "A few details about your business help us suggest the right solution.",
-      "budget": "An approximate net amount in PLN, matched to the services you chose. You can also choose “Not sure yet”.",
-      "timeline": "When should the solution be up and running?",
-      "contact": "How should we address you? The comment is optional.",
-      "summary": "Check the message, edit it if needed and send it via Telegram."
+      "goals": "No tech knowledge needed. Tell us what you would like to improve in your business.",
+      "details": "One simple question per goal, plus a short one about what you already have.",
+      "solution": "Here is what we suggest and what each part is for. Remove what you don't need or add more.",
+      "plan": "Pick a rough budget in PLN (net) matched to your services, and tell us when you want to start.",
+      "contact": "How should we address you? Check the message, edit it if you like, and send it via Telegram."
     },
     "progress": "Step {current} of {total}",
-    "stepsNav": "Request steps",
+    "stepsNav": "Steps to your solution",
     "nav": {
       "back": "Back",
       "next": "Next",
-      "toSummary": "Go to summary",
       "edit": "Change",
       "startOver": "Start over",
       "startOverConfirm": "Clear all answers?",
       "startOverYes": "Yes, clear",
       "startOverNo": "Cancel"
     },
-    "fields": {
-      "types": "Project areas",
-      "features": "Features",
-      "industry": "Industry",
-      "size": "Company size",
-      "hasWebsite": "Does your business already have a website?",
-      "hasCrm": "Does your business already use a CRM?",
+    "goals": {
+      "legend": "Goals",
+      "hint": "Pick up to {max}.",
+      "unsure": "Not sure yet — help me decide",
+      "knowIt": "I know what I need",
+      "unknownOption": "Not sure",
+      "items": {
+        "more-clients": {
+          "name": "More customers online",
+          "question": "Where should customers find out about you?",
+          "options": {
+            "google": "From Google",
+            "social-ads": "From Instagram, Facebook or ads",
+            "messengers": "From messengers and word of mouth"
+          }
+        },
+        "online-orders": {
+          "name": "Take orders and payments online",
+          "question": "How many products or services do you have?",
+          "options": {
+            "up-to-20": "Up to 20",
+            "20-200": "20–200",
+            "over-200": "Over 200"
+          }
+        },
+        "booking": {
+          "name": "Online booking and appointments",
+          "question": "How do clients book now?",
+          "options": {
+            "phone": "By phone",
+            "messengers": "In messengers",
+            "website-inconvenient": "Through the website, but it's inconvenient"
+          }
+        },
+        "client-order": {
+          "name": "Keep clients and orders organised",
+          "question": "Where do you keep clients and orders now?",
+          "options": {
+            "head-notebook": "In my head or a notebook",
+            "spreadsheets": "In Excel or spreadsheets",
+            "program-inconvenient": "In a program, but it's inconvenient"
+          }
+        },
+        "less-routine": {
+          "name": "Less routine work",
+          "question": "What takes the most time?",
+          "options": {
+            "documents": "Documents and invoices",
+            "reminders": "Reminders for customers",
+            "data-transfer": "Moving data between programs",
+            "emails-requests": "Emails and requests"
+          }
+        },
+        "fast-replies": {
+          "name": "Answer customers fast",
+          "question": "How do customers usually contact you?",
+          "options": {
+            "telegram": "In Telegram",
+            "website-chat": "On the website or in a chat",
+            "many-channels": "In several messengers and by email",
+            "repeated-questions": "Mostly with the same questions"
+          }
+        },
+        "see-numbers": {
+          "name": "See the numbers and reports",
+          "question": "What do you want to see in numbers?",
+          "options": {
+            "sales-clients": "Sales and clients",
+            "team-processes": "Team performance and processes",
+            "feedback": "Customer reviews and messages"
+          }
+        }
+      }
+    },
+    "have": {
+      "legend": "What do you already have?",
+      "hint": "Pick all that apply.",
+      "items": {
+        "website": "A website",
+        "social": "Social media",
+        "tracking": "A program or spreadsheets for tracking clients",
+        "none": "None of these"
+      }
+    },
+    "details": {
+      "unsureNote": "Not sure yet? One question is enough. We'll work out the rest together."
+    },
+    "solution": {
+      "fits": "We recommend: {combo}",
+      "consultation": "We'll pick the solution together during a short, free consultation.",
+      "remove": "Remove",
+      "removeNamed": "Remove: {service}",
+      "addMore": "Add more services",
+      "hideList": "Hide the list",
+      "listLegend": "All services",
+      "manualHint": "You pick the services yourself.",
+      "backToGuided": "Not sure? Answer a few questions"
+    },
+    "plan": {
       "budget": "Budget",
-      "timeline": "Timeline",
+      "timeline": "When do you want to start?",
+      "industry": "Industry",
+      "industryHint": "Optional — it helps us fit the solution better.",
+      "industryOther": "Which industry?",
+      "industryOtherHint": "Up to {max} characters."
+    },
+    "fields": {
       "name": "Name",
       "nameHint": "Your first name or the company name is enough.",
       "comment": "Comment (optional)",
       "commentHint": "Up to {max} characters. Briefly describe what you need."
-    },
-    "yes": "Yes",
-    "no": "No",
-    "extras": {
-      "multilingual": "Multiple Languages",
-      "cms": "Content Editing Panel (CMS)",
-      "seo": "Search Engine Optimisation (SEO)",
-      "online-payments": "Online Payments",
-      "data-migration": "Data Migration",
-      "team-training": "Team Training",
-      "telephony": "Phone System Integration",
-      "mobile-access": "Mobile Access",
-      "e-invoicing": "E-Invoicing",
-      "erp-integration": "ERP Integration",
-      "scheduled-reports": "Scheduled Reports",
-      "knowledge-base": "AI Knowledge Base",
-      "voice": "Voice Interaction",
-      "human-handoff": "Handover to a Human",
-      "crm-sync": "CRM Sync",
-      "broadcasts": "Broadcast Messages"
     },
     "industries": {
       "retail": "Retail",
@@ -226,13 +306,6 @@
       "it": "IT and technology",
       "other": "Other industry"
     },
-    "sizes": {
-      "solo": "1 person",
-      "2-10": "2–10 people",
-      "11-50": "11–50 people",
-      "51-200": "51–200 people",
-      "200-plus": "Over 200 people"
-    },
     "timelines": {
       "asap": "As soon as possible",
       "1-month": "Within a month",
@@ -244,7 +317,7 @@
       "upTo": "up to {currency} {max} net",
       "range": "{currency} {min}–{max} net",
       "from": "over {currency} {min} net",
-      "notSure": "Not sure yet",
+      "notSure": "Not sure yet — help me estimate",
       "reset": "Your selection changed, so the budget range was cleared. Please choose it again."
     },
     "errors": {
@@ -273,22 +346,29 @@
       "staleUpdate": "Update the message",
       "staleKeep": "Keep my text",
       "sent": "Your request has been sent.",
-      "sendFailed": "Your request could not be sent. Copy the text and send it to us another way."
+      "sendFailed": "Your request could not be sent. Copy the text and send it to us another way.",
+      "rowGoals": "Goals",
+      "rowHave": "What you already have",
+      "rowServices": "Services",
+      "rowBudget": "Budget",
+      "rowTimeline": "Timeline",
+      "rowIndustry": "Industry",
+      "rowConsultation": "To be chosen at a consultation"
     }
   },
   "lead": {
     "title": "Request from the {studio} website",
-    "types": "Areas",
-    "features": "Features",
-    "business": "Company",
-    "website": "Has a website",
-    "crm": "Uses a CRM",
+    "goals": "Goals",
+    "have": "Already have",
+    "solution": "Solution",
+    "services": "Services",
+    "industry": "Industry",
     "budget": "Budget",
     "timeline": "Timeline",
     "name": "Name",
     "comment": "Comment",
-    "yes": "yes",
-    "no": "no"
+    "unsure": "we are not sure yet, please advise",
+    "consultation": "to be chosen at a free consultation"
   },
   "notFound": {
     "title": "This sector is empty",

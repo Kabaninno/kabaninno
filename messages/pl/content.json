@@ -41,6 +41,7 @@
       "corporate-websites": {
         "title": "Strony firmowe",
         "summary": "Nowoczesna strona, która jasno mówi, czym się zajmujesz, buduje zaufanie i zamienia odwiedzających w zapytania.",
+        "benefit": "Strona, dzięki której klienci znajdą Twoją firmę w Google i jej zaufają.",
         "audience": "Dla firm usługowych, gabinetów, warsztatów i biur, które chcą wyglądać profesjonalnie w sieci i dostawać więcej zapytań.",
         "features": [
           "Projekt dopasowany do Twojej marki",
@@ -55,6 +56,7 @@
       "online-stores": {
         "title": "Sklepy internetowe",
         "summary": "Sklep online z wygodnym katalogiem, płatnościami i dostawą — gotowy do sprzedaży od pierwszego dnia.",
+        "benefit": "Sprzedajesz online i przyjmujesz płatności przez całą dobę.",
         "audience": "Dla producentów, sklepów stacjonarnych i marek, które chcą sprzedawać w internecie bez chaosu w zamówieniach.",
         "features": [
           "Katalog z filtrami i wariantami produktów",
@@ -68,6 +70,7 @@
       "landing-pages": {
         "title": "Landing page",
         "summary": "Jedna strona skupiona na jednym celu: sprzedaży produktu, zapisach na wydarzenie lub zbieraniu zapytań z kampanii.",
+        "benefit": "Jedna strona, która zamienia odwiedzających w zapytania.",
         "audience": "Dla firm, które uruchamiają reklamy, nowy produkt lub promocję i chcą szybko sprawdzić, czy to działa.",
         "features": [
           "Struktura nastawiona na konwersję",
@@ -81,6 +84,7 @@
       "web-apps": {
         "title": "Aplikacje webowe",
         "summary": "Aplikacja w przeglądarce dopasowana do Twoich procesów: panel klienta, system rezerwacji, kalkulator czy narzędzie wewnętrzne.",
+        "benefit": "Własne narzędzie online, które działa tak, jak pracuje Twoja firma.",
         "audience": "Dla firm, którym gotowe narzędzia już nie wystarczają, albo które chcą dać klientom wygodny dostęp do usług online.",
         "features": [
           "Projekt pod Twój proces, a nie odwrotnie",
@@ -96,6 +100,7 @@
       "crm-implementation": {
         "title": "Wdrożenie CRM",
         "summary": "Dobieramy i konfigurujemy gotowy CRM, przenosimy dane i szkolimy zespół, żeby system był używany, a nie tylko kupiony.",
+        "benefit": "Klienci i zlecenia w jednym miejscu, nic się nie gubi.",
         "audience": "Dla firm, które prowadzą klientów w Excelu, w notesie albo w głowie i czują, że coś im ucieka.",
         "features": [
           "Wybór systemu pod budżet i potrzeby",
@@ -109,6 +114,7 @@
       "custom-crm": {
         "title": "CRM na zamówienie",
         "summary": "Własny system zbudowany pod Twoją branżę i sposób pracy, bez zbędnych funkcji i opłat za każdego użytkownika.",
+        "benefit": "System do obsługi klientów skrojony pod Twoją firmę, bez zbędnych funkcji.",
         "audience": "Dla firm o nietypowych procesach, dla których gotowe CRM-y są za ciasne albo za drogie przy większej skali.",
         "features": [
           "Moduły tylko pod Twoje procesy",
@@ -122,6 +128,7 @@
       "sales-funnels": {
         "title": "Lejki sprzedażowe",
         "summary": "Projektujemy ścieżkę klienta od pierwszego kontaktu do zakupu i ustawiamy ją w CRM, żeby żaden lead nie przepadł.",
+        "benefit": "Widzisz, na jakim etapie jest każdy klient i do kogo wrócić.",
         "audience": "Dla firm, które mają zapytania, ale nie wiedzą, na którym etapie tracą klientów.",
         "features": [
           "Mapa etapów sprzedaży",
@@ -135,6 +142,7 @@
       "reports-dashboards": {
         "title": "Raporty i dashboardy",
         "summary": "Najważniejsze liczby Twojej firmy na jednym ekranie: sprzedaż, źródła klientów, wyniki zespołu — aktualne i czytelne.",
+        "benefit": "Najważniejsze liczby o sprzedaży na jednym ekranie.",
         "audience": "Dla właścicieli i menedżerów, którzy chcą podejmować decyzje na podstawie danych, a nie przeczucia.",
         "features": [
           "Dashboardy z danych z CRM i innych źródeł",
@@ -150,6 +158,7 @@
       "api-integrations": {
         "title": "Integracje przez API",
         "summary": "Łączymy Twoje narzędzia — sklep, CRM, księgowość, płatności, kalendarz — żeby dane przepływały same, bez przepisywania.",
+        "benefit": "Programy wymieniają dane same, bez ręcznego przepisywania.",
         "audience": "Dla firm, które korzystają z kilku programów i tracą czas na ręczne przenoszenie informacji między nimi.",
         "features": [
           "Połączenia z popularnymi usługami",
@@ -163,6 +172,7 @@
       "document-automation": {
         "title": "Automatyzacja dokumentów",
         "summary": "Umowy, oferty, faktury i protokoły generowane automatycznie z Twoich danych — w kilka sekund i bez literówek.",
+        "benefit": "Umowy, oferty i faktury powstają same, w kilka sekund.",
         "audience": "Dla firm, które codziennie przygotowują podobne dokumenty i kopiują te same dane z miejsca na miejsce.",
         "features": [
           "Szablony umów, ofert i protokołów",
@@ -176,6 +186,7 @@
       "notifications-reminders": {
         "title": "Powiadomienia i przypomnienia",
         "summary": "Automatyczne SMS-y, e-maile i wiadomości w komunikatorach: przypomnienia o wizytach, płatnościach i terminach.",
+        "benefit": "Klienci i zespół dostają przypomnienia na czas, bez Twojego udziału.",
         "audience": "Dla gabinetów, serwisów i firm usługowych, które tracą pieniądze przez nieodbyte wizyty i spóźnione płatności.",
         "features": [
           "Przypomnienia o wizytach i terminach",
@@ -189,6 +200,7 @@
       "data-processing": {
         "title": "Przetwarzanie danych",
         "summary": "Zbieramy, czyścimy i porządkujemy dane z różnych źródeł, żeby były gotowe do raportów, analiz i dalszej automatyzacji.",
+        "benefit": "Dane z różnych źródeł porządkują się same.",
         "audience": "Dla firm, które mają dane w wielu arkuszach i systemach, ale nie mogą z nich szybko skorzystać.",
         "features": [
           "Import z arkuszy, plików i systemów",
@@ -204,6 +216,7 @@
       "ai-assistants": {
         "title": "Asystenci AI i chatboty",
         "summary": "Asystent, który zna Twoją ofertę i odpowiada klientom na stronie lub w komunikatorze, a trudne sprawy przekazuje człowiekowi.",
+        "benefit": "Odpowiada klientom o każdej porze, także w nocy.",
         "audience": "Dla firm, które dostają wiele powtarzalnych pytań i chcą odpowiadać szybko, także wieczorami i w weekendy.",
         "features": [
           "Odpowiedzi na podstawie Twojej wiedzy",
@@ -217,6 +230,7 @@
       "ai-document-processing": {
         "title": "Przetwarzanie dokumentów z AI",
         "summary": "AI odczytuje faktury, umowy i formularze, wyciąga z nich potrzebne dane i przekazuje je do Twoich systemów.",
+        "benefit": "Czyta faktury i dokumenty za Ciebie i wyciąga to, co ważne.",
         "audience": "Dla firm, które ręcznie przepisują dane z dokumentów: logistyki, biur rachunkowych, firm handlowych i usługowych.",
         "features": [
           "Odczyt skanów, zdjęć i plików PDF",
@@ -230,6 +244,7 @@
       "content-generation": {
         "title": "Generowanie treści",
         "summary": "AI przygotowuje opisy produktów, posty, newslettery i odpowiedzi w stylu Twojej marki, a Ty tylko je zatwierdzasz.",
+        "benefit": "Opisy, posty i odpowiedzi powstają w minuty, nie w godziny.",
         "audience": "Dla sklepów i firm, które potrzebują dużo treści, a nie mają na nie czasu ani osobnego copywritera.",
         "features": [
           "Opisy produktów na dużą skalę",
@@ -243,6 +258,7 @@
       "ai-analytics": {
         "title": "Analityka AI",
         "summary": "AI analizuje sprzedaż, opinie i zgłoszenia klientów, wskazuje trendy i odpowiada na pytania o Twoje dane prostym językiem.",
+        "benefit": "Wnioski z Twoich danych podane prostym językiem.",
         "audience": "Dla firm, które mają dane, ale brakuje im czasu albo analityka, żeby wyciągać z nich wnioski.",
         "features": [
           "Pytania o dane zadawane zwykłym językiem",
@@ -258,6 +274,7 @@
       "sales-orders": {
         "title": "Sprzedaż i zamówienia",
         "summary": "Bot w Telegramie z katalogiem, koszykiem i płatnością, który przyjmuje zamówienia całą dobę.",
+        "benefit": "Klienci zamawiają w Telegramie w kilka kliknięć.",
         "audience": "Dla gastronomii, piekarni, sklepów lokalnych i marek, których klienci i tak piszą w komunikatorach.",
         "features": [
           "Katalog i koszyk w czacie",
@@ -271,6 +288,7 @@
       "booking": {
         "title": "Zapisy i rezerwacje",
         "summary": "Bot, przez który klienci sami wybierają usługę, termin i specjalistę, a potem dostają przypomnienie.",
+        "benefit": "Klienci zapisują się sami, a Ty nie odbierasz telefonów.",
         "audience": "Dla salonów beauty, gabinetów, szkół, trenerów i wszystkich, którzy umawiają klientów na konkretne godziny.",
         "features": [
           "Wolne terminy w czasie rzeczywistym",
@@ -284,6 +302,7 @@
       "customer-support": {
         "title": "Obsługa klienta",
         "summary": "Bot odpowiada na typowe pytania, zbiera zgłoszenia i przekazuje je właściwej osobie z zespołu.",
+        "benefit": "Szybkie odpowiedzi na typowe pytania prosto w komunikatorze.",
         "audience": "Dla firm, w których pytania klientów giną w prywatnych wiadomościach pracowników.",
         "features": [
           "Odpowiedzi na częste pytania",
@@ -297,6 +316,7 @@
       "mini-apps": {
         "title": "Telegram Mini Apps",
         "summary": "Pełnoprawna aplikacja otwierana w Telegramie: sklep, karta lojalnościowa, kalendarz czy panel klienta — bez instalacji.",
+        "benefit": "Mała aplikacja w Telegramie: katalog, zamówienia, konto klienta.",
         "audience": "Dla firm, które chcą mieć własną aplikację dla klientów bez kosztów i barier sklepów z aplikacjami.",
         "features": [
           "Interfejs jak w aplikacji mobilnej",

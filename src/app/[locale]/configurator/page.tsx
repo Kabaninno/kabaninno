@@ -54,6 +54,7 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
       color: getCategory(id)?.dna.color ?? '#E8ECF5',
     }),
     serviceTitle: (categoryId, slug) => getServiceText(locale, categoryId, slug).title,
+    serviceBenefit: (categoryId, slug) => getServiceText(locale, categoryId, slug).benefit,
   });
 
   // The wizard renders the panel header itself: its lead shows on the first
