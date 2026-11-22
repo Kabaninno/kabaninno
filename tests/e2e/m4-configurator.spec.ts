@@ -55,7 +55,6 @@ const checkGoal = (page: Page, id: keyof typeof cfg.goals.items) =>
   panel(page)
     .getByRole('checkbox', { name: goal(id).name, exact: true })
     .check();
-const stepsNav = (page: Page) => panel(page).getByRole('navigation', { name: cfg.stepsNav });
 
 test.describe('goals and details', () => {
   test('Next without a goal shows the error and focuses the first goal', async ({ page }) => {
@@ -154,7 +153,6 @@ test.describe('manual mode', () => {
     await panel(page).getByRole('button', { name: cfg.goals.knowIt }).click();
     await expect(stepTitle(page)).toHaveText(cfg.titles.solution);
     await expect(panel(page)).toContainText('Krok 2 z 4');
-    await expect(stepsNav(page).getByRole('button', { name: cfg.steps.details })).toHaveCount(0);
     await expect(panel(page)).toContainText(cfg.solution.consultation);
     // The list is open while nothing is picked.
     await panel(page)
@@ -274,7 +272,7 @@ test.describe('budget and timing', () => {
     await open(page);
     await next(page).click();
     await expect(stepTitle(page)).toHaveText(cfg.titles.contact);
-    await stepsNav(page).getByRole('button', { name: cfg.steps.plan }).click();
+    await panel(page).getByRole('button', { name: cfg.nav.back }).click();
     const other = panel(page).getByRole('button', { name: cfg.industries.other, exact: true });
     await other.click();
     await expect(other).toHaveAttribute('aria-pressed', 'true');

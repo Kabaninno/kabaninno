@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
 import { HighlightLink } from '@/components/nav/HighlightLink';
 import { Link } from '@/i18n/navigation';
 import { analytics } from '@/lib/analytics';
-import { ariaCurrentFor } from '@/lib/nav';
+import { ariaCurrentFor, showsHudCta } from '@/lib/nav';
 import { paths } from '@/lib/routes';
 import { accentStyle, formatIndex } from '@/lib/style';
 import { ConfiguratorLinkText, useRequestSummary } from '@/components/request/RequestCount';
@@ -33,7 +33,7 @@ const MD_QUERY = '(min-width: 48rem)';
  */
 export function MobileMenu({ categories, studioName, className }: MobileMenuProps) {
   const t = useTranslations('hud');
-  const { pathname } = useHudLocation();
+  const { pathname, section } = useHudLocation();
   const request = useRequestSummary();
   const [openOn, setOpenOn] = useState<string | null>(null);
   const open = openOn === pathname;
@@ -184,13 +184,16 @@ export function MobileMenu({ categories, studioName, className }: MobileMenuProp
           <div className="flex shrink-0 flex-col gap-3 border-t border-white/[0.06] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <SimpleModeToggle variant="row" />
             <LocaleSwitcher size="large" className="self-center" />
-            <Link
-              href={paths.configurator()}
-              onClick={() => analytics.track('cta_click', { placement: 'mobile-menu' })}
-              className={`${primaryButton} min-h-12 w-full px-6 text-sm`}
-            >
-              {t('cta')}
-            </Link>
+            {/* The HUD call-to-action rule holds at every width (D153). */}
+            {showsHudCta(section) ? (
+              <Link
+                href={paths.configurator()}
+                onClick={() => analytics.track('cta_click', { placement: 'mobile-menu' })}
+                className={`${primaryButton} min-h-12 w-full px-6 text-sm`}
+              >
+                {t('cta')}
+              </Link>
+            ) : null}
           </div>
         </div>
       </dialog>

@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { HighlightLink } from '@/components/nav/HighlightLink';
 import { Link } from '@/i18n/navigation';
 import { analytics } from '@/lib/analytics';
-import { ariaCurrentFor } from '@/lib/nav';
+import { ariaCurrentFor, showsHudCta } from '@/lib/nav';
 import { paths } from '@/lib/routes';
 import { ConfiguratorLinkText, useRequestSummary } from '@/components/request/RequestCount';
 import { hudLink, primaryButton } from '@/components/ui/styles';
@@ -41,7 +41,7 @@ interface HudProps {
  */
 export function Hud({ categories, studioName, homeLabel }: HudProps) {
   const t = useTranslations('hud');
-  const { pathname } = useHudLocation();
+  const { pathname, section } = useHudLocation();
   // Request draft size (M3): a badge on the configurator link while non-empty.
   const request = useRequestSummary();
 
@@ -95,13 +95,20 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
           <SimpleModeToggle className="max-md:hidden" />
           <LocaleSwitcher className="hidden md:block" />
           <LocaleSwitcher variant="menu" className="md:hidden" />
-          <Link
-            href={paths.configurator()}
-            onClick={() => analytics.track('cta_click', { placement: 'hud' })}
-            className={`${primaryButton} hud-cta h-10 px-5 text-body-s max-lg:hidden pointer-coarse:h-11`}
-          >
-            {t('cta')}
-          </Link>
+          {/*
+           * Not rendered on home and the configurator (D153), so the right
+           * block stays flush right. Below lg the bar has no room for it; the
+           * phone and tablet menu carries it under the same rule.
+           */}
+          {showsHudCta(section) ? (
+            <Link
+              href={paths.configurator()}
+              onClick={() => analytics.track('cta_click', { placement: 'hud' })}
+              className={`${primaryButton} h-10 px-5 text-body-s max-lg:hidden pointer-coarse:h-11`}
+            >
+              {t('cta')}
+            </Link>
+          ) : null}
           <MobileMenu categories={categories} studioName={studioName} className="md:hidden" />
         </div>
         <BootIndicator />

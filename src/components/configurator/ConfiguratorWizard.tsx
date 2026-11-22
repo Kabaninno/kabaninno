@@ -320,15 +320,7 @@ export function ConfiguratorWizard({
         {notice}
       </p>
 
-      <ProgressNav
-        steps={steps}
-        current={step}
-        canEnter={(target) => canEnterStep(target, draft, model)}
-        onSelect={goTo}
-        names={labels.steps}
-        progress={progress}
-        label={labels.stepsNav}
-      />
+      <ProgressNav steps={steps} current={step} names={labels.steps} progress={progress} />
 
       <form
         id={FORM_ID}

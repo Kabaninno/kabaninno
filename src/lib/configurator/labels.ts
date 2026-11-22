@@ -28,14 +28,13 @@ export interface CategoryLabel {
 }
 
 export interface WizardLabels {
-  /** Short names of the steps (the progress chips). */
+  /** Short names of the steps (shown above the progress bar). */
   steps: Record<ConfiguratorStepId, string>;
   /** The step's heading. */
   titles: Record<ConfiguratorStepId, string>;
   hints: Record<ConfiguratorStepId, string>;
   /** "Krok 3 z 5" per step index, for the guided flow and for the manual one (no details step). */
   progress: { guided: string[]; manual: string[] };
-  stepsNav: string;
   nav: {
     back: string;
     next: string;
@@ -255,7 +254,6 @@ export function buildWizardLabels({
     titles: byId(CONFIGURATOR_STEPS, (step) => t(`titles.${step}`)) as WizardLabels['titles'],
     hints: byId(CONFIGURATOR_STEPS, (step) => t(`hints.${step}`)) as WizardLabels['hints'],
     progress: { guided: progress(guidedCount), manual: progress(guidedCount - 1) },
-    stepsNav: t('stepsNav'),
     nav: {
       back: t('nav.back'),
       next: t('nav.next'),

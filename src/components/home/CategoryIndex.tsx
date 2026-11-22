@@ -1,5 +1,4 @@
 import { HighlightLink } from '@/components/nav/HighlightLink';
-import { HeroCtaWatch } from './HeroCtaWatch';
 import { ctaArrow, primaryButton } from '@/components/ui/styles';
 import type { NavCategory } from '@/lib/nav';
 import { paths } from '@/lib/routes';
@@ -175,7 +174,6 @@ export function CategoryIndex({
           href={paths.configurator()}
           highlightId={sceneNodeId.configurator}
           aria-describedby="home-cta-note"
-          data-hero-cta=""
           className={`${primaryButton} min-h-12 px-6 text-sm short:min-h-11 short:px-5`}
         >
           {cta.label}
@@ -186,7 +184,6 @@ export function CategoryIndex({
         <p id="home-cta-note" className="text-center text-xs text-muted text-halo short:sr-only">
           {cta.note}
         </p>
-        <HeroCtaWatch />
       </div>
     </nav>
   );

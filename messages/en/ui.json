@@ -172,7 +172,6 @@
       "contact": "How should we address you? Check the message, edit it if you like, and send it via Telegram."
     },
     "progress": "Step {current} of {total}",
-    "stepsNav": "Steps to your solution",
     "nav": {
       "back": "Back",
       "next": "Next",

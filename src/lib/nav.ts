@@ -30,6 +30,15 @@ export function sectionForPath(pathname: string): SiteSection {
 }
 
 /**
+ * Does the HUD show its "Find your solution" call-to-action in this section
+ * (round 3, A1, D153)? Not on home, which has its own call-to-action, and not
+ * on the configurator it leads to; everywhere else, at every width.
+ */
+export function showsHudCta(section: SiteSection): boolean {
+  return section !== 'home' && section !== 'configurator';
+}
+
+/**
  * `aria-current` for a nav link: "page" on the exact page, "true" anywhere
  * inside its section (e.g. Portfolio while a case is open).
  */

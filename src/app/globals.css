@@ -490,29 +490,6 @@
    * First-visit intro (IntroControl, D94): the home hero steps aside while
    * the intro flight plays and comes back with `.ui-enter` when it ends.
    */
-  /*
-   * The HUD call-to-action yields to the home one while that is on screen
-   * (HeroCtaWatch, D148). During the intro the home UI is hidden, so the HUD
-   * button stays. visibility drops it from the tab order and the a11y tree.
-   */
-  .hud-cta {
-    transition:
-      background-color 200ms var(--ease-calm),
-      box-shadow 200ms var(--ease-calm),
-      scale 200ms var(--ease-calm),
-      opacity 200ms var(--ease-calm),
-      visibility 0s;
-  }
-
-  :root[data-hero-cta-visible]:not([data-intro-active]) .hud-cta {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition:
-      opacity 200ms var(--ease-calm),
-      visibility 0s 200ms;
-  }
-
   [data-intro-active] [data-intro-hide] {
     animation: ui-exit 300ms ease-out both;
     pointer-events: none;

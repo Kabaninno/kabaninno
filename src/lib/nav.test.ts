@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ariaCurrentFor, sectionForPath } from './nav';
+import { ariaCurrentFor, sectionForPath, showsHudCta } from './nav';
 import { formatIndex, withTrailingSlash } from './style';
 
 describe('sectionForPath', () => {
@@ -13,6 +13,17 @@ describe('sectionForPath', () => {
     ['/elsewhere/', 'other'],
   ])('%j → %s', (pathname, section) => {
     expect(sectionForPath(pathname)).toBe(section);
+  });
+});
+
+describe('showsHudCta', () => {
+  it('hides the HUD call-to-action on home and the configurator only (D153)', () => {
+    expect(showsHudCta(sectionForPath('/'))).toBe(false);
+    expect(showsHudCta(sectionForPath('/configurator/'))).toBe(false);
+    expect(showsHudCta(sectionForPath('/services/web/'))).toBe(true);
+    expect(showsHudCta(sectionForPath('/services/web/landing-pages/'))).toBe(true);
+    expect(showsHudCta(sectionForPath('/portfolio/'))).toBe(true);
+    expect(showsHudCta(sectionForPath('/privacy/'))).toBe(true);
   });
 });
 
