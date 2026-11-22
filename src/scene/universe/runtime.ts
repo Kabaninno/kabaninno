@@ -24,6 +24,14 @@ export interface UniverseRuntime {
    */
   selected: number[];
   selectProgress: number[];
+  /**
+   * Growth of each selected category's link into the beacon, eased 0..1
+   * (0 = nothing, 1 = reaches the beacon; `linkProgress` is its linear clock).
+   */
+  link: number[];
+  linkProgress: number[];
+  /** Start slots of selections that begin together (LINK_STAGGER_SECONDS apart). */
+  stagger: SelectionStagger;
   /** Core world radius after the minimum on-screen size rule. */
   coreRadius: number[];
   /** On-screen core diameter, CSS px. */
@@ -68,6 +76,9 @@ export function createUniverseRuntime(): UniverseRuntime {
     emphasis: filled(0),
     selected: filled(0),
     selectProgress: filled(0),
+    link: filled(0),
+    linkProgress: filled(0),
+    stagger: { clock: 0, lastStart: -Infinity },
     coreRadius: filled(0.3),
     corePx: filled(20),
     pxPerUnit: filled(20),
@@ -108,10 +119,47 @@ export const SELECTED_EMPHASIS = 0.6;
  * (0 or 1) so a full transition takes SELECT_SECONDS; `instant` (reduced
  * motion) jumps straight to it.
  */
-export function stepSelection(progress: number, target: number, dt: number, instant: boolean) {
+export function stepSelection(
+  progress: number,
+  target: number,
+  dt: number,
+  instant: boolean,
+  seconds: number = SELECT_SECONDS,
+) {
   if (instant) return target;
-  const step = dt / SELECT_SECONDS;
+  const step = dt / seconds;
   return target > progress ? Math.min(progress + step, target) : Math.max(progress - step, target);
+}
+
+/** Time a selection link takes to grow from its category into the beacon, seconds. */
+export const LINK_GROW_SECONDS = 0.7;
+/** Delay between selections that start together (several links appear at once), seconds. */
+export const LINK_STAGGER_SECONDS = 0.15;
+
+/** Clock (seconds, advanced by the frame loop) and the time the last selection started. */
+export interface SelectionStagger {
+  clock: number;
+  lastStart: number;
+}
+
+/**
+ * Selected-state target of a node this frame, staggered: a newly selected
+ * node (wanted 1, still at progress 0) waits for its slot, at least
+ * LINK_STAGGER_SECONDS after the previous start, so links that appear
+ * together grow one after another. Takes the slot (mutates `stagger`) when
+ * it starts. Deselection and nodes already under way are never delayed;
+ * `instant` (reduced motion) applies everything at once.
+ */
+export function staggerSelection(
+  wanted: number,
+  progress: number,
+  stagger: SelectionStagger,
+  instant: boolean,
+): number {
+  if (instant || wanted <= 0 || progress > 0) return wanted;
+  if (stagger.clock - stagger.lastStart < LINK_STAGGER_SECONDS) return 0;
+  stagger.lastStart = stagger.clock;
+  return wanted;
 }
 
 /** Displayed selected amount for a linear progress: ease in-out (smoothstep). */

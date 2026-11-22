@@ -86,6 +86,57 @@ export function frameCenter(frame: SafeFrame): { x: number; y: number } {
 }
 
 /**
+ * Centre of the free area itself, in viewport fractions: the safe rect's
+ * centre (clamped to the viewport). It differs from the frame's centre only
+ * when the minimum frame size widened the frame against a viewport edge (a
+ * phone band of a few dozen px above an expanded sheet). The viewport centre
+ * when the rect is missing or invalid.
+ */
+export function freeAreaCenter(
+  rect: SafeRect | null | undefined,
+  viewportWidth: number,
+  viewportHeight: number,
+): { x: number; y: number } {
+  const frame = resolveSafeFrame(rect, viewportWidth, viewportHeight);
+  if (!rect || frame === FULL_FRAME) return frameCenter(frame);
+  const left = clamp(rect.x / viewportWidth, 0, 1);
+  const right = clamp((rect.x + rect.width) / viewportWidth, 0, 1);
+  const top = clamp(rect.y / viewportHeight, 0, 1);
+  const bottom = clamp((rect.y + rect.height) / viewportHeight, 0, 1);
+  return { x: (left + right) / 2, y: (top + bottom) / 2 };
+}
+
+/**
+ * Moves a goal across its view so that its look target projects to `point`
+ * (viewport fractions) instead of the frame centre. Camera and look target
+ * shift together by an amount proportional to the view distance, so a later
+ * dolly along the view direction keeps the target at that point.
+ */
+export function centreOnPoint(
+  goal: CameraGoal,
+  point: { x: number; y: number },
+  aspect: number,
+  frame: SafeFrame = FULL_FRAME,
+): CameraGoal {
+  const centre = frameCenter(frame);
+  const dx = point.x - centre.x;
+  const dy = point.y - centre.y;
+  if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return goal;
+  const back = sub(goal.position, goal.lookAt);
+  const distance = Math.hypot(...back);
+  if (!(distance > 0)) return goal;
+  const forward = scale(back, -1 / distance);
+  const right = normalize(cross(forward, [0, 1, 0]));
+  const up = cross(right, forward);
+  // View-space tangents at which the target must appear (the principal point stays put).
+  const tan = Math.tan((goal.fov * Math.PI) / 360);
+  const tanX = dx * 2 * tan * (aspect > 0 ? aspect : 1);
+  const tanY = -dy * 2 * tan;
+  const shift = scale(add(scale(right, tanX), scale(up, tanY)), -distance);
+  return { ...goal, position: add(goal.position, shift), lookAt: add(goal.lookAt, shift) };
+}
+
+/**
  * `camera.setViewOffset(w, h, offsetX, offsetY, w, h)` offsets (CSS px) that
  * move the principal point from the viewport centre to (centerX, centerY),
  * given in viewport fractions.
@@ -441,9 +492,7 @@ interface FitPoint {
  * Distance and look target from which every sphere fits its frame tangents,
  * looking along `-dir` (up = +Y): fixed-point iterations that fit the
  * distance, then recentre on the projected extents so the group centres in
- * the frame. `finalFit` refits the distance at the final look target, which
- * guarantees containment when the recentring has not fully converged (wide,
- * deep groups such as the configurator selection).
+ * the frame.
  */
 function fitPoints(
   points: readonly FitPoint[],
@@ -451,7 +500,7 @@ function fitPoints(
   start: Vec3,
   minDistance: number,
   maxDistance: number,
-  { iterations = 5, finalFit = false }: { iterations?: number; finalFit?: boolean } = {},
+  iterations = 5,
 ): { look: Vec3; distance: number } {
   const forward = scale(dir, -1);
   const right = normalize(cross(forward, [0, 1, 0]));
@@ -495,115 +544,40 @@ function fitPoints(
       add(scale(right, ((minX + maxX) / 2) * distance), scale(up, ((minY + maxY) / 2) * distance)),
     );
   }
-  if (finalFit) distance = fitDistanceAt(look);
   return { look, distance };
 }
 
 /**
- * Configurator with a selection (D81): the beacon plus the selected nodes,
- * fitted into the free frame from the beacon focus' viewing direction, never
- * closer than the beacon focus itself. Nodes join nearest-first while the fit
- * stays within `maxDistance` (the overview distance); if not all of them fit,
- * the framing keeps the beacon and the nearest selected nodes with the
- * network around them instead of zooming out past the overview. `sway`: the
- * idle auto-rotate range the fit must cover (as in the overview).
+ * Configurator framing (owner feedback round 3, part C): the beacon crystal
+ * always sits at the centre of the free frame, on every step and for every
+ * selection; the camera never turns toward the selected categories. Each
+ * selected category (store `emphasis`, D81) moves the camera back along its
+ * viewing direction by `perLink` of the beacon focus distance, at most `max`
+ * in total, so the links entering the crystal stay visible (the categories
+ * themselves may stay off-screen).
  */
-export function selectionGoal(
+export const CONFIGURATOR_DOLLY = { perLink: 0.07, max: 1.2 } as const;
+
+/**
+ * Distance factor of the configurator view for `links` selected categories.
+ * Under reduced motion a selection never moves the camera (always 1).
+ */
+export function configuratorDistanceFactor(links: number, reducedMotion = false): number {
+  if (reducedMotion || !(links > 0)) return 1;
+  return Math.min(1 + CONFIGURATOR_DOLLY.perLink * Math.floor(links), CONFIGURATOR_DOLLY.max);
+}
+
+/** Distinct category nodes of a configurator selection (unknown ids and other kinds ignored). */
+export function configuratorLinkCount(
   model: UniverseModel,
-  focus: CameraGoal,
-  selected: readonly UniverseNode[],
-  aspect: number,
-  frame: SafeFrame,
-  maxDistance: number,
-  sway = 0,
-): CameraGoal {
-  if (selected.length === 0) return focus;
-  const anchor = model.configurator;
-  const { tanV, tanH } = frameTangents(focus.fov, aspect, frame);
-  const angles = sway > 0 ? [0, -sway, sway, -sway / 2, sway / 2] : [0];
-  const toPoints = (node: UniverseNode, centroid: Vec3): FitPoint[] => {
-    const { radius, margin } = selectionFraming(node);
-    return angles.map((angle) => ({
-      p: rotateY(node.position, centroid, angle),
-      r: radius,
-      tanV: tanV * margin,
-      tanH: tanH * margin,
-    }));
-  };
-  const dir = normalize(sub(focus.position, focus.lookAt));
-  const minDistance = Math.hypot(...sub(focus.position, focus.lookAt));
-  const ordered = [...selected].sort(
-    (a, b) =>
-      Math.hypot(...sub(a.position, anchor.position)) -
-      Math.hypot(...sub(b.position, anchor.position)),
-  );
-  let best = focus;
-  for (let n = 1; n <= ordered.length; n++) {
-    const group = [anchor, ...ordered.slice(0, n)];
-    const centroid = scale(
-      group.reduce<Vec3>((sum, node) => add(sum, node.position), [0, 0, 0]),
-      1 / group.length,
-    );
-    const points = group.flatMap((node) => toPoints(node, centroid));
-    const fit = fitPoints(points, dir, centroid, minDistance, Infinity, {
-      iterations: 12,
-      finalFit: true,
-    });
-    if (fit.distance > maxDistance) break;
-    best = { position: add(fit.look, scale(dir, fit.distance)), lookAt: fit.look, fov: focus.fov };
+  emphasis: readonly string[] | undefined,
+): number {
+  if (!emphasis?.length) return 0;
+  const keys = new Set<string>();
+  for (const key of emphasis) {
+    if (model.byKey.get(key)?.kind === 'category') keys.add(key);
   }
-  return best;
-}
-
-/** Configurator: content sits this share of the frame height above centre (visual MN-4). */
-export const CONFIGURATOR_LIFT = 0.08;
-
-/**
- * Raises the framed content by `lift` × the frame height (camera and look
- * target move down together), as far as the topmost node — with its framing
- * radius — stays inside the frame.
- */
-export function liftInFrame(
-  goal: CameraGoal,
-  nodes: readonly UniverseNode[],
-  aspect: number,
-  frame: SafeFrame,
-  lift: number,
-): CameraGoal {
-  const { tanV } = frameTangents(goal.fov, aspect, frame);
-  const back = sub(goal.position, goal.lookAt);
-  const distance = Math.hypot(...back);
-  const forward = scale(back, -1 / distance);
-  const right = normalize(cross(forward, [0, 1, 0]));
-  const up = cross(right, forward);
-  let top = -Infinity;
-  for (const node of nodes) {
-    const rel = sub(node.position, goal.position);
-    const z = dot(rel, forward);
-    if (z <= 0.1) continue;
-    top = Math.max(top, (dot(rel, up) + selectionFraming(node).radius) / z);
-  }
-  const room = Number.isFinite(top) ? tanV * 0.97 - top : 2 * lift * tanV;
-  const shift = Math.max(0, Math.min(2 * lift * tanV, room)) * distance;
-  if (shift <= 0) return goal;
-  const down = scale(up, -shift);
-  return { ...goal, position: add(goal.position, down), lookAt: add(goal.lookAt, down) };
-}
-
-/**
- * Selection framing per node: the beacon with its pings, a selected category
- * with its glowing core and halo (not the whole orbit preview, which would
- * push the camera far back for little gain).
- */
-function selectionFraming(node: UniverseNode): { radius: number; margin: number } {
-  switch (node.kind) {
-    case 'configurator':
-      return { radius: 1.8, margin: 0.9 };
-    case 'category':
-      return { radius: Math.max(Math.min(node.systemRadius, 2.2), 1.2), margin: 0.86 };
-    case 'portfolio':
-      return { radius: 1.6, margin: 0.9 };
-  }
+  return keys.size;
 }
 
 /**
@@ -611,7 +585,9 @@ function selectionFraming(node: UniverseNode): { radius: number; margin: number 
  * focus is fitted into it (the rig shifts the principal point to its centre).
  * `sway`: idle auto-rotate amplitude the overview fit must cover.
  * `planetAngle`: live orbit angle of the focused planet (planet mode).
- * `emphasis`: configurator selection (store `emphasis`, D81), configurator mode only.
+ * `emphasis`: configurator selection (store `emphasis`, D81), configurator mode
+ * only: dollies the beacon view back (CONFIGURATOR_DOLLY), never under
+ * `reducedMotion`.
  */
 export function computeCameraGoal(
   target: SceneTarget,
@@ -622,6 +598,14 @@ export function computeCameraGoal(
     sway?: number;
     planetAngle?: number;
     emphasis?: readonly string[];
+    /** prefers-reduced-motion: a configurator selection never moves the camera. */
+    reducedMotion?: boolean;
+    /**
+     * Centre of the free area (`freeAreaCenter`, viewport fractions): the
+     * configurator crystal projects there, even when the frame was widened
+     * past a tiny free band. Default: the frame centre.
+     */
+    freeCenter?: { x: number; y: number };
     /** Planet focus: keeps the chosen viewing side stable while the planet parks. */
     planetView?: PlanetViewMemo;
     /** Viewport in CSS px: the phone's tall overview sizes its nodes on screen. */
@@ -670,23 +654,17 @@ export function computeCameraGoal(
         fov,
       );
     case 'configurator': {
+      // The crystal is the look target, so it projects to the free frame's centre (D28) —
+      // or to the free band's own centre when the frame had to be widened past it; a
+      // selection only dollies the camera back along the same direction.
       const anchor = model.configurator;
-      const distance = Math.max(fitDistance(4.6, 4.2, fov, aspect, frame), 8.5);
-      const focus = approach(anchor.position, overview.position, distance, fov, 0.18);
-      const selected = (options.emphasis ?? [])
-        .map((key) => model.byKey.get(key))
-        .filter((node): node is UniverseNode => !!node && node.kind !== 'configurator');
-      const goal = selectionGoal(
-        model,
-        focus,
-        selected,
-        aspect,
-        frame,
-        // Never wider than the overview (which already shows every node).
-        Math.hypot(...sub(overview.position, overview.lookAt)),
-        options.sway ?? 0,
+      const factor = configuratorDistanceFactor(
+        configuratorLinkCount(model, options.emphasis),
+        options.reducedMotion,
       );
-      return liftInFrame(goal, [anchor, ...selected], aspect, frame, CONFIGURATOR_LIFT);
+      const distance = Math.max(fitDistance(4.6, 4.2, fov, aspect, frame), 8.5) * factor;
+      const focus = approach(anchor.position, overview.position, distance, fov, 0.18);
+      return options.freeCenter ? centreOnPoint(focus, options.freeCenter, aspect, frame) : focus;
     }
     default:
       return home();

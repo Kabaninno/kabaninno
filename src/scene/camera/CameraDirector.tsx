@@ -41,6 +41,7 @@ import {
   FULL_FRAME,
   PHONE_CORE_BOOST,
   computeCameraGoal,
+  freeAreaCenter,
   SYSTEM_SWAY,
   isPortrait,
   overviewSwayAmplitude,
@@ -93,6 +94,12 @@ const INTRO = {
 const INTRO_SNAP_SECONDS = 0.5;
 /** CameraControls' smoothing of programmatic moves and inertia (seconds). */
 const CONTROLS_SMOOTH_TIME = 0.5;
+/**
+ * Configurator dolly after a selection change (CONFIGURATOR_DOLLY): critically
+ * damped with this smoothing, the move is ~95 % done after 0.85 s and ~97 %
+ * after 1 s; the smoothing applies for `ms`.
+ */
+const EMPHASIS_DOLLY = { smoothTime: 0.36, ms: 1500 } as const;
 /** Frame changes below this (viewport fractions) are ignored. */
 const FRAME_EPSILON = 1e-4;
 /** Idle auto-rotate: delay after the last input, sway / spin per focus. */
@@ -222,6 +229,10 @@ interface DirectorState {
   refreshHover: boolean;
   /** `performance.now()` until which a settled reframe uses the fast smoothing (S3). */
   fastReframeUntil: number;
+  /** `performance.now()` until which the controls use the configurator dolly smoothing. */
+  emphasisDollyUntil: number;
+  /** Centre of the free area itself (`freeAreaCenter`), viewport fractions. */
+  freeCenter: { x: number; y: number };
 }
 
 /**
@@ -348,6 +359,7 @@ export function CameraDirector({
     // 1. Free frame (non-reactive store read, resolved only when inputs change).
     const safeRect = useSceneStore.getState().safeRect;
     let frameChanged = false;
+    let freeCenterChanged = false;
     if (
       safeRect !== d.safeRect ||
       width !== d.viewportWidth ||
@@ -364,6 +376,12 @@ export function CameraDirector({
       const next = resolveSafeFrame(local, width, height);
       frameChanged = !sameFrame(next, d.frame);
       if (frameChanged) d.frame = next;
+      // The free band's own centre (the configurator crystal sits there, even in a tiny band).
+      const freeCenter = freeAreaCenter(local, width, height);
+      freeCenterChanged =
+        Math.abs(freeCenter.x - d.freeCenter.x) > FRAME_EPSILON ||
+        Math.abs(freeCenter.y - d.freeCenter.y) > FRAME_EPSILON;
+      if (freeCenterChanged) d.freeCenter = freeCenter;
     }
     const minCore = minCoreDiameterPx(
       d.frame.width * width,
@@ -404,22 +422,35 @@ export function CameraDirector({
     const angleChanged =
       planetAngle !== undefined &&
       (d.goalPlanetAngle === undefined || Math.abs(planetAngle - d.goalPlanetAngle) > 1e-5);
-    // On the configurator the framing also keeps the selected categories in view.
-    const emphasis = target.mode === 'configurator' ? useSceneStore.getState().emphasis : undefined;
+    // On the configurator each selected category dollies the beacon view back a little
+    // (the crystal stays centred); under reduced motion a selection never moves the camera.
+    const emphasis =
+      target.mode === 'configurator' && !reducedMotion
+        ? useSceneStore.getState().emphasis
+        : undefined;
+    const emphasisChanged = emphasis !== d.goalEmphasis;
+    // Only the configurator framing follows the free band's own centre.
+    const areaChanged = frameChanged || (freeCenterChanged && target.mode === 'configurator');
     let goalChanged = false;
     if (
       d.goal === null ||
       targetChanged ||
       model !== d.goalModel ||
       aspect !== d.goalAspect ||
-      frameChanged ||
+      areaChanged ||
       angleChanged ||
-      emphasis !== d.goalEmphasis
+      emphasisChanged
     ) {
+      // A selection change alone: a short, smooth dolly (~0.9 s), not the default reframe.
+      if (d.goal !== null && emphasisChanged && !targetChanged && !areaChanged) {
+        d.emphasisDollyUntil = performance.now() + EMPHASIS_DOLLY.ms;
+      }
       d.goal = computeCameraGoal(target, model, aspect, d.frame, {
         sway: reducedMotion ? 0 : IDLE.overview.amplitude,
         planetAngle,
         emphasis,
+        reducedMotion,
+        freeCenter: d.freeCenter,
         planetView: d.planetView,
         viewport: { width, height },
       });
@@ -504,9 +535,13 @@ export function CameraDirector({
       }
     } else {
       // A frame change (sheet collapsing, panel resizing) reframes fast (S3).
-      if (goalChanged && frameChanged) d.fastReframeUntil = performance.now() + FAST_REFRAME.ms;
+      if (goalChanged && areaChanged) d.fastReframeUntil = performance.now() + FAST_REFRAME.ms;
       const now = performance.now();
-      const controlsSmooth = reframeSmoothTime(now, d.fastReframeUntil, CONTROLS_SMOOTH_TIME);
+      const controlsSmooth = reframeSmoothTime(
+        now,
+        d.fastReframeUntil,
+        now < d.emphasisDollyUntil ? EMPHASIS_DOLLY.smoothTime : CONTROLS_SMOOTH_TIME,
+      );
       if (controls.smoothTime !== controlsSmooth) controls.smoothTime = controlsSmooth;
       if (goalChanged) reframe(d, controls, target, goalPose, reducedMotion);
       if (reducedMotion) {
@@ -1182,6 +1217,8 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     goalEmphasis: undefined,
     planetView: {},
     fastReframeUntil: 0,
+    emphasisDollyUntil: 0,
+    freeCenter: { x: 0.5, y: 0.5 },
     azimuthOffset: 0,
     settledRadius: 1,
     safeRect: undefined,

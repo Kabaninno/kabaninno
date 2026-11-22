@@ -29,9 +29,11 @@ import { PortfolioCluster } from './PortfolioCluster';
 import {
   DRIFT_AMPLITUDE,
   FOCUSED_NETWORK,
+  LINK_GROW_SECONDS,
   SELECTED_EMPHASIS,
   createUniverseRuntime,
   easeSelection,
+  staggerSelection,
   stepSelection,
   writeDrift,
   type UniverseRuntime,
@@ -207,6 +209,7 @@ export function Universe({
 
     rt.time = time;
     rt.animated = !reducedMotion;
+    rt.stagger.clock += dt;
     shared.hovering = highlighted !== null;
     let maxFocus = 0;
     let settling = false;
@@ -227,11 +230,30 @@ export function Universe({
         if (Math.abs(focusTarget - focus) > 0.002) settling = true;
       }
       if (Math.abs(hoverTarget - hover) > 0.002) settling = true;
-      const selectTarget = node.kind !== 'configurator' && selection?.has(node.key) ? 1 : 0;
-      const progress = stepSelection(rt.selectProgress[i]!, selectTarget, dt, reducedMotion);
-      if (progress !== selectTarget) settling = true;
+      // Selections that start together light up (and grow their links) one after another.
+      const wanted = node.kind !== 'configurator' && selection?.has(node.key) ? 1 : 0;
+      // (A link still withdrawing counts as under way: re-selecting it never waits.)
+      const selectTarget = staggerSelection(
+        wanted,
+        Math.max(rt.selectProgress[i]!, rt.linkProgress[i]!),
+        rt.stagger,
+        reducedMotion,
+      );
+      // A started selection leaves 0 this frame even on a zero-length frame (its slot is taken).
+      const selectDt = Math.max(dt, 1e-4);
+      const progress = stepSelection(rt.selectProgress[i]!, selectTarget, selectDt, reducedMotion);
+      const linkProgress = stepSelection(
+        rt.linkProgress[i]!,
+        selectTarget,
+        selectDt,
+        reducedMotion,
+        LINK_GROW_SECONDS,
+      );
+      if (progress !== wanted || linkProgress !== wanted) settling = true;
       rt.selectProgress[i] = progress;
       rt.selected[i] = easeSelection(progress);
+      rt.linkProgress[i] = linkProgress;
+      rt.link[i] = easeSelection(linkProgress);
       rt.hover[i] = hover;
       rt.focus[i] = focus;
       // Hover / highlight stays on top of the steady selected state.

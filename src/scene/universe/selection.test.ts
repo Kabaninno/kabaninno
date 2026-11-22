@@ -4,11 +4,15 @@ import type { SceneManifest } from '../types';
 import { buildUniverseModel } from './model';
 import {
   FOCUSED_NETWORK,
+  LINK_GROW_SECONDS,
+  LINK_STAGGER_SECONDS,
   SELECT_SECONDS,
   createUniverseRuntime,
   easeSelection,
   neighbourDim,
+  staggerSelection,
   stepSelection,
+  type SelectionStagger,
 } from './runtime';
 import { bowControlPoint } from './network-model';
 import { PACKET_SPEED, buildSelectionGeometry, packetFlow } from './selection-model';
@@ -61,6 +65,48 @@ describe('selected state easing (D81)', () => {
     expect(easeSelection(0.9)).toBeGreaterThan(0.9);
     expect(easeSelection(-1)).toBe(0);
     expect(easeSelection(2)).toBe(1);
+  });
+
+  it('grows a link over LINK_GROW_SECONDS', () => {
+    expect(stepSelection(0, 1, LINK_GROW_SECONDS / 2, false, LINK_GROW_SECONDS)).toBeCloseTo(
+      0.5,
+      9,
+    );
+    expect(stepSelection(0, 1, LINK_GROW_SECONDS, false, LINK_GROW_SECONDS)).toBe(1);
+    expect(stepSelection(0, 1, 0.001, true, LINK_GROW_SECONDS)).toBe(1);
+  });
+
+  it('staggers selections that start together by LINK_STAGGER_SECONDS', () => {
+    const stagger: SelectionStagger = { clock: 0, lastStart: -Infinity };
+    const dt = 1 / 60;
+    const progress = [0, 0, 0];
+    const startedAt: number[] = [];
+    // Three categories selected in the same frame.
+    for (let frame = 0; frame < 60; frame++) {
+      stagger.clock += dt;
+      progress.forEach((value, i) => {
+        const target = staggerSelection(1, value, stagger, false);
+        if (target === 1 && value === 0) startedAt[i] = stagger.clock;
+        progress[i] = stepSelection(value, target, dt, false);
+      });
+    }
+    expect(startedAt).toHaveLength(3);
+    expect(startedAt[1]! - startedAt[0]!).toBeGreaterThanOrEqual(LINK_STAGGER_SECONDS - 1e-9);
+    expect(startedAt[1]! - startedAt[0]!).toBeLessThan(LINK_STAGGER_SECONDS + 2 * dt);
+    expect(startedAt[2]! - startedAt[1]!).toBeGreaterThanOrEqual(LINK_STAGGER_SECONDS - 1e-9);
+    expect(startedAt[2]! - startedAt[1]!).toBeLessThan(LINK_STAGGER_SECONDS + 2 * dt);
+  });
+
+  it('never delays a single selection, a deselection or reduced motion', () => {
+    const stagger: SelectionStagger = { clock: 10, lastStart: 0 };
+    expect(staggerSelection(1, 0, stagger, false)).toBe(1);
+    expect(stagger.lastStart).toBe(10);
+    // Right after: a second new selection waits, one already under way does not.
+    expect(staggerSelection(1, 0, stagger, false)).toBe(0);
+    expect(staggerSelection(1, 0.4, stagger, false)).toBe(1);
+    expect(staggerSelection(0, 0.4, stagger, false)).toBe(0);
+    expect(staggerSelection(1, 0, stagger, true)).toBe(1);
+    expect(stagger.lastStart).toBe(10);
   });
 
   it('keeps selected nodes bright while the focused network dims the others', () => {

@@ -15,7 +15,12 @@ import { buildUniverseModel } from '../universe/model';
 import {
   FULL_FRAME,
   MIN_FRAME_FRACTION,
+  centreOnPoint,
   computeCameraGoal,
+  configuratorDistanceFactor,
+  freeAreaCenter,
+  configuratorLinkCount,
+  CONFIGURATOR_DOLLY,
   controlLimits,
   fitDistance,
   fovForAspect,
@@ -36,7 +41,6 @@ import {
   orbitTangent,
   SYSTEM_FIT,
   resolveSafeFrame,
-  selectionGoal,
   usesPortraitOverview,
   viewOffsetForCenter,
   type CameraGoal,
@@ -172,9 +176,8 @@ describe('computeCameraGoal', () => {
       dist(portfolio.position, model.portfolio.position),
     );
     const configurator = computeCameraGoal({ mode: 'configurator' }, model, DESKTOP);
-    // The beacon sits a little above the frame centre (MN-4: the framing is lifted).
-    expect(dist(configurator.lookAt, model.configurator.position)).toBeLessThan(2);
-    expect(configurator.lookAt[1]).toBeLessThan(model.configurator.position[1]);
+    // The beacon crystal is the look target: the centre of the frame (owner round 3, part C).
+    expect(configurator.lookAt).toEqual(model.configurator.position);
   });
 
   it('keeps every goal inside the far plane with room for the star layers', () => {
@@ -214,6 +217,8 @@ const DESKTOP_HOME_RECT: Rect = { x: 550, y: 110, width: 770, height: 460 };
 const DESKTOP_PANEL_RECT: Rect = { x: 0, y: 72, width: 960, height: 828 };
 const PHONE_HOME_RECT: Rect = { x: 0, y: 76, width: 390, height: 330 };
 const PHONE_SHEET_RECT: Rect = { x: 0, y: 64, width: 390, height: 300 };
+/** Configurator on a phone with the sheet expanded: a thin band under the HUD (round 3, C). */
+const PHONE_BAND_RECT: Rect = { x: 0, y: 68, width: 390, height: 33 };
 
 /**
  * Projects a world point the way the rig renders it: camera at the goal,
@@ -758,94 +763,177 @@ describe('planet focus framing', () => {
   });
 });
 
-describe('configurator selection framing (D81)', () => {
+describe('configurator framing (owner round 3, part C)', () => {
   const configurator = { mode: 'configurator' as const };
   const key = (id: string) => `category:${id}`;
   const views = [
     [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
+    [
+      { width: 1920, height: 1080 },
+      { x: 0, y: 72, width: 1280, height: 1008 },
+    ],
+    [
+      { width: 1366, height: 768 },
+      { x: 0, y: 64, width: 846, height: 704 },
+    ],
     [PHONE_VIEW, PHONE_SHEET_RECT],
+    // Expanded sheet: a 33 px band under the HUD, smaller than MIN_FRAME_FRACTION.
+    [PHONE_VIEW, PHONE_BAND_RECT],
   ] as const;
-  const selections = [
-    ['crm'],
-    ['web', 'crm'],
-    ['ai', 'telegram'],
-    model.categories.map((node) => node.categoryId),
-  ];
+  const ids = model.categories.map((node) => node.categoryId);
+  /** 0–3 selected categories, plus every category (the dolly stays capped). */
+  const selections = [[], ids.slice(0, 1), ids.slice(0, 2), ids.slice(0, 3), ids];
+  const direction = (g: CameraGoal) =>
+    normalize([
+      g.position[0] - g.lookAt[0],
+      g.position[1] - g.lookAt[1],
+      g.position[2] - g.lookAt[2],
+    ]);
 
-  it('keeps the plain beacon focus without a selection, and ignores it elsewhere', () => {
-    const frame = resolveSafeFrame(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
-    const aspect = DESKTOP_VIEW.width / DESKTOP_VIEW.height;
-    const plain = computeCameraGoal(configurator, model, aspect, frame);
-    expect(computeCameraGoal(configurator, model, aspect, frame, { emphasis: [] })).toEqual(plain);
-    // Unknown ids and the beacon itself do not count as a selection.
-    expect(
-      computeCameraGoal(configurator, model, aspect, frame, {
-        emphasis: ['category:nope', 'configurator'],
-      }),
-    ).toEqual(plain);
-    for (const target of [
-      { mode: 'universe' as const },
-      { mode: 'system' as const, category: 'web' },
-      { mode: 'portfolio' as const },
-    ]) {
-      expect(
-        computeCameraGoal(target, model, aspect, frame, { emphasis: [key('web'), key('ai')] }),
-      ).toEqual(computeCameraGoal(target, model, aspect, frame));
-    }
+  it('dollies back by CONFIGURATOR_DOLLY per link, capped at 1.2', () => {
+    expect(configuratorDistanceFactor(0)).toBe(1);
+    expect(configuratorDistanceFactor(1)).toBeCloseTo(1 + CONFIGURATOR_DOLLY.perLink, 9);
+    expect(configuratorDistanceFactor(2)).toBeCloseTo(1 + 2 * CONFIGURATOR_DOLLY.perLink, 9);
+    expect(configuratorDistanceFactor(3)).toBeLessThanOrEqual(1.2);
+    expect(configuratorDistanceFactor(3)).toBeGreaterThan(configuratorDistanceFactor(2));
+    for (const links of [4, 5, 12, 100]) expect(configuratorDistanceFactor(links)).toBe(1.2);
+    expect(CONFIGURATOR_DOLLY.max).toBe(1.2);
+    // Invalid counts never move the camera.
+    expect(configuratorDistanceFactor(-1)).toBe(1);
+    expect(configuratorDistanceFactor(Number.NaN)).toBe(1);
+    // Reduced motion: a selection never moves the camera.
+    for (const links of [0, 1, 3, 9]) expect(configuratorDistanceFactor(links, true)).toBe(1);
   });
 
-  it('fits the beacon and every selected category into the free rect', () => {
+  it('finds the free band centre even when the frame was widened past it', () => {
+    expect(freeAreaCenter(null, 390, 844)).toEqual({ x: 0.5, y: 0.5 });
+    expect(freeAreaCenter({ x: 0, y: 0, width: 0, height: 10 }, 390, 844)).toEqual({
+      x: 0.5,
+      y: 0.5,
+    });
+    // A rect larger than the minimum frame: the same as the frame centre.
+    const frame = resolveSafeFrame(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
+    const centre = freeAreaCenter(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
+    expect(centre.x).toBeCloseTo(frameCenter(frame).x, 12);
+    expect(centre.y).toBeCloseTo(frameCenter(frame).y, 12);
+    // The 33 px band: the frame is widened against the top edge, the band centre is not.
+    const band = freeAreaCenter(PHONE_BAND_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
+    const bandFrame = resolveSafeFrame(PHONE_BAND_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
+    expect(band.y * PHONE_VIEW.height).toBeCloseTo(68 + 33 / 2, 9);
+    expect(frameCenter(bandFrame).y).toBeGreaterThan(band.y);
+  });
+
+  it('moves a goal across its view to put its target on a point, keeping direction and distance', () => {
+    const aspect = PHONE_VIEW.width / PHONE_VIEW.height;
+    const frame = resolveSafeFrame(PHONE_BAND_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
+    const goal = computeCameraGoal(configurator, model, aspect, frame);
+    expect(centreOnPoint(goal, frameCenter(frame), aspect, frame)).toEqual(goal);
+    const point = { x: 0.3, y: 0.1 };
+    const moved = centreOnPoint(goal, point, aspect, frame);
+    const p = projectPx(moved, goal.lookAt, PHONE_VIEW, frame);
+    expect(p.x).toBeCloseTo(point.x * PHONE_VIEW.width, 6);
+    expect(p.y).toBeCloseTo(point.y * PHONE_VIEW.height, 6);
+    expect(dist(moved.position, moved.lookAt)).toBeCloseTo(dist(goal.position, goal.lookAt), 9);
+    direction(moved).forEach((value, axis) => expect(value).toBeCloseTo(direction(goal)[axis]!, 9));
+  });
+
+  it('counts distinct selected categories only', () => {
+    expect(configuratorLinkCount(model, undefined)).toBe(0);
+    expect(configuratorLinkCount(model, [])).toBe(0);
+    expect(configuratorLinkCount(model, ['category:nope', 'configurator', 'portfolio'])).toBe(0);
+    expect(configuratorLinkCount(model, [key(ids[0]!), key(ids[0]!), key(ids[1]!)])).toBe(2);
+  });
+
+  it('keeps the crystal at the centre of the free rect for 0–3 selected categories', () => {
     for (const [view, rect] of views) {
       const frame = resolveSafeFrame(rect, view.width, view.height);
       const aspect = view.width / view.height;
-      // The beacon focus approaches from the overview, which depends on the sway.
-      const plain = computeCameraGoal(configurator, model, aspect, frame, { sway: 0.2 });
-      const overview = computeCameraGoal({ mode: 'universe' }, model, aspect, frame, { sway: 0.2 });
-      for (const ids of selections) {
+      // As the director passes it: the free band's own centre.
+      const freeCenter = freeAreaCenter(rect, view.width, view.height);
+      const widened = rect.height / view.height < MIN_FRAME_FRACTION;
+      const plain = computeCameraGoal(configurator, model, aspect, frame, {
+        sway: 0.2,
+        freeCenter,
+      });
+      const plainDistance = dist(plain.position, plain.lookAt);
+      for (const selection of selections) {
         const goal = computeCameraGoal(configurator, model, aspect, frame, {
-          emphasis: ids.map(key),
+          emphasis: selection.map(key),
           sway: 0.2,
+          freeCenter,
         });
-        expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(true);
-        for (const id of ids) {
-          const node = model.byKey.get(key(id))!;
-          expect(sphereInRect(goal, node.position, 1, view, frame, rect)).toBe(true);
+        // The crystal projects to the free rect's centre (px), whatever the selection.
+        const crystal = projectPx(goal, model.configurator.position, view, frame);
+        expect(crystal.x).toBeCloseTo(rect.x + rect.width / 2, 6);
+        expect(crystal.y).toBeCloseTo(rect.y + rect.height / 2, 6);
+        if (!widened) {
+          // The frame is the rect: the crystal is the look target itself.
+          expect(goal.lookAt).toEqual(model.configurator.position);
+          expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(
+            true,
+          );
         }
-        // Never closer than the beacon focus, never wider than the overview.
-        const distance = dist(goal.position, goal.lookAt);
-        expect(distance).toBeGreaterThanOrEqual(dist(plain.position, plain.lookAt) - 1e-9);
-        expect(distance).toBeLessThanOrEqual(dist(overview.position, overview.lookAt) + 1e-9);
-        // Same viewing direction as the beacon focus: a dolly out, not a swing around.
-        const direction = (g: CameraGoal) =>
-          normalize([
-            g.position[0] - g.lookAt[0],
-            g.position[1] - g.lookAt[1],
-            g.position[2] - g.lookAt[2],
-          ]);
+        // A dolly along the same viewing direction, never toward the categories.
         direction(goal).forEach((value, axis) =>
           expect(value).toBeCloseTo(direction(plain)[axis]!, 9),
         );
+        const factor = dist(goal.position, goal.lookAt) / plainDistance;
+        expect(factor).toBeCloseTo(configuratorDistanceFactor(selection.length), 9);
+        expect(factor).toBeGreaterThanOrEqual(1);
+        expect(factor).toBeLessThanOrEqual(1.2 + 1e-9);
       }
     }
   });
 
-  it('keeps the beacon and the nearest selected nodes when not all of them fit', () => {
-    const [view, rect] = views[1];
+  it('moves the camera back step by step as categories are added, and forth when removed', () => {
+    const [view, rect] = views[0];
     const frame = resolveSafeFrame(rect, view.width, view.height);
     const aspect = view.width / view.height;
-    const focus = computeCameraGoal(configurator, model, aspect, frame);
-    const focusDistance = dist(focus.position, focus.lookAt);
-    const crm = model.byKey.get(key('crm'))!;
-    const telegram = model.byKey.get(key('telegram'))!;
-    const crmOnly = selectionGoal(model, focus, [crm], aspect, frame, Infinity);
-    const cap = dist(crmOnly.position, crmOnly.lookAt) + 0.5;
-    // CRM is the nearest category to the beacon; Telegram is across the ring.
-    const goal = selectionGoal(model, focus, [telegram, crm], aspect, frame, cap);
-    expect(goal).toEqual(crmOnly);
-    expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(true);
-    expect(sphereInRect(goal, crm.position, 1, view, frame, rect)).toBe(true);
-    // Nothing fits under the cap: the plain beacon focus.
-    expect(selectionGoal(model, focus, [telegram], aspect, frame, focusDistance)).toEqual(focus);
+    const distanceFor = (count: number) => {
+      const goal = computeCameraGoal(configurator, model, aspect, frame, {
+        emphasis: ids.slice(0, count).map(key),
+      });
+      return dist(goal.position, goal.lookAt);
+    };
+    expect(distanceFor(1)).toBeGreaterThan(distanceFor(0));
+    expect(distanceFor(2)).toBeGreaterThan(distanceFor(1));
+    expect(distanceFor(3)).toBeGreaterThan(distanceFor(2));
+    expect(distanceFor(3) / distanceFor(0)).toBeCloseTo(configuratorDistanceFactor(3), 9);
+    // Removing a category brings the camera back to the framing of that count,
+    // whichever categories remain.
+    const afterRemoval = computeCameraGoal(configurator, model, aspect, frame, {
+      emphasis: [key(ids[0]!), key(ids[2]!)],
+    });
+    expect(dist(afterRemoval.position, afterRemoval.lookAt)).toBeCloseTo(distanceFor(2), 9);
+  });
+
+  it('ignores the selection under reduced motion and on other routes', () => {
+    for (const [view, rect] of views) {
+      const frame = resolveSafeFrame(rect, view.width, view.height);
+      const aspect = view.width / view.height;
+      const plain = computeCameraGoal(configurator, model, aspect, frame, { sway: 0 });
+      for (const selection of selections) {
+        expect(
+          computeCameraGoal(configurator, model, aspect, frame, {
+            emphasis: selection.map(key),
+            sway: 0,
+            reducedMotion: true,
+          }),
+        ).toEqual(plain);
+      }
+      expect(computeCameraGoal(configurator, model, aspect, frame, { emphasis: [] })).toEqual(
+        computeCameraGoal(configurator, model, aspect, frame),
+      );
+      for (const target of [
+        { mode: 'universe' as const },
+        { mode: 'system' as const, category: 'web' },
+        { mode: 'portfolio' as const },
+      ]) {
+        expect(
+          computeCameraGoal(target, model, aspect, frame, { emphasis: [key('web'), key('ai')] }),
+        ).toEqual(computeCameraGoal(target, model, aspect, frame));
+      }
+    }
   });
 });
 
@@ -919,36 +1007,6 @@ describe('system view fit (MJ2)', () => {
         const limit = view === PHONE_VIEW ? sphere * 0.95 : sphere * 1.05;
         expect(dist(goal.position, goal.lookAt)).toBeLessThan(limit);
         expect(maxX - minX).toBeGreaterThan(rect.width * 0.45);
-      }
-    }
-  });
-});
-
-describe('configurator framing lift (MN-4)', () => {
-  it('raises the beacon and the selection above the frame centre, inside the rect', () => {
-    for (const [view, rect] of [
-      [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
-      [PHONE_VIEW, PHONE_SHEET_RECT],
-    ] as const) {
-      const frame = resolveSafeFrame(rect, view.width, view.height);
-      for (const emphasis of [[], ['category:crm', 'category:web']]) {
-        const goal = computeCameraGoal(
-          { mode: 'configurator' },
-          model,
-          view.width / view.height,
-          frame,
-          { emphasis },
-        );
-        if (emphasis.length === 0) {
-          const beacon = projectPx(goal, model.configurator.position, view, frame);
-          expect(beacon.y).toBeLessThan(rect.y + rect.height / 2 - rect.height * 0.05);
-        }
-        expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(true);
-        for (const id of emphasis) {
-          expect(sphereInRect(goal, model.byKey.get(id)!.position, 1, view, frame, rect)).toBe(
-            true,
-          );
-        }
       }
     }
   });

@@ -34,10 +34,11 @@ interface SelectionLinksProps {
 
 /**
  * Configurator selection (D81): lit links from each selected category to the
- * beacon, with data impulses travelling into it. Two draw calls, skipped
- * entirely while nothing is selected. Uniform arrays are bound to the runtime
- * by reference (like the network), so drift, the eased selected state, hover
- * and presence need no per-frame copies.
+ * beacon, with data impulses travelling into it. A new link grows from its
+ * category into the beacon (runtime `link`; several start one after another).
+ * Two draw calls, skipped entirely while nothing is selected. Uniform arrays
+ * are bound to the runtime by reference (like the network), so drift, link
+ * growth, hover and presence need no per-frame copies.
  */
 export function SelectionLinks({ model, runtime, preset }: SelectionLinksProps) {
   const linesRef = useRef<LineSegments>(null);
@@ -55,7 +56,7 @@ export function SelectionLinks({ model, runtime, preset }: SelectionLinksProps) 
     const shared = {
       // Replaced by the runtime arrays (bound by reference) on the first frame.
       uOffsets: { value: Array.from({ length: MAX_UNIVERSE_NODES }, () => new Vector3()) },
-      uSelected: { value: new Array<number>(MAX_UNIVERSE_NODES).fill(0) },
+      uLink: { value: new Array<number>(MAX_UNIVERSE_NODES).fill(0) },
       uHover: { value: new Array<number>(MAX_UNIVERSE_NODES).fill(0) },
       uPresence: { value: new Array<number>(MAX_UNIVERSE_NODES).fill(1) },
       uBeacon: { value: model.configurator.index },
@@ -80,7 +81,7 @@ export function SelectionLinks({ model, runtime, preset }: SelectionLinksProps) 
     if (!rt) return;
     let any = false;
     for (const node of model.categories) {
-      if ((rt.selected[node.index] ?? 0) > 0.001) {
+      if ((rt.link[node.index] ?? 0) > 0.001) {
         any = true;
         break;
       }
@@ -94,7 +95,7 @@ export function SelectionLinks({ model, runtime, preset }: SelectionLinksProps) 
     if (!material) return;
     const u = material.uniforms;
     u.uOffsets.value = rt.offsets;
-    u.uSelected.value = rt.selected;
+    u.uLink.value = rt.link;
     u.uHover.value = rt.hover;
     u.uPresence.value = rt.presence;
     u.uTime.value = rt.time;
