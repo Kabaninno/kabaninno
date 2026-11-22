@@ -1,16 +1,20 @@
 /**
- * M4 "Configurator + Telegram", UI side, for the solution finder (D149).
+ * M4 "Configurator + Telegram", UI side, for the solution finder (D149,
+ * round 3 D155–D158).
  *
- * Covers: the five steps and their validation, the goal limit and "not sure
- * yet", the manual mode ("I know what I need"), the recommendation and its
- * edits (remove / add more), budgets by level, persistence across reload,
- * prefill from `?add=` and from the request draft, the message in pl and uk,
- * the Telegram link (encoded, within the budget, leading "@" rule) or the
- * unconfigured state, the Copy fallback, and "Start over".
+ * Covers: the five steps and their validation, the industry step (a tap moves
+ * on, "Other" asks for a few words) and the typical goals it marks, the goal
+ * limit and "not sure yet", the manual mode ("I know what I need"), the
+ * recommendation and its edits (remove / add more) with the live estimate,
+ * persistence across reload (and a v2 draft), prefill from `?add=` and from
+ * the request draft, the first-person message in pl and uk, the Telegram link
+ * (encoded, within the budget, leading "@" rule) or the unconfigured state,
+ * WhatsApp hidden without a number, the Copy fallback, and "Start over".
  */
 import type { Page } from '@playwright/test';
 import { siteConfig } from '~/site.config';
 import { isValidTelegramUsername } from '@/lib/configurator/telegram';
+import { isValidWhatsappNumber } from '@/lib/configurator/whatsapp';
 import { expect, test } from '../support/fixtures';
 import { sitePath } from '../support/env';
 import {
@@ -23,6 +27,7 @@ import { categoryName, localized, paths, serviceTitle, ui, type TestLocale } fro
 
 const REQUEST_KEY = 'kabaninno.request.v1';
 const configured = isValidTelegramUsername(siteConfig.telegramUsername.replace(/^@/, ''));
+const whatsappConfigured = isValidWhatsappNumber(siteConfig.whatsappNumber);
 const cfg = ui.pl.configurator;
 const goal = <K extends keyof typeof cfg.goals.items>(id: K) => cfg.goals.items[id];
 
@@ -56,11 +61,57 @@ const checkGoal = (page: Page, id: keyof typeof cfg.goals.items) =>
     .getByRole('checkbox', { name: goal(id).name, exact: true })
     .check();
 
+/** Opens the wizard and skips the optional industry step with the footer's Next. */
+async function openOnGoals(page: Page) {
+  await open(page);
+  await expect(stepTitle(page)).toHaveText(cfg.titles.industry);
+  await next(page).click();
+  await expect(stepTitle(page)).toHaveText(cfg.titles.goals);
+}
+
+/** The estimate block of the solution step (a polite live region). */
+const estimateBlock = (page: Page) => panel(page).locator('[aria-live="polite"]').last();
+
+test.describe('industry (round 3, B1)', () => {
+  test('a tap on an industry moves on to the goals, which mark the typical ones', async ({
+    page,
+  }) => {
+    await open(page);
+    await expect(stepTitle(page)).toHaveText(cfg.titles.industry);
+    await expect(panel(page)).toContainText('Krok 1 z 5');
+    await panel(page)
+      .getByRole('button', { name: cfg.industries['beauty-health'], exact: true })
+      .click();
+    await expect(stepTitle(page)).toHaveText(cfg.titles.goals);
+    await expect(stepTitle(page)).toBeFocused();
+    await expect(panel(page)).toContainText('Krok 2 z 5');
+    // Booking and more clients are typical for beauty and health; nothing is preselected.
+    await expect(panel(page).getByText(cfg.goals.typical)).toHaveCount(2);
+    await expect(
+      panel(page).getByRole('checkbox', { name: new RegExp(goal('booking').name) }),
+    ).toHaveAccessibleName(new RegExp(cfg.goals.typical));
+    await expect(panel(page).getByRole('checkbox', { checked: true })).toHaveCount(0);
+  });
+
+  test('"Other" asks for a few words and has its own Next', async ({ page }) => {
+    await open(page);
+    const other = panel(page).getByRole('button', { name: cfg.industries.other, exact: true });
+    await other.click();
+    await expect(other).toHaveAttribute('aria-pressed', 'true');
+    await expect(stepTitle(page)).toHaveText(cfg.titles.industry);
+    await panel(page).getByLabel(cfg.industry.other).fill('Stolarnia artystyczna');
+    await next(page).first().click();
+    await expect(stepTitle(page)).toHaveText(cfg.titles.goals);
+    await expect(panel(page).getByText(cfg.goals.typical)).toHaveCount(0);
+    await panel(page).getByRole('button', { name: cfg.nav.back }).click();
+    await expect(panel(page).getByLabel(cfg.industry.other)).toHaveValue('Stolarnia artystyczna');
+  });
+});
+
 test.describe('goals and details', () => {
   test('Next without a goal shows the error and focuses the first goal', async ({ page }) => {
-    await open(page);
-    await expect(stepTitle(page)).toHaveText(cfg.titles.goals);
-    await expect(panel(page)).toContainText('Krok 1 z 5');
+    await openOnGoals(page);
+    await expect(panel(page)).toContainText('Krok 2 z 5');
     await next(page).click();
     await expect(panel(page)).toContainText(cfg.errors.requiredMulti);
     const first = panel(page).locator('#cfg-goals-0');
@@ -72,11 +123,11 @@ test.describe('goals and details', () => {
     await next(page).click();
     await expect(stepTitle(page)).toHaveText(cfg.titles.details);
     await expect(stepTitle(page)).toBeFocused();
-    await expect(panel(page)).toContainText('Krok 2 z 5');
+    await expect(panel(page)).toContainText('Krok 3 z 5');
   });
 
   test('at most three goals; "not sure yet" replaces them all', async ({ page }) => {
-    await open(page);
+    await openOnGoals(page);
     await checkGoal(page, 'more-clients');
     await checkGoal(page, 'online-orders');
     await checkGoal(page, 'booking');
@@ -96,7 +147,7 @@ test.describe('goals and details', () => {
   });
 
   test('each goal needs an answer; the shared question is optional', async ({ page }) => {
-    await open(page);
+    await openOnGoals(page);
     await checkGoal(page, 'booking');
     await checkGoal(page, 'less-routine');
     await next(page).click();
@@ -117,7 +168,7 @@ test.describe('goals and details', () => {
   });
 
   test('"not sure yet": only the shared question, then a consultation', async ({ page }) => {
-    await open(page);
+    await openOnGoals(page);
     await panel(page).getByRole('checkbox', { name: cfg.goals.unsure }).check();
     await next(page).click();
     await expect(panel(page)).toContainText(cfg.details.unsureNote);
@@ -130,7 +181,7 @@ test.describe('goals and details', () => {
   });
 
   test('"nothing of these" excludes the other answers', async ({ page }) => {
-    await open(page);
+    await openOnGoals(page);
     await checkGoal(page, 'booking');
     await next(page).click();
     const have = (key: keyof typeof cfg.have.items) =>
@@ -149,10 +200,10 @@ test.describe('manual mode', () => {
   test('"I know what I need" skips the details step and starts with the full list', async ({
     page,
   }) => {
-    await open(page);
+    await openOnGoals(page);
     await panel(page).getByRole('button', { name: cfg.goals.knowIt }).click();
     await expect(stepTitle(page)).toHaveText(cfg.titles.solution);
-    await expect(panel(page)).toContainText('Krok 2 z 4');
+    await expect(panel(page)).toContainText('Krok 3 z 4');
     await expect(panel(page)).toContainText(cfg.solution.consultation);
     // The list is open while nothing is picked.
     await panel(page)
@@ -164,18 +215,18 @@ test.describe('manual mode', () => {
     await expect(
       panel(page).getByRole('button', { name: cfg.solution.backToGuided }),
     ).toBeVisible();
-    // Next goes straight to the plan.
+    // Next goes straight to the contact.
     await next(page).click();
-    await expect(stepTitle(page)).toHaveText(cfg.titles.plan);
-    await expect(panel(page)).toContainText('Krok 3 z 4');
+    await expect(stepTitle(page)).toHaveText(cfg.titles.contact);
+    await expect(panel(page)).toContainText('Krok 4 z 4');
   });
 
   test('back to the questions from the manual mode', async ({ page }) => {
-    await open(page);
+    await openOnGoals(page);
     await panel(page).getByRole('button', { name: cfg.goals.knowIt }).click();
     await panel(page).getByRole('button', { name: cfg.solution.backToGuided }).click();
     await expect(stepTitle(page)).toHaveText(cfg.titles.goals);
-    await expect(panel(page)).toContainText('Krok 1 z 5');
+    await expect(panel(page)).toContainText('Krok 2 z 5');
   });
 });
 
@@ -183,7 +234,7 @@ test.describe('the recommendation', () => {
   test('shows the combination, one line per service, and lets the visitor remove and add', async ({
     page,
   }) => {
-    await open(page);
+    await openOnGoals(page);
     await checkGoal(page, 'online-orders');
     await checkGoal(page, 'booking');
     await next(page).click();
@@ -222,7 +273,7 @@ test.describe('the recommendation', () => {
     expect(request).not.toContain('web/online-stores');
   });
 
-  test('removing every service leaves the consultation text; the plan still works', async ({
+  test('removing every service leaves the consultation text; the contact still works', async ({
     page,
   }) => {
     await seed(page, 'solution', {
@@ -240,65 +291,40 @@ test.describe('the recommendation', () => {
       })
       .click();
     await expect(panel(page)).toContainText(cfg.solution.consultation);
+    await expect(estimateBlock(page)).toHaveText(cfg.solution.estimate.consultation);
     await next(page).click();
-    await expect(stepTitle(page)).toHaveText(cfg.titles.plan);
+    await expect(stepTitle(page)).toHaveText(cfg.titles.contact);
   });
 });
 
-test.describe('budget and timing', () => {
-  test('budgets follow the highest complexity level of the services (D138)', async ({ page }) => {
-    await seed(page, 'plan', {
-      ...DRAFT,
-      mode: 'manual',
-      goals: [],
-      answers: {},
-      added: ['web/landing-pages'],
-      budget: null,
-    });
-    await open(page);
-    const options = panel(page).locator('input[name="cfg-budget"]');
-    await expect(options).toHaveCount(4);
-    await expect(
-      panel(page)
-        .locator('label', { hasText: /1\s?500/ })
-        .first(),
-    ).toBeVisible();
-    await expect(panel(page)).toContainText(cfg.budget.notSure);
-    await expect(panel(page)).not.toContainText(/10\s?000/);
-  });
-
-  test('industry is optional; "other" asks for a few words', async ({ page }) => {
-    await seed(page, 'plan', { ...DRAFT, industry: null });
-    await open(page);
-    await next(page).click();
-    await expect(stepTitle(page)).toHaveText(cfg.titles.contact);
-    await panel(page).getByRole('button', { name: cfg.nav.back }).click();
-    const other = panel(page).getByRole('button', { name: cfg.industries.other, exact: true });
-    await other.click();
-    await expect(other).toHaveAttribute('aria-pressed', 'true');
-    await panel(page).getByLabel(cfg.plan.industryOther).fill('Stolarnia artystyczna');
-    await other.click();
-    await expect(other).toHaveAttribute('aria-pressed', 'false');
-    await expect(panel(page).getByLabel(cfg.plan.industryOther)).toHaveCount(0);
-  });
-
-  test('a changed selection clears a budget that no longer fits and says so', async ({ page }) => {
+test.describe('the estimate (round 3, B1–B2)', () => {
+  test('price and timeline follow the services as they are removed or added', async ({ page }) => {
     await seed(page, 'solution', {
       ...DRAFT,
       mode: 'manual',
       goals: [],
       answers: {},
       added: ['web/landing-pages'],
-      budget: 'up-to-1500',
     });
     await open(page);
+    const block = estimateBlock(page);
+    await expect(block).toContainText(cfg.solution.estimate.price);
+    await expect(block).toContainText(/800–1500\s?zł/);
+    await expect(block).toContainText('2–5 dni');
+    await expect(block).toContainText(cfg.solution.estimate.note);
+    // + AI assistant: 1 800–4 000 zł; max(10, round(0.7 × 15)) = 11 days → weeks.
     await panel(page).getByRole('button', { name: cfg.solution.addMore }).click();
     await panel(page)
-      .getByRole('checkbox', { name: serviceTitle('pl', 'crm', 'custom-crm'), exact: true })
+      .getByRole('checkbox', { name: serviceTitle('pl', 'ai', 'ai-assistants'), exact: true })
       .check();
-    await next(page).click();
-    await expect(panel(page)).toContainText(cfg.budget.reset);
-    await expect(panel(page).locator('input[name="cfg-budget"]:checked')).toHaveCount(0);
+    await expect(block).toContainText(/1800–4000\s?zł/);
+    await expect(block).toContainText('1–2 tygodnie');
+    await panel(page)
+      .getByRole('checkbox', { name: serviceTitle('pl', 'web', 'landing-pages'), exact: true })
+      .uncheck();
+    await expect(block).toContainText(/1000–2500\s?zł/);
+    await expect(block).toContainText('5–10 dni');
+    await expect(panel(page)).not.toContainText(/netto/i);
   });
 });
 
@@ -324,7 +350,7 @@ test.describe('contact and summary', () => {
 
 test.describe('persistence and prefill', () => {
   test('the draft and the step survive a reload', async ({ page }) => {
-    await open(page);
+    await openOnGoals(page);
     await checkGoal(page, 'less-routine');
     await next(page).click();
     await expect(stepTitle(page)).toHaveText(cfg.titles.details);
@@ -333,7 +359,7 @@ test.describe('persistence and prefill', () => {
     await expect(stepTitle(page)).toHaveText(cfg.titles.details);
     const stored = await page.evaluate((key) => localStorage.getItem(key), CONFIGURATOR_KEY);
     expect(JSON.parse(stored!)).toMatchObject({
-      v: 2,
+      v: 3,
       step: 'details',
       draft: { goals: ['less-routine'] },
     });
@@ -344,7 +370,7 @@ test.describe('persistence and prefill', () => {
     await expect(stepTitle(page)).toHaveText(cfg.titles.solution);
     await expect(panel(page).locator('[role="status"]').first()).toHaveText(cfg.prefilled);
     await expect(panel(page)).toContainText(serviceTitle('pl', 'crm', 'custom-crm'));
-    await expect(panel(page)).toContainText('Krok 2 z 4');
+    await expect(panel(page)).toContainText('Krok 3 z 4');
     // The request draft mirrors it (HUD badge).
     expect(await page.evaluate((key) => localStorage.getItem(key), REQUEST_KEY)).toContain(
       'crm/custom-crm',
@@ -379,21 +405,35 @@ test.describe('persistence and prefill', () => {
   });
 
   test('Start over asks first, then clears the draft and the request', async ({ page }) => {
-    await seed(page, 'plan');
+    await seed(page, 'solution');
     await open(page);
     await panel(page).getByRole('button', { name: cfg.nav.startOver }).click();
     const cancel = panel(page).getByRole('button', { name: cfg.nav.startOverNo });
     await expect(cancel).toBeFocused();
     await panel(page).getByRole('button', { name: cfg.nav.startOverYes }).click();
-    await expect(stepTitle(page)).toHaveText(cfg.titles.goals);
+    await expect(stepTitle(page)).toHaveText(cfg.titles.industry);
     await expect(
-      panel(page).getByRole('checkbox', { name: goal('online-orders').name, exact: true }),
-    ).not.toBeChecked();
+      panel(page).getByRole('button', { name: cfg.industries.retail, exact: true }),
+    ).toHaveAttribute('aria-pressed', 'false');
     await page.waitForTimeout(500);
     const stored = await page.evaluate((key) => localStorage.getItem(key), CONFIGURATOR_KEY);
-    expect(JSON.parse(stored!).draft.goals).toEqual([]);
+    expect(JSON.parse(stored!).draft).toMatchObject({ goals: [], industry: null });
   });
 });
+
+/** «Zmień» on the services row, remove the custom CRM, and back to the contact step. */
+async function removeCustomCrm(page: Page) {
+  await panel(page)
+    .getByRole('button', { name: `${cfg.nav.edit}: ${cfg.summary.rowServices}` })
+    .click();
+  await expect(stepTitle(page)).toHaveText(cfg.titles.solution);
+  await panel(page)
+    .getByRole('button', {
+      name: cfg.solution.removeNamed.replace('{service}', serviceTitle('pl', 'crm', 'custom-crm')),
+    })
+    .click();
+  await next(page).click();
+}
 
 test.describe('summary and hand-off', () => {
   test('the message is complete in Polish and editable with "Restore default"', async ({
@@ -403,9 +443,18 @@ test.describe('summary and hand-off', () => {
     await open(page);
     const message = panel(page).getByLabel(cfg.summary.message, { exact: true });
     const text = await message.inputValue();
-    expect(text.split('\n')[0]).toBe('Zapytanie ze strony KABANINNO');
-    expect(text).toContain(goal('online-orders').name);
+    // The client's own request in the first person (round 3, B3).
+    expect(text.split('\n').slice(0, 2)).toEqual([
+      'Dzień dobry!',
+      'Mam na imię Łucja Żółkiewska. Chcę skorzystać z usług KABANINNO.',
+    ]);
+    expect(text).toContain(goal('online-orders').phrase);
+    expect(text).toContain(goal('client-order').sentences['program-inconvenient']);
     expect(text).toContain(categoryName('pl', 'web'));
+    // Store 3 000–6 000 + custom CRM 4 000–8 000; max(28, round(0.7 × 49)) = 34 days ≈ 5 weeks.
+    // Polish groups five-digit numbers only (Intl): "7000–14 000 zł".
+    expect(text).toMatch(/Orientacyjnie: 7000–14\s000\szł, 2–5 tygodni\./);
+    expect(text.split('\n').at(-1)).toBe(ui.pl.lead.closing);
     for (const id of DRAFT_SERVICES) {
       const [category, slug] = id.split('/') as [string, string];
       expect(text).toContain(serviceTitle('pl', category, slug));
@@ -421,23 +470,18 @@ test.describe('summary and hand-off', () => {
   test('an edit made before an answer changed is flagged, then updated or kept (Q-F3-01)', async ({
     page,
   }) => {
-    await seedOnce(page, 'contact', { ...DRAFT, budget: 'up-to-5000' });
+    await seedOnce(page, 'contact');
     await open(page);
     const summary = cfg.summary;
     const message = panel(page).getByLabel(summary.message, { exact: true });
     const original = await message.inputValue();
     await message.fill(`${original}\nPS. Proszę o telefon.`);
 
-    // Change the budget through «Zmień» and come back.
-    await panel(page)
-      .getByRole('button', { name: `${cfg.nav.edit}: ${summary.rowBudget}` })
-      .click();
-    await expect(stepTitle(page)).toHaveText(cfg.titles.plan);
-    await panel(page).locator('#cfg-budget-3').check();
-    await next(page).click();
+    // Change the services through «Zmień» and come back.
+    await removeCustomCrm(page);
     await expect(stepTitle(page)).toHaveText(cfg.titles.contact);
 
-    // The edit is stale: the notice says so, and the text still has the old budget.
+    // The edit is stale: the notice says so, and the text still has the old services.
     await expect(panel(page)).toContainText(summary.staleNotice);
     expect(await message.inputValue()).toContain('PS. Proszę o telefon.');
 
@@ -455,21 +499,19 @@ test.describe('summary and hand-off', () => {
   test('"Update the message" regenerates it from the changed answers (Q-F3-01)', async ({
     page,
   }) => {
-    await seedOnce(page, 'contact', { ...DRAFT, budget: 'up-to-5000' });
+    await seedOnce(page, 'contact');
     await open(page);
     const summary = cfg.summary;
     const message = panel(page).getByLabel(summary.message, { exact: true });
     await message.fill('Mój własny tekst');
-    await panel(page)
-      .getByRole('button', { name: `${cfg.nav.edit}: ${summary.rowBudget}` })
-      .click();
-    await panel(page).locator('#cfg-budget-3').check();
-    await next(page).click();
+    await removeCustomCrm(page);
     await panel(page).getByRole('button', { name: summary.staleUpdate }).click();
     await expect(panel(page)).not.toContainText(summary.staleNotice);
     const text = await message.inputValue();
     expect(text).not.toContain('Mój własny tekst');
-    expect(text.split('\n')[0]).toBe('Zapytanie ze strony KABANINNO');
+    expect(text.split('\n')[0]).toBe(ui.pl.lead.greeting);
+    expect(text).not.toContain(serviceTitle('pl', 'crm', 'custom-crm'));
+    expect(text).toMatch(/Orientacyjnie: 3000–6000 zł, 1–3 tygodnie\./);
   });
 
   test('the message is in Ukrainian on /uk/', async ({ page }) => {
@@ -478,10 +520,14 @@ test.describe('summary and hand-off', () => {
     const text = await panel(page)
       .getByLabel(ui.uk.configurator.summary.message, { exact: true })
       .inputValue();
-    expect(text.split('\n')[0]).toBe('Запит із сайту KABANINNO');
-    expect(text).toContain(ui.uk.configurator.goals.items['online-orders'].name);
-    expect(text).toContain(ui.uk.configurator.industries.retail);
-    expect(text).toContain(ui.uk.configurator.timelines['1-3-months']);
+    expect(text.split('\n')[0]).toBe('Доброго дня!');
+    expect(text).toContain('Мене звати Łucja Żółkiewska. Хочу скористатися послугами KABANINNO.');
+    expect(text).toContain(ui.uk.configurator.goals.items['online-orders'].phrase);
+    expect(text).toContain(
+      `Мій бізнес: ${ui.uk.configurator.industries.retail.toLocaleLowerCase('uk')}.`,
+    );
+    expect(text).toMatch(/Орієнтовно: 7\s000–14\s000 zł, 2–5 тижнів\./);
+    expect(text.split('\n').at(-1)).toBe('Чи можемо обговорити деталі?');
   });
 
   test('Copy puts the full text on the clipboard', async ({ page, context }) => {
@@ -537,6 +583,14 @@ test.describe('summary and hand-off', () => {
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     expect(copied.replace(/\r\n/g, '\n')).toBe(text);
     await tab.close();
+  });
+
+  test('WhatsApp: no button while siteConfig.whatsappNumber is empty (B4)', async ({ page }) => {
+    test.skip(whatsappConfigured, 'a WhatsApp number is configured in this build');
+    await seed(page, 'contact');
+    await open(page);
+    await expect(panel(page).getByLabel(cfg.summary.message, { exact: true })).toBeVisible();
+    await expect(panel(page).getByText(/WhatsApp/)).toHaveCount(0);
   });
 
   test('unconfigured Telegram: no send link, a notice, Copy stays', async ({ page }) => {

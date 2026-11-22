@@ -8,23 +8,11 @@ import plUi from '~/messages/pl/ui.json';
 import ukContent from '~/messages/uk/content.json';
 import ukUi from '~/messages/uk/ui.json';
 import { CONFIGURATOR_STEPS } from '../configurator-steps';
-import {
-  buildWizardLabels,
-  errorText,
-  fillTemplate,
-  formatBudgetLabel,
-  type Translate,
-} from './labels';
+import { buildWizardLabels, errorText, fillTemplate, type Translate } from './labels';
 import { emptyDraft } from './draft';
+import { formatTimeline } from './estimate';
 import { buildLeadMessage } from './message';
-import {
-  BUDGET_NOT_SURE,
-  GOAL_UNSURE,
-  OPTION_UNKNOWN,
-  allBudgetIds,
-  allServices,
-  getConfiguratorModel,
-} from './model';
+import { GOAL_UNSURE, HAVE_NONE, OPTION_UNKNOWN, allServices, getConfiguratorModel } from './model';
 
 const model = getConfiguratorModel();
 const dictionaries = {
@@ -35,7 +23,7 @@ const dictionaries = {
 
 function labelsFor(locale: keyof typeof dictionaries) {
   const messages = dictionaries[locale];
-  const translator = (namespace: 'configurator' | 'lead') =>
+  const translator = (namespace: 'configurator' | 'lead' | 'service') =>
     createTranslator({ locale, messages, namespace }) as unknown as Translate;
   const services = messages.services as Record<
     string,
@@ -46,6 +34,7 @@ function labelsFor(locale: keyof typeof dictionaries) {
     model,
     t: translator('configurator'),
     tLead: translator('lead'),
+    tService: translator('service'),
     studio: 'KABANINNO',
     category: (id) => ({
       name: (messages.categories as Record<string, { name: string }>)[id]!.name,
@@ -83,19 +72,34 @@ describe('buildWizardLabels', () => {
     }
     for (const id of model.have) expect(labels.details.have[id], id).toBeTruthy();
     for (const id of model.industries) expect(labels.industries[id]).toBeTruthy();
-    for (const id of model.timelines) expect(labels.timelines[id]).toBeTruthy();
-    expect(Object.keys(labels.budgets)).toEqual(allBudgetIds(model));
-    expect(labels.budgetReset).toBeTruthy();
+    for (const goal of model.goals) {
+      expect(labels.lead.goalPhrases[goal.id], goal.id).toBeTruthy();
+      for (const option of goal.options.filter((item) => item.id !== OPTION_UNKNOWN)) {
+        expect(labels.lead.answers[goal.id]?.[option.id], `${goal.id}/${option.id}`).toMatch(
+          /[.!?]$/,
+        );
+      }
+    }
+    expect(labels.goals.typical).toBeTruthy();
+    expect(Object.values(labels.solution.estimate).every(Boolean)).toBe(true);
+    expect(labels.summary.sendWhatsapp).toContain('WhatsApp');
     expect(labels.progress.guided).toHaveLength(CONFIGURATOR_STEPS.length);
     expect(labels.progress.manual).toHaveLength(CONFIGURATOR_STEPS.length - 1);
-    // No leaked ICU arguments or message keys; the two client-side templates keep their {name}.
+    // No leaked ICU arguments or message keys; the client-side templates keep their {name}.
     const stripped = JSON.stringify({
       ...labels,
       solution: { ...labels.solution, fits: '', removeNamed: '' },
+      timeline: {},
+      lead: {},
     });
-    expect(stripped).not.toMatch(/\{\w+|configurator\.|lead\./);
+    expect(stripped).not.toMatch(/\{\w+|configurator\.|lead\.|service\./);
     expect(labels.solution.fits).toContain('{combo}');
     expect(labels.solution.removeNamed).toContain('{service}');
+    expect(labels.lead.picked).toMatch(/\{combo\}.*\{services\}/);
+    expect(labels.lead.estimate).toMatch(/\{price\}.*\{timeline\}/);
+    expect(labels.timeline.days[5]).toContain('{min}');
+    // Every number the estimate can reach has its phrase.
+    expect(Object.keys(labels.timeline.weeks).length).toBeGreaterThanOrEqual(24);
   });
 
   it('the goal "I don’t know" option shares one wording; the limit is in the hint', () => {
@@ -125,39 +129,59 @@ describe('buildWizardLabels', () => {
     expect(labelsFor('pl').errors.nameTooShort).toBe('Wpisz co najmniej 2 znaki.');
     expect(labelsFor('pl').errors.commentTooLong).toBe('Maksymalnie 1000 znaków.');
     expect(labelsFor('en').errors.nameTooLong).toBe('Up to 80 characters.');
-    expect(labelsFor('uk').lead.title).toBe('Запит із сайту KABANINNO');
+    expect(labelsFor('uk').lead.intro).toBe('Хочу скористатися послугами KABANINNO.');
+    expect(labelsFor('pl').lead.intro).toBe('Chcę skorzystać z usług KABANINNO.');
   });
 
-  it('feeds the message generator with complete labels (pl, uk)', () => {
+  it('feeds the message generator with complete labels (pl, en, uk)', () => {
     const draft = {
       ...emptyDraft(),
-      goals: ['booking', GOAL_UNSURE].slice(0, 1),
+      industry: 'food',
+      goals: ['booking'],
       answers: { booking: 'phone' },
       have: ['website', 'tracking'],
-      industry: 'food',
-      budget: BUDGET_NOT_SURE,
-      timeline: 'asap',
       contact: { name: 'Łucja', comment: '' },
     };
     const services = ['telegram/booking', 'automation/notifications-reminders'];
-    const pl = buildLeadMessage(draft, services, labelsFor('pl').lead);
-    expect(pl).toContain('Zapytanie ze strony KABANINNO');
-    expect(pl).toContain(plUi.configurator.goals.items.booking.name);
-    expect(pl).toContain(plUi.configurator.goals.items.booking.options.phone);
-    expect(pl).toContain(plUi.configurator.have.items.tracking);
-    expect(pl).toContain(plUi.configurator.budget.notSure);
-    const uk = buildLeadMessage(draft, services, labelsFor('uk').lead);
-    expect(uk).toContain(ukUi.configurator.industries.food);
-    expect(uk).toContain(ukUi.configurator.timelines.asap);
-    expect(uk).toContain(ukUi.configurator.goals.items.booking.name);
-    expect(`${pl}${uk}`).not.toContain('undefined');
-    const consultation = buildLeadMessage(
-      { ...draft, goals: [GOAL_UNSURE], answers: {} },
-      [],
-      labelsFor('pl').lead,
+    const estimate = { price: '1400–3500 zł', timeline: '5–10 dni' };
+    const pl = buildLeadMessage(draft, services, labelsFor('pl').lead, { estimate });
+    expect(pl).toMatch(/^Dzień dobry!\nMam na imię Łucja\. Chcę skorzystać z usług KABANINNO\./);
+    expect(pl).toContain(plUi.configurator.goals.items.booking.sentences.phone);
+    expect(pl).toContain('Orientacyjnie: 1400–3500 zł, 5–10 dni.');
+    // Gender-neutral first person (B3): no "Chciałbym / Chciałabym".
+    expect(pl).not.toMatch(/Chciałbym|Chciałabym/);
+    const en = buildLeadMessage(draft, services, labelsFor('en').lead, { estimate });
+    const uk = buildLeadMessage(draft, services, labelsFor('uk').lead, { estimate });
+    expect(uk).toContain(
+      `Мій бізнес: ${ukUi.configurator.industries.food.toLocaleLowerCase('uk')}.`,
     );
-    expect(consultation).toContain(plUi.lead.consultation);
-    expect(consultation).toContain(plUi.lead.unsure);
+    expect(uk).toContain(ukUi.configurator.goals.items.booking.phrase);
+    for (const text of [pl, en, uk]) {
+      expect(text).not.toMatch(/undefined|\{\w+\}/);
+      expect(text.split('\n').at(-1)).toMatch(/\?$/);
+    }
+    const consultation = buildLeadMessage(
+      { ...draft, goals: [GOAL_UNSURE], answers: {}, have: [HAVE_NONE] },
+      [],
+      labelsFor('uk').lead,
+    );
+    expect(consultation).toContain(ukUi.lead.consultation);
+    expect(consultation).toContain(ukUi.lead.haveNone);
+  });
+
+  it('no "netto" anywhere in the interface texts (round 3, B1)', () => {
+    expect(JSON.stringify([plUi, enUi, ukUi])).not.toMatch(/netto|нетто|\bnet\b/i);
+  });
+});
+
+describe('timeline phrases of the estimate', () => {
+  it('days up to ten, weeks above, one number when the weeks round together', () => {
+    expect(formatTimeline([2, 5], labelsFor('uk').timeline)).toBe('2–5 днів');
+    expect(formatTimeline([10, 21], labelsFor('uk').timeline)).toBe('1–3 тижні');
+    expect(formatTimeline([12, 16], labelsFor('uk').timeline)).toBe('2 тижні');
+    expect(formatTimeline([5, 11], labelsFor('pl').timeline)).toBe('1–2 tygodnie');
+    expect(formatTimeline([1, 3], labelsFor('en').timeline)).toBe('1–3 days');
+    expect(formatTimeline([14, 30], labelsFor('en').timeline)).toBe('2–4 weeks');
   });
 });
 
@@ -168,44 +192,18 @@ describe('fillTemplate', () => {
   });
 });
 
-describe('formatBudgetLabel', () => {
-  const t = (key: string, values?: Record<string, string | number>) =>
-    `${key}:${JSON.stringify(values)}`;
-
-  it('formats amounts with the locale’s grouping and picks the template', () => {
-    expect(formatBudgetLabel({ id: 'a', min: 15000, max: 40000 }, 'en', 'PLN', t)).toBe(
-      'budget.range:{"min":"15,000","max":"40,000","currency":"PLN"}',
-    );
-    expect(formatBudgetLabel({ id: 'b', max: 5000 }, 'en', 'PLN', t)).toBe(
-      'budget.upTo:{"max":"5,000","currency":"PLN"}',
-    );
-    expect(formatBudgetLabel({ id: 'c', min: 40000 }, 'en', 'PLN', t)).toBe(
-      'budget.from:{"min":"40,000","currency":"PLN"}',
-    );
-  });
-
-  it('produces real labels per locale (no-break spaces are normalised later, D35)', () => {
-    const pl = labelsFor('pl').budgets['5000-10000']!;
-    expect(pl.replace(/[  ]/g, ' ')).toBe('5 000–10 000 PLN netto');
-    expect(labelsFor('en').budgets['up-to-1500']).toBe('up to PLN 1,500 net');
-    expect(labelsFor('uk').budgets['over-6000']!.replace(/[  ]/g, ' ')).toBe(
-      'понад 6 000 PLN нетто',
-    );
-  });
-});
-
 describe('errorText', () => {
   const errors = labelsFor('pl').errors;
 
   it('maps validation codes to field-specific messages', () => {
     expect(errorText('goals', 'required', errors)).toBe(errors.requiredMulti);
     expect(errorText('answers.booking', 'required', errors)).toBe(errors.requiredOne);
-    expect(errorText('budget', 'required', errors)).toBe(errors.requiredOne);
+
     expect(errorText('contact.name', 'required', errors)).toBe(errors.requiredText);
     expect(errorText('contact.name', 'tooShort', errors)).toBe(errors.nameTooShort);
     expect(errorText('contact.name', 'tooLong', errors)).toBe(errors.nameTooLong);
     expect(errorText('contact.comment', 'tooLong', errors)).toBe(errors.commentTooLong);
     expect(errorText('industry', 'tooLong', errors)).toBe(errors.industryTooLong);
-    expect(errorText('budget', 'unknown', errors)).toBe(errors.unknown);
+    expect(errorText('industry', 'unknown', errors)).toBe(errors.unknown);
   });
 });

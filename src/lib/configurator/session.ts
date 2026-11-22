@@ -1,4 +1,4 @@
-import type { ConfiguratorStepId } from '../configurator-steps';
+import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '../configurator-steps';
 import { sceneNodeId } from '@/scene/node-ids';
 import { prefillDraft, emptyDraft, servicesOf, type ConfiguratorDraft } from './draft';
 import type { ConfiguratorModel } from './model';
@@ -44,7 +44,8 @@ export interface StartingState {
  *
  * A visitor who arrives with services picked on the planet pages and has not
  * answered any goal knows what they want: they continue in the manual mode, on
- * the solution step (D150).
+ * the solution step (D151), with the estimate; the industry step stays
+ * reachable with Back.
  */
 export function startingState(
   stored: {
@@ -58,9 +59,11 @@ export function startingState(
   const base = stored?.draft ?? emptyDraft();
   const draft = prefillDraft(base, refs, model);
   const added = draft.added.filter((id) => !base.added.includes(id));
-  let step: ConfiguratorStepId = stored?.step ?? 'goals';
+  let step: ConfiguratorStepId = stored?.step ?? CONFIGURATOR_STEPS[0];
   let next = draft;
-  if (added.length > 0 && base.goals.length === 0 && step === 'goals') {
+  // Not yet past the goals: the industry step (first) or the goals step.
+  const early = step === 'industry' || step === 'goals';
+  if (added.length > 0 && base.goals.length === 0 && early) {
     next = { ...draft, mode: 'manual' };
     step = 'solution';
   }

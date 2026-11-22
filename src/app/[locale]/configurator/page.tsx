@@ -40,6 +40,7 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
   setRequestLocale(locale);
   const t = await getTranslations('configurator');
   const tLead = await getTranslations('lead');
+  const tService = await getTranslations('service');
 
   const model = getConfiguratorModel();
   const labels = buildWizardLabels({
@@ -48,6 +49,7 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
     // The keys are built from model ids; next-intl's typed keys cannot see them.
     t: t as unknown as Translate,
     tLead: tLead as unknown as Translate,
+    tService: tService as unknown as Translate,
     studio: siteConfig.studioName,
     category: (id) => ({
       name: getCategoryText(locale, id).name,
@@ -66,6 +68,7 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
         labels={labels}
         locale={locale}
         telegramUsername={siteConfig.telegramUsername}
+        whatsappNumber={siteConfig.whatsappNumber}
         header={{
           eyebrow: t('eyebrow'),
           title: bindShortWords(t('title'), locale),

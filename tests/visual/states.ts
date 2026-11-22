@@ -87,7 +87,7 @@ const demoCases = ['iframe', 'video', 'mockup'].flatMap((type) => {
   return project ? [{ type, slug: project.slug }] : [];
 });
 
-const CONFIGURATOR_STEP_IDS = ['goals', 'details', 'solution', 'plan', 'contact'] as const;
+const CONFIGURATOR_STEP_IDS = ['industry', 'goals', 'details', 'solution', 'contact'] as const;
 
 /** The home index link of a locale-less path. */
 function indexLink(page: Page, locale: TestLocale, path: string) {

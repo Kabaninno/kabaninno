@@ -44,7 +44,7 @@ describe('configurator storage', () => {
   it('round-trips the draft and the step under a versioned key', () => {
     expect(saveConfigurator(draft, 'details')).toBe(true);
     expect(JSON.parse(data.get(CONFIGURATOR_STORAGE_KEY)!)).toMatchObject({
-      v: 2,
+      v: 3,
       step: 'details',
     });
     expect(loadConfigurator(model)).toEqual({ draft, step: 'details', message: null });
@@ -56,7 +56,7 @@ describe('configurator storage', () => {
     expect(saveConfigurator(draft, 'goals', message)).toBe(true);
     expect(loadConfigurator(model)?.message).toEqual(message);
     expect(
-      readStoredConfigurator({ v: 2, step: 'goals', draft, message: 'x' }, model)?.message,
+      readStoredConfigurator({ v: 3, step: 'goals', draft, message: 'x' }, model)?.message,
     ).toBeNull();
     clearConfigurator();
     expect(loadConfigurator(model)).toBeNull();
@@ -65,7 +65,7 @@ describe('configurator storage', () => {
   it('ignores other versions, garbage and corrupted JSON', () => {
     // The v1 draft of the old seven-step form is not migrated (D149).
     expect(readStoredConfigurator({ v: 1, step: 'type', draft }, model)).toBeNull();
-    expect(readStoredConfigurator({ v: 3, step: 'goals', draft }, model)).toBeNull();
+    expect(readStoredConfigurator({ v: 4, step: 'goals', draft }, model)).toBeNull();
     expect(readStoredConfigurator('draft', model)).toBeNull();
     data.set(CONFIGURATOR_STORAGE_KEY, '{not json');
     expect(loadConfigurator(model)).toBeNull();
@@ -74,28 +74,41 @@ describe('configurator storage', () => {
   it('drops stale ids and moves the step back to the last enterable one', () => {
     const loaded = readStoredConfigurator(
       {
-        v: 2,
+        v: 3,
         step: 'contact',
-        draft: { ...draft, added: ['web/removed'], budget: 'gone' },
+        draft: { ...draft, added: ['web/removed'], answers: {} },
       },
       model,
     );
     expect(loaded?.draft.added).toEqual([]);
-    expect(loaded?.draft.budget).toBeNull();
-    // The cleared budget makes the plan step the furthest the visitor may enter.
-    expect(loaded?.step).toBe('plan');
+    // The goal lost its answer: the details step is the furthest the visitor may enter.
+    expect(loaded?.step).toBe('details');
+  });
+
+  it('migrates a v2 draft: no budget or timeline, the budget step resumes on the solution', () => {
+    const v2 = {
+      v: 2,
+      step: 'plan',
+      draft: { ...draft, budget: '3000-6000', timeline: 'asap' },
+    };
+    const loaded = readStoredConfigurator(v2, model);
+    expect(loaded?.step).toBe('solution');
+    expect(loaded?.draft).toEqual(draft);
+    expect(readStoredConfigurator({ ...v2, step: 'contact' }, model)?.step).toBe('contact');
   });
 
   it('falls back to the first step for an unknown step id', () => {
-    expect(readStoredConfigurator({ v: 2, step: 'nope', draft }, model)?.step).toBe('goals');
+    expect(readStoredConfigurator({ v: 3, step: 'nope', draft }, model)?.step).toBe('industry');
   });
 
   it('a stored manual draft never lands on the details step', () => {
     const manual = { ...emptyDraft(), mode: 'manual', added: ['web/landing-pages'] };
-    expect(readStoredConfigurator({ v: 2, step: 'details', draft: manual }, model)?.step).toBe(
-      'goals',
+    expect(readStoredConfigurator({ v: 3, step: 'details', draft: manual }, model)?.step).toBe(
+      'industry',
     );
-    expect(readStoredConfigurator({ v: 2, step: 'plan', draft: manual }, model)?.step).toBe('plan');
+    expect(readStoredConfigurator({ v: 3, step: 'solution', draft: manual }, model)?.step).toBe(
+      'solution',
+    );
   });
 
   it('works without storage (private mode, blocked access)', () => {

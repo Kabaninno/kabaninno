@@ -151,25 +151,25 @@
     "title": "Find your solution",
     "lead": "Answer a few simple questions about your business. We'll pick the solution and explain, in plain words, what each part is for.",
     "steps": {
+      "industry": "Industry",
       "goals": "Goals",
       "details": "Questions",
       "solution": "Solution",
-      "plan": "Budget & timing",
       "contact": "Contact"
     },
     "titles": {
+      "industry": "Your industry",
       "goals": "What do you want to improve?",
       "details": "A few quick questions",
       "solution": "Your solution",
-      "plan": "Budget and timing",
       "contact": "Contact and summary"
     },
     "hints": {
+      "industry": "Pick the one that best describes your business, and we'll move straight on.",
       "goals": "No tech knowledge needed. Tell us what you would like to improve in your business.",
       "details": "One simple question per goal, plus a short one about what you already have.",
       "solution": "Here is what we suggest and what each part is for. Remove what you don't need or add more.",
-      "plan": "Pick a rough budget in PLN (net) matched to your services, and tell us when you want to start.",
-      "contact": "How should we address you? Check the message, edit it if you like, and send it via Telegram."
+      "contact": "What should we call you? Check the message, edit it if needed, and send it to us."
     },
     "progress": "Step {current} of {total}",
     "nav": {
@@ -180,6 +180,11 @@
       "startOverConfirm": "Clear all answers?",
       "startOverYes": "Yes, clear",
       "startOverNo": "Cancel"
+    },
+    "industry": {
+      "legend": "Industry",
+      "other": "What industry are you in?",
+      "otherHint": "A few words, up to {max} characters."
     },
     "goals": {
       "legend": "Goals",
@@ -195,6 +200,12 @@
             "google": "From Google",
             "social-ads": "From Instagram, Facebook or ads",
             "messengers": "From messengers and word of mouth"
+          },
+          "phrase": "how we attract customers online",
+          "sentences": {
+            "google": "Customers should find us on Google.",
+            "social-ads": "I want to reach customers through Instagram, Facebook and ads.",
+            "messengers": "I want more customers through messaging apps and word of mouth."
           }
         },
         "online-orders": {
@@ -204,6 +215,12 @@
             "up-to-20": "Up to 20",
             "20-200": "20–200",
             "over-200": "Over 200"
+          },
+          "phrase": "online orders and payments",
+          "sentences": {
+            "up-to-20": "We have up to 20 products or services.",
+            "20-200": "We have 20 to 200 products or services.",
+            "over-200": "We have over 200 products or services."
           }
         },
         "booking": {
@@ -213,6 +230,12 @@
             "phone": "By phone",
             "messengers": "In messengers",
             "website-inconvenient": "Through the website, but it's inconvenient"
+          },
+          "phrase": "online booking and appointments",
+          "sentences": {
+            "phone": "Customers currently book by phone.",
+            "messengers": "Customers currently book through messaging apps.",
+            "website-inconvenient": "Customers currently book through the website, but it's inconvenient."
           }
         },
         "client-order": {
@@ -222,6 +245,12 @@
             "head-notebook": "In my head or a notebook",
             "spreadsheets": "In Excel or spreadsheets",
             "program-inconvenient": "In a program, but it's inconvenient"
+          },
+          "phrase": "how we keep track of clients and orders",
+          "sentences": {
+            "head-notebook": "I currently keep track of clients and orders in my head or in a notebook.",
+            "spreadsheets": "I currently track clients and orders in Excel or spreadsheets.",
+            "program-inconvenient": "I track clients and orders in a program, but it's inconvenient."
           }
         },
         "less-routine": {
@@ -232,6 +261,13 @@
             "reminders": "Reminders for customers",
             "data-transfer": "Moving data between programs",
             "emails-requests": "Emails and requests"
+          },
+          "phrase": "how we handle routine tasks",
+          "sentences": {
+            "documents": "Documents and invoices take the most time.",
+            "reminders": "Sending reminders to customers takes the most time.",
+            "data-transfer": "Moving data between programs takes the most time.",
+            "emails-requests": "Emails and requests take the most time."
           }
         },
         "fast-replies": {
@@ -242,6 +278,13 @@
             "website-chat": "On the website or in a chat",
             "many-channels": "In several messengers and by email",
             "repeated-questions": "Mostly with the same questions"
+          },
+          "phrase": "how quickly we reply to customers",
+          "sentences": {
+            "telegram": "Customers usually message us on Telegram.",
+            "website-chat": "Customers usually contact us through the website or a chat.",
+            "many-channels": "Customers write to us on several messaging apps and by email.",
+            "repeated-questions": "Customers mostly ask the same questions over and over."
           }
         },
         "see-numbers": {
@@ -251,9 +294,16 @@
             "sales-clients": "Sales and clients",
             "team-processes": "Team performance and processes",
             "feedback": "Customer reviews and messages"
+          },
+          "phrase": "reporting and a clear view of the numbers",
+          "sentences": {
+            "sales-clients": "I want clear numbers on sales and clients.",
+            "team-processes": "I want clear numbers on team performance and processes.",
+            "feedback": "I want clear numbers on customer reviews and messages."
           }
         }
-      }
+      },
+      "typical": "Often chosen in your industry"
     },
     "have": {
       "legend": "What do you already have?",
@@ -277,15 +327,14 @@
       "hideList": "Hide the list",
       "listLegend": "All services",
       "manualHint": "You pick the services yourself.",
-      "backToGuided": "Not sure? Answer a few questions"
-    },
-    "plan": {
-      "budget": "Budget",
-      "timeline": "When do you want to start?",
-      "industry": "Industry",
-      "industryHint": "Optional — it helps us fit the solution better.",
-      "industryOther": "Which industry?",
-      "industryOtherHint": "Up to {max} characters."
+      "backToGuided": "Not sure? Answer a few questions",
+      "estimate": {
+        "price": "Estimated cost",
+        "timeline": "Estimated timeline",
+        "note": "This is a preliminary estimate. We'll agree on the exact price and timeline after a short call.",
+        "consultation": "We'll give you the price and timeline after a short free consultation.",
+        "exact": "{unit, select, days {{n, plural, one {# day} other {# days}}} other {{n, plural, one {# week} other {# weeks}}}}"
+      }
     },
     "fields": {
       "name": "Name",
@@ -305,20 +354,6 @@
       "it": "IT and technology",
       "other": "Other industry"
     },
-    "timelines": {
-      "asap": "As soon as possible",
-      "1-month": "Within a month",
-      "1-3-months": "1–3 months",
-      "3-plus-months": "Over 3 months",
-      "flexible": "Flexible"
-    },
-    "budget": {
-      "upTo": "up to {currency} {max} net",
-      "range": "{currency} {min}–{max} net",
-      "from": "over {currency} {min} net",
-      "notSure": "Not sure yet — help me estimate",
-      "reset": "Your selection changed, so the budget range was cleared. Please choose it again."
-    },
     "errors": {
       "requiredMulti": "Choose at least one option.",
       "requiredOne": "Choose one of the options.",
@@ -334,12 +369,13 @@
       "messageHint": "You can edit it freely before sending.",
       "restoreDefault": "Restore the default text",
       "send": "Send via Telegram",
+      "sendWhatsapp": "Send via WhatsApp",
       "sendHint": "If the text didn't appear in the chat, it's already copied — just paste it.",
       "copy": "Copy text",
       "copied": "Copied to clipboard.",
       "copyFailed": "Couldn't copy. Select the text and copy it manually.",
       "newTab": "opens in a new tab",
-      "truncated": "The message is long, so Telegram will show a shortened version. Copy the full text and paste it into the chat.",
+      "truncated": "The message is long, so the messaging app will show a shortened version. Copy the full text and paste it into the chat.",
       "unconfigured": "Sending via Telegram is not available yet. Copy the text and send it to us another way.",
       "staleNotice": "Your answers changed after you edited the message. It still contains your version.",
       "staleUpdate": "Update the message",
@@ -349,25 +385,22 @@
       "rowGoals": "Goals",
       "rowHave": "What you already have",
       "rowServices": "Services",
-      "rowBudget": "Budget",
-      "rowTimeline": "Timeline",
       "rowIndustry": "Industry",
       "rowConsultation": "To be chosen at a consultation"
     }
   },
   "lead": {
-    "title": "Request from the {studio} website",
-    "goals": "Goals",
-    "have": "Already have",
-    "solution": "Solution",
-    "services": "Services",
-    "industry": "Industry",
-    "budget": "Budget",
-    "timeline": "Timeline",
-    "name": "Name",
-    "comment": "Comment",
-    "unsure": "we are not sure yet, please advise",
-    "consultation": "to be chosen at a free consultation"
+    "greeting": "Hello!",
+    "introName": "My name is {name}.",
+    "intro": "I'd like to work with {studio}.",
+    "business": "My business: {industry}.",
+    "improve": "I'd like to improve: {goals}.",
+    "have": "I already have: {items}.",
+    "haveNone": "I don't have a website, social media or a client-tracking program yet.",
+    "picked": "Your website recommended: {combo} — {services}.",
+    "estimate": "Estimate: {price}, {timeline}.",
+    "consultation": "I'm not sure yet exactly what I need, so I'd like a consultation.",
+    "closing": "Could we discuss the details?"
   },
   "notFound": {
     "title": "This sector is empty",

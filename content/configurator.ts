@@ -4,11 +4,15 @@
  * lines come from the content texts. Validated and combined with the
  * categories in `src/lib/configurator/model.ts`.
  *
- * The configurator is a short diagnostic (D149): the visitor picks up to
- * three goals, answers one plain question per goal, and the configurator
- * recommends services; they can drop any of them or add others, then pick a
- * budget and send the request.
+ * The configurator is a short diagnostic (D149, round 3 D155): the visitor
+ * names their industry, picks up to three goals, answers one plain question
+ * per goal, and the configurator recommends services with an indicative
+ * price and timeline (`pricePLN` and `timelineDays` of the services); they can
+ * drop any of them or add others, then send the request.
  *
+ * - `industries`: one choice on the first step; `other` asks for a few words.
+ *   `industryGoals` names the 1–2 goals typical for an industry: they get an
+ *   "Often chosen in your industry" mark, never a preselection.
  * - `goals`: what the visitor wants to improve. Each goal has one question; each
  *   answer (option) maps to the services recommended for it, as ids
  *   `"<category>/<slug>"` of `content/categories.ts`. Every goal ends with an
@@ -16,20 +20,7 @@
  *   `configurator.goals.items.<goal>.{name,question,options.<option>}`.
  * - `have`: the shared question "What do you already have?". `none` is
  *   exclusive. Texts: `configurator.have.items.<id>`.
- * - Budgets follow the choice (D138): every service has a complexity level
- *   1–3 (`complexity`); the budget step offers the ranges of the highest level
- *   among the selected services (`budgetLevels`), and `consultationLevel` when
- *   nothing is selected (a consultation request). All the numbers live here,
- *   in PLN netto; nothing in code needs to change to edit them.
  */
-export type ComplexityLevel = 1 | 2 | 3;
-
-/** A budget range in `siteConfig.currency` (netto): `min` inclusive, `max` exclusive. */
-export interface BudgetRangeInput {
-  min?: number;
-  max?: number;
-}
-
 export interface GoalOptionInput {
   id: string;
   /** Recommended services (`"<category>/<slug>"`), most important first. */
@@ -49,22 +40,10 @@ export interface ConfiguratorDataInput {
   goals: readonly GoalInput[];
   /** Ids of "What do you already have?"; `none` is the exclusive "nothing of these". */
   have: readonly string[];
-  /**
-   * Complexity level of every service, by id `"<category>/<slug>"`. Every
-   * service of `content/categories.ts` must be listed.
-   */
-  complexity: Record<string, ComplexityLevel>;
-  /** The level of a request with no services yet (a consultation). */
-  consultationLevel: ComplexityLevel;
-  /**
-   * Budget ranges offered per complexity level (PLN netto), from the lowest
-   * to the highest. A range's id is derived from its numbers (`up-to-1500`,
-   * `1500-3000`, `over-3000`), so the same range under two levels is one
-   * option with one label. "Not sure yet" is always added by the code.
-   */
-  budgetLevels: Record<ComplexityLevel, readonly BudgetRangeInput[]>;
+  /** Industry ids of the first step; `other` is the free-text one. */
   industries: readonly string[];
-  timelines: readonly string[];
+  /** Goals typical for an industry (1–2 each), marked on the goals step. */
+  industryGoals: Readonly<Record<string, readonly string[]>>;
   contact: { nameMin: number; nameMax: number; commentMax: number };
 }
 
@@ -162,42 +141,6 @@ export const configuratorData: ConfiguratorDataInput = {
     },
   ],
   have: ['website', 'social', 'tracking', 'none'],
-  complexity: {
-    // Websites and web apps
-    'web/landing-pages': 1,
-    'web/corporate-websites': 2,
-    'web/online-stores': 2,
-    'web/web-apps': 3,
-    // CRM
-    'crm/sales-funnels': 2,
-    'crm/reports-dashboards': 2,
-    'crm/crm-implementation': 3,
-    'crm/custom-crm': 3,
-    // Automation
-    'automation/document-automation': 1,
-    'automation/notifications-reminders': 1,
-    'automation/api-integrations': 2,
-    'automation/data-processing': 2,
-    // AI
-    'ai/content-generation': 2,
-    'ai/ai-assistants': 3,
-    'ai/ai-document-processing': 3,
-    'ai/ai-analytics': 3,
-    // Telegram bots
-    'telegram/customer-support': 1,
-    'telegram/booking': 2,
-    'telegram/sales-orders': 2,
-    'telegram/mini-apps': 3,
-  },
-  consultationLevel: 2,
-  budgetLevels: {
-    // Landing page, simple bot, simple automation.
-    1: [{ max: 1500 }, { min: 1500, max: 3000 }, { min: 3000 }],
-    // Website, store, integrations, a bot with orders.
-    2: [{ max: 3000 }, { min: 3000, max: 6000 }, { min: 6000 }],
-    // CRM, AI, web application.
-    3: [{ max: 5000 }, { min: 5000, max: 10000 }, { min: 10000 }],
-  },
   industries: [
     'retail',
     'services',
@@ -210,7 +153,18 @@ export const configuratorData: ConfiguratorDataInput = {
     'it',
     'other',
   ],
-  timelines: ['asap', '1-month', '1-3-months', '3-plus-months', 'flexible'],
+  // My choice: the owner gave no table for this (D155).
+  industryGoals: {
+    retail: ['online-orders', 'more-clients'],
+    services: ['booking', 'client-order'],
+    'beauty-health': ['booking', 'more-clients'],
+    food: ['online-orders', 'fast-replies'],
+    education: ['booking', 'more-clients'],
+    'real-estate': ['more-clients', 'client-order'],
+    logistics: ['less-routine', 'see-numbers'],
+    manufacturing: ['less-routine', 'client-order'],
+    it: ['less-routine', 'see-numbers'],
+  },
   contact: {
     /** Name length after trimming, in characters. */
     nameMin: 2,

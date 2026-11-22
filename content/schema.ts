@@ -119,6 +119,13 @@ export const serviceSchema = z.object({
   timelineDays: z
     .tuple([z.int().positive(), z.int().positive()])
     .refine(([min, max]) => min <= max, 'timelineDays: min must be <= max'),
+  /**
+   * Indicative price range in PLN, `[min, max]` (round 3, B2). Feeds the
+   * configurator estimate (`src/lib/configurator/estimate.ts`).
+   */
+  pricePLN: z
+    .tuple([z.int().positive(), z.int().positive()])
+    .refine(([min, max]) => min <= max, 'pricePLN: min must be <= max'),
   planet: planetSchema,
 });
 

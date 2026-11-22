@@ -51,23 +51,34 @@ export function fitsTelegramBudget(
 }
 
 /**
- * The longest grapheme-safe prefix of `text` (plus "…") whose link fits the
- * budget. Binary search over grapheme clusters; `truncated` tells the UI to
- * offer the full text through "Copy".
+ * The longest grapheme-safe prefix of `text` (plus "…") whose link
+ * (`toUrl(text)`) fits the budget. Binary search over grapheme clusters;
+ * `truncated` tells the UI to offer the full text through "Copy". Shared by
+ * the Telegram and WhatsApp links.
  */
-export function fitTextToTelegramUrl(
-  username: string,
+export function fitTextToUrl(
   text: string,
+  toUrl: (text: string) => string,
   maxUrlLength: number = TELEGRAM_URL_BUDGET,
 ): { text: string; truncated: boolean } {
-  if (fitsTelegramBudget(username, text, maxUrlLength)) return { text, truncated: false };
+  const fits = (candidate: string) => toUrl(candidate).length <= maxUrlLength;
+  if (fits(text)) return { text, truncated: false };
   const units = graphemes(text);
   let low = 0;
   let high = units.length - 1;
   while (low < high) {
     const middle = Math.ceil((low + high) / 2);
-    if (fitsTelegramBudget(username, truncateGraphemes(text, middle), maxUrlLength)) low = middle;
+    if (fits(truncateGraphemes(text, middle))) low = middle;
     else high = middle - 1;
   }
   return { text: truncateGraphemes(text, low), truncated: true };
+}
+
+/** `fitTextToUrl` for the Telegram link of this username. */
+export function fitTextToTelegramUrl(
+  username: string,
+  text: string,
+  maxUrlLength: number = TELEGRAM_URL_BUDGET,
+): { text: string; truncated: boolean } {
+  return fitTextToUrl(text, (candidate) => telegramUrl(username, candidate), maxUrlLength);
 }

@@ -2,20 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { getCategories } from '~/content';
 import { configuratorData } from '~/content/configurator';
 import {
-  BUDGET_NOT_SURE,
   GOAL_UNSURE,
   HAVE_NONE,
   OPTION_UNKNOWN,
-  allBudgetIds,
   allServices,
-  budgetIds,
-  budgetRangeId,
-  budgetRangesFor,
   buildConfiguratorModel,
-  complexityLevel,
   findGoal,
   findService,
   getConfiguratorModel,
+  typicalGoals,
 } from './model';
 
 describe('configurator model', () => {
@@ -80,22 +75,25 @@ describe('configurator model', () => {
     const extended = buildConfiguratorModel(
       [
         ...getCategories(),
-        { id: 'hardware', services: [{ slug: 'kiosks' }, { slug: 'printers' }] },
-      ],
-      {
-        ...configuratorData,
-        complexity: {
-          ...configuratorData.complexity,
-          'hardware/kiosks': 2,
-          'hardware/printers': 1,
+        {
+          id: 'hardware',
+          services: [
+            { slug: 'kiosks', pricePLN: [1000, 2000], timelineDays: [5, 10] },
+            { slug: 'printers', pricePLN: [500, 900], timelineDays: [1, 3] },
+          ],
         },
-      },
+      ],
+      configuratorData,
     );
     expect(extended.categories.at(-1)).toBe('hardware');
     expect(extended.services.hardware!.map((service) => service.id)).toEqual([
       'hardware/kiosks',
       'hardware/printers',
     ]);
+    expect(findService(extended, 'hardware/kiosks')).toMatchObject({
+      price: [1000, 2000],
+      days: [5, 10],
+    });
   });
 
   it('rejects goals pointing at unknown services or without an "unknown" option', () => {
@@ -130,68 +128,40 @@ describe('configurator model', () => {
     ).toThrow(/must include "none"/);
   });
 
-  it('gives every service a complexity level 1–3', () => {
-    for (const service of allServices(model)) {
-      expect([1, 2, 3], service.id).toContain(model.complexity[service.id]);
+  it('carries the price and timeline of every service from the content (D156)', () => {
+    expect(findService(model, 'web/landing-pages')).toMatchObject({
+      price: [800, 1500],
+      days: [2, 5],
+    });
+    expect(findService(model, 'telegram/mini-apps')).toMatchObject({
+      price: [2500, 5000],
+      days: [10, 21],
+    });
+    expect(model.currency).toBe('PLN');
+  });
+
+  it('marks 1–2 typical goals per industry, none for "other" (D155)', () => {
+    expect(typicalGoals(model, 'beauty-health')).toEqual(['booking', 'more-clients']);
+    expect(typicalGoals(model, 'other')).toEqual([]);
+    expect(typicalGoals(model, null)).toEqual([]);
+    for (const industry of model.industries.filter((id) => id !== 'other')) {
+      const goals = typicalGoals(model, industry);
+      expect(goals.length, industry).toBeGreaterThanOrEqual(1);
+      expect(goals.length, industry).toBeLessThanOrEqual(2);
+      for (const goal of goals) expect(findGoal(model, goal), goal).toBeDefined();
     }
-    expect(() =>
-      buildConfiguratorModel(getCategories(), { ...configuratorData, complexity: {} }),
-    ).toThrow(/no complexity level for/);
     expect(() =>
       buildConfiguratorModel(getCategories(), {
         ...configuratorData,
-        complexity: { ...configuratorData.complexity, 'web/ghost': 1 },
+        industryGoals: { shipyards: ['booking'] },
       }),
-    ).toThrow('unknown "web/ghost"');
-  });
-
-  it('derives range ids from the numbers', () => {
-    expect(budgetRangeId({ max: 1500 })).toBe('up-to-1500');
-    expect(budgetRangeId({ min: 1500, max: 3000 })).toBe('1500-3000');
-    expect(budgetRangeId({ min: 3000 })).toBe('over-3000');
-  });
-
-  it('offers the ranges of the highest level among the selected services (D138)', () => {
-    // Level 1: a landing page.
-    const simple = ['web/landing-pages'];
-    expect(complexityLevel(model, simple)).toBe(1);
-    expect(budgetRangesFor(model, simple).map((range) => range.id)).toEqual([
-      'up-to-1500',
-      '1500-3000',
-      'over-3000',
-    ]);
-    // Level 2: a store; level 3 wins as soon as a CRM is added.
-    const store = ['web/landing-pages', 'web/online-stores'];
-    expect(complexityLevel(model, store)).toBe(2);
-    expect(budgetIds(model, store)).toEqual([
-      'up-to-3000',
-      '3000-6000',
-      'over-6000',
-      BUDGET_NOT_SURE,
-    ]);
-    const crm = ['web/online-stores', 'crm/custom-crm'];
-    expect(complexityLevel(model, crm)).toBe(3);
-    expect(budgetIds(model, crm)).toEqual([
-      'up-to-5000',
-      '5000-10000',
-      'over-10000',
-      BUDGET_NOT_SURE,
-    ]);
-  });
-
-  it('a request without services is a consultation: level 2 (D149)', () => {
-    expect(model.consultationLevel).toBe(2);
-    expect(complexityLevel(model, [])).toBe(2);
-    expect(budgetIds(model, [])).toEqual(budgetIds(model, ['web/online-stores']));
-  });
-
-  it('knows every range of every level (labels) and carries the currency', () => {
-    expect(allBudgetIds(model).at(-1)).toBe(BUDGET_NOT_SURE);
-    const distinct = new Set(
-      Object.values(configuratorData.budgetLevels).flatMap((ranges) => ranges.map(budgetRangeId)),
-    );
-    expect(allBudgetIds(model)).toHaveLength(distinct.size + 1);
-    expect(model.currency).toBe('PLN');
+    ).toThrow('unknown industry "shipyards"');
+    expect(() =>
+      buildConfiguratorModel(getCategories(), {
+        ...configuratorData,
+        industryGoals: { food: ['ghost'] },
+      }),
+    ).toThrow('unknown goal "ghost"');
   });
 
   it('finds services and goals', () => {

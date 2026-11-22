@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { fillTemplate, type WizardLabels } from '@/lib/configurator/labels';
 import { categoriesOf } from '@/lib/configurator/recommend';
+import type { LeadEstimate } from '@/lib/configurator/message';
 import type { ConfiguratorModel } from '@/lib/configurator/model';
 import { accentStyle } from '@/lib/style';
 import { OptionGroup, linkButtonClass } from './fields';
@@ -12,6 +13,8 @@ interface SolutionStepProps {
   labels: WizardLabels;
   /** The services the request is about now (recommended minus removed plus added). */
   services: readonly string[];
+  /** The estimate of those services, formatted; null without services (a consultation). */
+  estimate: LeadEstimate | null;
   manual: boolean;
   onRemove: (id: string) => void;
   /** The full list: adds the service, or removes it when it is in the request. */
@@ -26,11 +29,17 @@ interface SolutionStepProps {
  * services by category (open from the start in the manual mode while nothing
  * is picked). Without any service (not sure yet, or all removed) a short text
  * promises to choose together on a free consultation.
+ *
+ * Under the services, the estimate (round 3, B1, D156): indicative price and
+ * timeline, recomputed as soon as a service is removed or added, with a note
+ * that it is preliminary; without services it says the price and timeline
+ * follow a short free consultation.
  */
 export function SolutionStep({
   model,
   labels,
   services,
+  estimate,
   manual,
   onRemove,
   onToggle,
@@ -115,6 +124,8 @@ export function SolutionStep({
         </p>
       )}
 
+      <EstimateBlock estimate={estimate} labels={labels.solution.estimate} />
+
       <div className="mt-5">
         <button
           type="button"
@@ -147,6 +158,47 @@ export function SolutionStep({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * "Indicative price … / Indicative timeline …" and the note. A polite live
+ * region, so a screen reader hears the new numbers after "Remove" or a pick
+ * in the full list.
+ */
+function EstimateBlock({
+  estimate,
+  labels,
+}: {
+  estimate: LeadEstimate | null;
+  labels: WizardLabels['solution']['estimate'];
+}) {
+  return (
+    <div
+      aria-live="polite"
+      className="mt-5 rounded-2xl border border-white/[0.1] bg-white/[0.025] px-4 py-3.5"
+    >
+      {estimate ? (
+        <>
+          <dl className="flex flex-col gap-2">
+            {(
+              [
+                [labels.price, estimate.price],
+                [labels.timeline, estimate.timeline],
+              ] as const
+            ).map(([term, value]) => (
+              <div key={term} className="flex flex-wrap items-baseline justify-between gap-x-4">
+                <dt className="text-sm text-muted">{term}</dt>
+                <dd className="font-display text-lg font-medium text-ink tabular-nums">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-2.5 text-sm leading-relaxed text-muted">{labels.note}</p>
+        </>
+      ) : (
+        <p className="text-body leading-relaxed text-ink">{labels.consultation}</p>
+      )}
     </div>
   );
 }

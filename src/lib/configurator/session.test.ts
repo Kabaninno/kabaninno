@@ -47,9 +47,19 @@ describe('startingState (prefill)', () => {
     expect(start.message).toBeNull();
   });
 
-  it('starts on the goals step with an empty draft when there is nothing to add', () => {
+  it('starts on the industry step with an empty draft when there is nothing to add', () => {
     const start = startingState(null, [], model);
-    expect(start).toEqual({ draft: emptyDraft(), step: 'goals', message: null, added: [] });
+    expect(start).toEqual({ draft: emptyDraft(), step: 'industry', message: null, added: [] });
+  });
+
+  it('a visitor from a planet who picked an industry only still goes to the solution', () => {
+    const start = startingState(
+      { draft: { ...emptyDraft(), industry: 'food' }, step: 'goals', message: null },
+      ['web/online-stores'],
+      model,
+    );
+    expect(start.draft).toMatchObject({ mode: 'manual', industry: 'food' });
+    expect(start.step).toBe('solution');
   });
 
   it('is idempotent: nothing new on a stored draft that already has them', () => {
@@ -76,14 +86,22 @@ describe('startingState (prefill)', () => {
   });
 
   it('keeps the visitor’s other answers', () => {
-    const base = { ...emptyDraft(), budget: 'not-sure', timeline: 'asap' };
+    const base = {
+      ...emptyDraft(),
+      industry: 'other',
+      industryOther: 'Stolarnia',
+      contact: { name: 'Ola', comment: '' },
+    };
     const { draft } = startingState(
-      { draft: base, step: 'plan', message: null },
+      { draft: base, step: 'contact', message: null },
       ['ai/ai-assistants'],
       model,
     );
-    expect(draft.budget).toBe('not-sure');
-    expect(draft.timeline).toBe('asap');
+    expect(draft).toMatchObject({
+      industry: 'other',
+      industryOther: 'Stolarnia',
+      contact: { name: 'Ola' },
+    });
   });
 });
 

@@ -15,12 +15,9 @@
 **Раунд правок №3 за відгуком власника (2026-11-22; A і B сам, тексти — content-writer, C — scene-engineer; без рев’ю-агентів і Lighthouse).**
 
 - **Частина A — ✅ готова (D153–D154):** кнопка HUD за сторінкою (немає на головній і в конфігураторі, є на решті; на телефоні — у меню за тим самим правилом), `HeroCtaWatch` прибрано; шапка конфігуратора — назва кроку, «01 / 05» і смуга (видимий «Крок X з N» і рядок вкладок прибрані). Ворота: lint, typecheck, 706 юніт-тестів, `build:preview` з guard — ✅.
-- **Частина B — план:**
-  1. Дані: `pricePLN` і нові `timelineDays` у `content/categories.ts` (+ схема); `content/configurator.ts` — без `complexity`, `budgetLevels`, `consultationLevel`, `timelines`, з `industryGoals` (1–2 типові цілі на галузь).
-  2. Логіка: `estimate(services)` (нове, з тестами); кроки `industry → goals → details → solution → contact` (ручний режим без `details`); чернетка без `budget`/`timeline`, сховище `v: 3` з міграцією `v: 2` (крок `plan` → `solution`).
-  3. Повідомлення від першої особи за шаблоном власника (речення-відповіді на уточнення, рядок «Орієнтовно: ціна, термін»), тести.
-  4. UI: крок «Ваша галузь» (автоперехід, «Інше» з полем і «Далі»), позначка «Часто обирають у вашій галузі», блок оцінки на кроці «Рішення», крок «Контакт» з Telegram і WhatsApp (кнопка лише коли `whatsappNumber` заданий), прибрати PlanStep і «netto».
-  5. Тексти pl/en/uk — чернетка моя, вичитка content-writer; e2e `m4-configurator` оновити й запустити лише його.
+- **Частина B — ✅ готова (D155–D158):** кроки «Галузь → Цілі → Уточнення → Рішення з оцінкою → Контакт»; `pricePLN` і нові терміни послуг; `estimate.ts`; повідомлення від першої особи (uk — шаблон власника, pl/en — content-writer, відкриті питання в `CONTENT_REVIEW.md`, «Round 3»); WhatsApp готовий, але прихований — номер власник не заповнив (`whatsappNumber: ''`); чернетка v2 мігрує у v3; «netto» прибрано.
+  - Ворота: lint, typecheck, 712 юніт-тестів, `build:preview` з guard — ✅; e2e `m4-configurator` — 26 passed, 1 skipped. Власні знімки: `reports/qa/c3-b.mjs` → `reports/qa/c3-shots/` (gitignored).
+- **Частина C — далі:** камера конфігуратора (scene-engineer).
 - Далі — стан після раунду №2:
 
 **Раунд правок №2 за відгуком власника (2026-11-22, ✅; частина A сам, частина B сам або через ui-engineer/content-writer; без рев’ю-агентів і Lighthouse).**

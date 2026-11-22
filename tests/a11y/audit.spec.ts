@@ -69,9 +69,9 @@ const ROUTES: Route[] = [
     init: seed(CONFIGURATOR_KEY, storedConfigurator('solution')),
   },
   {
-    name: 'wizard-plan',
+    name: 'wizard-industry',
     path: (l) => localized(l, paths.configurator()),
-    init: seed(CONFIGURATOR_KEY, storedConfigurator('plan')),
+    init: seed(CONFIGURATOR_KEY, storedConfigurator('industry')),
   },
   {
     name: 'wizard-errors',

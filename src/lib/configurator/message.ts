@@ -1,61 +1,105 @@
 import type { ConfiguratorDraft } from './draft';
-import { GOAL_UNSURE } from './model';
-import { TELEGRAM_URL_BUDGET, fitTextToTelegramUrl, fitsTelegramBudget } from './telegram';
+import { GOAL_UNSURE, HAVE_NONE } from './model';
+import { TELEGRAM_URL_BUDGET, fitTextToUrl } from './telegram';
 import { graphemes, normalizeSpaces, truncateGraphemes } from './text';
 
 /**
- * The lead message the visitor sends via Telegram (BRIEF: a tidy message in
- * the interface language that the visitor can review and edit). Pure and
- * locale-agnostic: every word comes from `labels` (ui.json / content texts,
- * resolved by the caller), so the same function serves pl, en and uk. The
- * generator only joins labels and the visitor's own words, so the wording
- * stays gender-neutral as long as the labels are (D14).
+ * The lead message the visitor sends via Telegram or WhatsApp, written as the
+ * client's own request in the first person (round 3, B3, D158):
+ *
+ *   Доброго дня!
+ *   Мене звати {name}. Хочу скористатися послугами KABANINNO.
+ *
+ *   Мій бізнес: {industry}.
+ *   Хочу покращити: {goals}.
+ *   {one short sentence per answered question}
+ *   Що вже є: {have}.
+ *
+ *   На сайті мені підібрали: {Category + Category} — {services}.
+ *   Орієнтовно: {price}, {timeline}.
+ *
+ *   {comment}
+ *
+ *   Чи можемо обговорити деталі?
+ *
+ * Lines without data are left out. Without services ("not sure yet" picks
+ * none) one consultation sentence replaces the two solution lines. Pure and
+ * locale-agnostic: every word comes from `labels` (ui.json, resolved on the
+ * server), so the same function serves pl, en and uk; the wording is
+ * gender-neutral as long as the labels are (D14).
  *
  * The generated text is the default for the last step; the visitor may edit
- * it, and the submitter sends whatever text it is given.
+ * it, and the hand-off sends whatever text it is given.
  */
 
 export interface LeadLabels {
-  /** First line, e.g. "Zapytanie ze strony KABANINNO". */
-  title: string;
-  /** Section names. */
-  goals: string;
+  /** The interface locale (lower-casing list items). */
+  locale: string;
+  /** "Доброго дня!" */
+  greeting: string;
+  /** "Мене звати {name}." */
+  introName: string;
+  /** "Хочу скористатися послугами KABANINNO." */
+  intro: string;
+  /** "Мій бізнес: {industry}." */
+  business: string;
+  /** "Хочу покращити: {goals}." */
+  improve: string;
+  /** "Що вже є: {items}." */
   have: string;
-  solution: string;
-  services: string;
-  industry: string;
-  budget: string;
-  timeline: string;
-  name: string;
-  comment: string;
-  /** The goal line of "I don't know yet, advise me". */
-  unsure: string;
-  /** In place of the services when there are none: to be chosen on a consultation. */
+  /** "Nothing of these" as a sentence. */
+  haveNone: string;
+  /** "На сайті мені підібрали: {combo} — {services}." */
+  picked: string;
+  /** "Орієнтовно: {price}, {timeline}." */
+  estimate: string;
+  /** Instead of the solution lines: "not sure yet, I'd like a consultation". */
   consultation: string;
-  /** Option names by id; ids without a label are printed as they are. */
-  goalNames: Record<string, string>;
-  /** The chosen answer's wording, by goal id and option id. */
+  /** "Чи можемо обговорити деталі?" */
+  closing: string;
+  /** The goal as it reads after "I want to improve:", by goal id. */
+  goalPhrases: Record<string, string>;
+  /** One sentence per answer, by goal id and option id ("don't know" has none). */
   answers: Record<string, Record<string, string>>;
   haveNames: Record<string, string>;
   categories: Record<string, string>;
   /** By service id `"<category>/<slug>"`. */
   serviceNames: Record<string, string>;
   industries: Record<string, string>;
-  /** By budget id, including "not-sure" (amounts already formatted). */
-  budgets: Record<string, string>;
-  timelines: Record<string, string>;
+}
+
+/** The estimate, already formatted ("1 800–4 000 zł", "1–2 тижні"), or null for none. */
+export interface LeadEstimate {
+  price: string;
+  timeline: string;
 }
 
 /**
- * `full`: readable, one item per line, blank lines between blocks.
- * `compact`: one line per section, comma-separated, for long requests.
+ * `full`: the template above, paragraphs separated by blank lines.
+ * `compact`: for a link that has to stay short (Ukrainian text takes six URL
+ * characters per letter): no blank lines, and the answer sentences and "what we
+ * already have" are left out.
  */
 export type LeadFormat = 'full' | 'compact';
 
-const label = (names: Record<string, string>, id: string) => names[id] ?? id;
+export interface LeadOptions {
+  format?: LeadFormat;
+  estimate?: LeadEstimate | null;
+}
 
 function collapse(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+function fill(template: string, values: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
+}
+
+/** Lower-cases the first letter of a list item, unless it starts an acronym ("CRM", "AI"). */
+function lowerFirst(text: string, locale: string): string {
+  const [first = '', second = ''] = Array.from(text);
+  if (second && second !== second.toLocaleLowerCase(locale)) return text;
+  return first.toLocaleLowerCase(locale) + text.slice(first.length);
 }
 
 /** The services a lead is about (`servicesOf`), resolved by the caller. */
@@ -63,68 +107,63 @@ export function buildLeadMessage(
   draft: ConfiguratorDraft,
   services: readonly string[],
   labels: LeadLabels,
-  { format = 'full' }: { format?: LeadFormat } = {},
+  { format = 'full', estimate = null }: LeadOptions = {},
 ): string {
   const compact = format === 'compact';
-  const goals = draft.goals.map((id) => {
-    if (id === GOAL_UNSURE) return labels.unsure;
-    const answer = draft.answers[id];
-    const name = label(labels.goalNames, id);
-    return answer !== undefined ? `${name} (${label(labels.answers[id] ?? {}, answer)})` : name;
-  });
-  const have = draft.have.map((id) => label(labels.haveNames, id));
-  const categories = [
-    ...new Set(services.map((id) => label(labels.categories, id.split('/')[0] ?? ''))),
-  ];
-  const names = services.map((id) => label(labels.serviceNames, id));
-  const industryOther = collapse(draft.industryOther);
-  const industry =
-    draft.industry === null
-      ? null
-      : draft.industry === 'other' && industryOther
-        ? industryOther
-        : label(labels.industries, draft.industry);
   const name = collapse(draft.contact.name);
   const comment = draft.contact.comment.trim();
+  const industryOther = collapse(draft.industryOther);
+  const industry =
+    draft.industry === null || draft.industry === 'other'
+      ? industryOther
+      : lowerFirst(labels.industries[draft.industry] ?? draft.industry, labels.locale);
+  const goals = draft.goals
+    .filter((id) => id !== GOAL_UNSURE)
+    .map((id) => labels.goalPhrases[id] ?? id);
+  const answers = draft.goals.flatMap((id) => {
+    const answer = draft.answers[id];
+    const sentence = answer === undefined ? undefined : labels.answers[id]?.[answer];
+    return sentence ? [sentence] : [];
+  });
+  const have = draft.have.includes(HAVE_NONE)
+    ? labels.haveNone
+    : draft.have.length > 0
+      ? fill(labels.have, {
+          items: draft.have
+            .map((id) => lowerFirst(labels.haveNames[id] ?? id, labels.locale))
+            .join(', '),
+        })
+      : '';
 
-  const blocks: string[][] = [[labels.title]];
-  const details: string[] = [];
-  if (goals.length > 0) {
-    if (compact) details.push(`${labels.goals}: ${goals.join('; ')}`);
-    else details.push(`${labels.goals}:`, ...goals.map((goal) => `• ${goal}`));
+  const opening = [labels.greeting, [name && fill(labels.introName, { name }), labels.intro]];
+  const about = [
+    industry && fill(labels.business, { industry }),
+    goals.length > 0 && fill(labels.improve, { goals: goals.join(', ') }),
+    ...(compact ? [] : [answers.join(' '), have]),
+  ];
+  const solution: (string | false)[] = [];
+  if (services.length === 0) solution.push(labels.consultation);
+  else {
+    const combo = [
+      ...new Set(services.map((id) => labels.categories[id.split('/')[0] ?? ''] ?? id)),
+    ].join(' + ');
+    const names = services.map((id) => labels.serviceNames[id] ?? id).join(', ');
+    solution.push(fill(labels.picked, { combo, services: names }));
+    if (estimate) solution.push(fill(labels.estimate, { ...estimate }));
   }
-  if (have.length > 0) details.push(`${labels.have}: ${have.join(', ')}`);
-  if (names.length > 0) {
-    details.push(`${labels.solution}: ${categories.join(' + ')}`);
-    if (compact) details.push(`${labels.services}: ${names.join(', ')}`);
-    else details.push(`${labels.services}:`, ...names.map((service) => `• ${service}`));
-  } else {
-    details.push(`${labels.solution}: ${labels.consultation}`);
-  }
-  if (industry) details.push(`${labels.industry}: ${industry}`);
-  const budget =
-    draft.budget !== null ? `${labels.budget}: ${label(labels.budgets, draft.budget)}` : null;
-  const timeline =
-    draft.timeline !== null
-      ? `${labels.timeline}: ${label(labels.timelines, draft.timeline)}`
-      : null;
-  if (compact) {
-    const plan = [budget, timeline].filter(Boolean).join(' · ');
-    if (plan) details.push(plan);
-  } else {
-    if (budget) details.push(budget);
-    if (timeline) details.push(timeline);
-  }
-  if (name) details.push(`${labels.name}: ${name}`);
-
-  if (compact) {
-    blocks[0]!.push(...details);
-    if (comment) blocks[0]!.push(`${labels.comment}: ${collapse(comment)}`);
-  } else {
-    if (details.length > 0) blocks.push(details);
-    if (comment) blocks.push([`${labels.comment}:`, comment]);
-  }
-  return normalizeSpaces(blocks.map((lines) => lines.join('\n')).join('\n\n'));
+  const paragraphs: (string | false | (string | false)[])[][] = [
+    opening,
+    about,
+    solution,
+    [compact ? collapse(comment) : comment],
+    [labels.closing],
+  ];
+  const lines = (paragraph: (typeof paragraphs)[number]) =>
+    paragraph
+      .map((line) => (Array.isArray(line) ? line.filter(Boolean).join(' ') : line))
+      .filter((line): line is string => Boolean(line));
+  const blocks = paragraphs.map(lines).filter((block) => block.length > 0);
+  return normalizeSpaces(blocks.map((block) => block.join('\n')).join(compact ? '\n' : '\n\n'));
 }
 
 export interface FittedLeadMessage {
@@ -135,25 +174,27 @@ export interface FittedLeadMessage {
 }
 
 /**
- * The default message within the Telegram URL budget: the full format if it
- * fits, otherwise the compact one, otherwise the compact one with the
- * comment shortened (grapheme-safe, with "…"); as a last resort the whole
- * compact text is cut. The visitor can always copy the untruncated full text.
+ * The default message within a link budget (`toUrl` builds the Telegram or
+ * WhatsApp link): the full format if it fits, otherwise the compact one,
+ * otherwise the compact one with the comment shortened (grapheme-safe, with
+ * "…"); as a last resort the whole compact text is cut. The visitor can always
+ * copy the untruncated full text.
  */
 export function fitLeadMessage(
   draft: ConfiguratorDraft,
   services: readonly string[],
   labels: LeadLabels,
-  { username, maxUrlLength = TELEGRAM_URL_BUDGET }: { username: string; maxUrlLength?: number },
+  {
+    toUrl,
+    estimate = null,
+    maxUrlLength = TELEGRAM_URL_BUDGET,
+  }: { toUrl: (text: string) => string; estimate?: LeadEstimate | null; maxUrlLength?: number },
 ): FittedLeadMessage {
-  const full = buildLeadMessage(draft, services, labels, { format: 'full' });
-  if (fitsTelegramBudget(username, full, maxUrlLength)) {
-    return { text: full, format: 'full', truncated: false };
-  }
-  const compact = buildLeadMessage(draft, services, labels, { format: 'compact' });
-  if (fitsTelegramBudget(username, compact, maxUrlLength)) {
-    return { text: compact, format: 'compact', truncated: false };
-  }
+  const fits = (text: string) => toUrl(text).length <= maxUrlLength;
+  const full = buildLeadMessage(draft, services, labels, { format: 'full', estimate });
+  if (fits(full)) return { text: full, format: 'full', truncated: false };
+  const compact = buildLeadMessage(draft, services, labels, { format: 'compact', estimate });
+  if (fits(compact)) return { text: compact, format: 'compact', truncated: false };
   const comment = draft.contact.comment.trim();
   const withComment = (count: number) =>
     buildLeadMessage(
@@ -163,19 +204,19 @@ export function fitLeadMessage(
       },
       services,
       labels,
-      { format: 'compact' },
+      { format: 'compact', estimate },
     );
   const units = graphemes(comment).length;
-  if (units > 0 && fitsTelegramBudget(username, withComment(0), maxUrlLength)) {
+  if (units > 0 && fits(withComment(0))) {
     let low = 0;
     let high = units - 1;
     while (low < high) {
       const middle = Math.ceil((low + high) / 2);
-      if (fitsTelegramBudget(username, withComment(middle), maxUrlLength)) low = middle;
+      if (fits(withComment(middle))) low = middle;
       else high = middle - 1;
     }
     return { text: withComment(low), format: 'compact', truncated: true };
   }
-  const fitted = fitTextToTelegramUrl(username, withComment(0), maxUrlLength);
+  const fitted = fitTextToUrl(withComment(0), toUrl, maxUrlLength);
   return { text: fitted.text, format: 'compact', truncated: true };
 }

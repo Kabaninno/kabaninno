@@ -255,7 +255,10 @@ All studio-wide settings live in [`site.config.ts`](site.config.ts):
 - `domain` — still the placeholder `[ДОМЕН]`; the production domain without protocol (used for absolute URLs when
   `NEXT_PUBLIC_SITE_URL` is not set). The placeholder never reaches a page: deploys use the URL from the
   Pages workflow, and the postbuild guard fails on `[ДОМЕН]`;
-- `currency` — currency of configurator budget ranges (`PLN`).
+- `whatsappNumber` — empty: no WhatsApp button. Digits only with the country code, no `+` or spaces
+  (e.g. `48123456789`): the configurator shows «Wyślij przez WhatsApp» next to Telegram, which copies
+  the message and opens `https://wa.me/<number>?text=…`;
+- `currency` — currency of the configurator estimate (`PLN`).
 
 Texts marked for human review are listed in [`CONTENT_REVIEW.md`](CONTENT_REVIEW.md).
 
@@ -297,17 +300,15 @@ Unit tests for helpers live next to the code (`src/lib/*.test.ts`).
 Content is data: no component or scene code changes.
 
 1. In [`content/categories.ts`](content/categories.ts), add an entry to the category's
-   `services`: a URL `slug`, `timelineDays: [min, max]` (days; shown as days up to 10, otherwise as rounded weeks) and the planet's look (`planet`: `shape`,
+   `services`: a URL `slug`, `pricePLN: [min, max]` (the configurator estimate), `timelineDays: [min, max]` (days; shown as days up to 10, otherwise as rounded weeks) and the planet's look (`planet`: `shape`,
    `material`, `size`, optional `rings`/`moons`/`shell`, and `orbit: { radius, tilt, speed,
 phase }`). Reuse the existing shape/material/moon values (listed in `content/schema.ts`) and
    pick an orbit radius that does not collide with the neighbours.
 2. Add its texts under `services.<category>.<slug>` in `messages/{pl,en,uk}/content.json`
    (`title`, `summary`, `benefit`, `audience`, `features`, `example`; copy an existing service). `benefit` is
    one plain-words line (max 90 characters) shown next to the service in the configurator.
-3. Give the service a complexity level 1–3 in [`content/configurator.ts`](content/configurator.ts)
-   (`complexity`): it decides which budget ranges the configurator offers.
-4. Run `npm test`: the content tests fail on a missing text, an unknown value, a missing
-   complexity level or a duplicate slug.
+3. Run `npm test`: the content tests fail on a missing text, an unknown value or a duplicate
+   slug.
 
 The service page in all languages, its sitemap entry, the planet in the 3D system, the HUD and
 panel links, the configurator's list of services (step 3, "Add more") and the structured data appear
@@ -317,27 +318,32 @@ afterwards so the Open Graph images show it.
 
 ## The configurator (solution finder)
 
-A short diagnostic for clients who do not know the technology (D149). Five steps: **goals** (up to
-three, or "not sure yet") → **details** (one plain question per goal, plus "what do you already
-have") → **solution** (recommended services with one line each, removable; "Add more" opens the full
-list) → **budget and timing** (budget ranges by complexity, timeline, optional industry) → **contact
-and summary** (name, comment, the editable message, "Send via Telegram"). "I know what I need"
-skips the details step (manual mode).
+A short diagnostic for clients who do not know the technology (D149, D155). Five steps:
+**industry** (chips; a tap moves on, "Other" asks for a few words; optional) → **goals** (up to
+three, or "not sure yet"; the goals typical for the industry are marked) → **details** (one plain
+question per goal, plus "what do you already have") → **solution** (recommended services with one
+line each, removable; "Add more" opens the full list; the indicative price and timeline from
+`estimate.ts`, D156) → **contact** (name, comment, the editable first-person message, "Send via
+Telegram" and, with `whatsappNumber`, "Send via WhatsApp"). "I know what I need" skips the details
+step (manual mode).
 
 Everything that is not a sentence lives in [`content/configurator.ts`](content/configurator.ts):
 
 - `goals`: each goal has one question; each answer (option) maps to the services recommended for it
   (`"<category>/<slug>"`, most important first). Every goal ends with an `unknown` option. At most
   `maxRecommended` services are recommended, taken rank by rank across the picked goals.
-- `have`, `industries`, `timelines`, `complexity` (level 1–3 of every service), `budgetLevels` (PLN
-  netto per level), `consultationLevel` (the level of a request without services), `maxGoals`.
+- `have`, `industries`, `industryGoals` (1–2 typical goals per industry), `maxGoals`.
+- Prices and timelines are the services' own `pricePLN` and `timelineDays` (`content/categories.ts`):
+  the estimate sums the prices (rounded to 100) and takes `max(longest, 0.7 × sum)` for the timeline.
 
 Their texts are in `messages/<locale>/ui.json` → `configurator.goals.items.<goal>.{name,question,options.<option>}`,
-`configurator.have.items.<id>`, `configurator.industries.<id>` and so on; the service lines come from the
+`configurator.have.items.<id>`, `configurator.industries.<id>` and so on (the message also uses
+`goals.items.<goal>.phrase` and one `sentences.<option>` per answer, and the `lead.*` template); the service lines come from the
 `benefit` text of each service. To add a goal: add it to `goals` (with its `unknown` option) and its
 texts in all three locales; `npm test` fails on a missing text or an unknown service. The pure
 recommendation logic is `src/lib/configurator/recommend.ts`; the draft (stored in
-`localStorage` as `kabaninno.configurator.v2`) and its validation are in `draft.ts`.
+`localStorage` as `kabaninno.configurator.v2`, version 3; a version-2 draft is migrated) and its
+validation are in `draft.ts`.
 
 ## Adding a case study
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { primaryButton, secondaryButton } from '@/components/ui/styles';
 import { analytics } from '@/lib/analytics';
-import { stepsFor, type ConfiguratorStepId } from '@/lib/configurator-steps';
+import { CONFIGURATOR_STEPS, stepsFor, type ConfiguratorStepId } from '@/lib/configurator-steps';
 import {
   canEnterStep,
   chooseGuided,
@@ -19,8 +19,10 @@ import {
   type ConfiguratorDraft,
   type StepErrors,
 } from '@/lib/configurator/draft';
+import { estimate, formatPriceRange, formatTimeline } from '@/lib/configurator/estimate';
 import { errorText, type WizardLabels } from '@/lib/configurator/labels';
-import type { ConfiguratorModel } from '@/lib/configurator/model';
+import type { LeadEstimate } from '@/lib/configurator/message';
+import { findService, type ConfiguratorModel } from '@/lib/configurator/model';
 import {
   editMessage,
   emphasisForDraft,
@@ -38,7 +40,7 @@ import { ContactFields } from './ContactFields';
 import { DetailsStep } from './DetailsStep';
 import { focusField } from './fields';
 import { GoalsStep } from './GoalsStep';
-import { PlanStep } from './PlanStep';
+import { IndustryStep } from './IndustryStep';
 import { ProgressNav } from './ProgressNav';
 import { SolutionStep } from './SolutionStep';
 import { SummaryActions, SummaryStep, useLeadHandoff } from './SummaryStep';
@@ -49,6 +51,8 @@ interface ConfiguratorWizardProps {
   locale: string;
   /** `siteConfig.telegramUsername` (the placeholder means "not configured"). */
   telegramUsername: string;
+  /** `siteConfig.whatsappNumber` (empty: no WhatsApp button). */
+  whatsappNumber: string;
   /** Panel header, formatted on the server; the lead is shown on the first step only (MJ-1). */
   header: { eyebrow: string; title: string; lead: string };
 }
@@ -74,12 +78,13 @@ function whenRequestHydrated(callback: () => void): () => void {
 }
 
 /**
- * The solution finder (D149), inside the configurator panel (side panel on
- * desktop, bottom sheet on phones): a short diagnostic for visitors who do not
- * know the technology.
+ * The solution finder (D149, round 3 D155), inside the configurator panel
+ * (side panel on desktop, bottom sheet on phones): a short diagnostic for
+ * visitors who do not know the technology.
  *
- * - Five steps: goals → details → solution → budget and timing → contact and
- *   summary. "I know what I need" (manual mode) skips the details step.
+ * - Five steps: industry (a tap moves on) → goals → details → solution with
+ *   the estimate → contact and summary. "I know what I need" (manual mode)
+ *   skips the details step.
  *   Earlier steps are always reachable, later ones once the previous are valid
  *   (`canEnterStep`).
  * - Errors appear after "Next" (not while typing), with `aria-invalid`,
@@ -93,9 +98,10 @@ function whenRequestHydrated(callback: () => void): () => void {
  * - Scene (D81): the categories of the current services are emphasised while
  *   the configurator is open; cleared on unmount.
  * - Compact chrome (visual MJ-1): the panel header (h1 `configurator-title`)
- *   shows its lead on the first step only, the steps are one scrollable row
- *   of chips, and Back / Next (on the last step: Send / Copy) sit in a sticky
- *   glass footer at the bottom of the panel.
+ *   shows its lead on the first step only, the progress shows the current
+ *   step's name and "01 / 05" (D154), and Back / Next (on the last step: Send
+ *   via Telegram / WhatsApp, or Copy) sit in a sticky glass footer at the
+ *   bottom of the panel.
  * - All texts arrive pre-formatted in `labels` (server).
  */
 export function ConfiguratorWizard({
@@ -103,16 +109,15 @@ export function ConfiguratorWizard({
   labels,
   locale,
   telegramUsername,
+  whatsappNumber,
   header,
 }: ConfiguratorWizardProps) {
   const [draft, setDraft] = useState<ConfiguratorDraft>(emptyDraft);
-  const [step, setStep] = useState<ConfiguratorStepId>('goals');
+  const [step, setStep] = useState<ConfiguratorStepId>(CONFIGURATOR_STEPS[0]);
   const [attempted, setAttempted] = useState<Partial<Record<ConfiguratorStepId, true>>>({});
   const [notice, setNotice] = useState('');
   const [ready, setReady] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  // The budget range was cleared because the services moved to another level (D138).
-  const [budgetReset, setBudgetReset] = useState(false);
   // The visitor's edit of the summary message and the default it was based on (Q-F3-01).
   const [message, setMessage] = useState<MessageEdit | null>(null);
   const draftRef = useRef(draft);
@@ -127,6 +132,16 @@ export function ConfiguratorWizard({
 
   const steps = stepsFor(draft.mode);
   const services = useMemo(() => servicesOf(draft, model), [draft, model]);
+  // The estimate of the current services (D156), formatted for the solution step and the message.
+  const estimateText = useMemo((): LeadEstimate | null => {
+    const found = estimate(services.flatMap((id) => findService(model, id) ?? []));
+    return found
+      ? {
+          price: formatPriceRange(found.price, locale, model.currency),
+          timeline: formatTimeline(found.days, labels.timeline),
+        }
+      : null;
+  }, [services, model, locale, labels.timeline]);
 
   // Restore the stored draft and apply the prefill once the request draft is known.
   useEffect(
@@ -215,9 +230,6 @@ export function ConfiguratorWizard({
     const request = useRequestStore.getState();
     for (const ref of sync.add) request.add(ref);
     for (const ref of sync.remove) request.remove(ref);
-    // A changed selection can drop the chosen range: say so on the budget step.
-    if (draftRef.current.budget !== null && next.budget === null) setBudgetReset(true);
-    else if (next.budget !== null) setBudgetReset(false);
     draftRef.current = next;
     setDraft(next);
   }, []);
@@ -238,6 +250,8 @@ export function ConfiguratorWizard({
     submitter,
     locale,
     username: submitter.username,
+    whatsappNumber,
+    estimate: estimateText,
     edit: message,
   });
 
@@ -271,7 +285,7 @@ export function ConfiguratorWizard({
 
   /** "I know what I need": the manual mode, on the solution step, no questions. */
   const knowWhatINeed = () => {
-    const manual = chooseManual(draft, model);
+    const manual = chooseManual(draft);
     update(manual);
     goTo('solution', manual);
   };
@@ -288,13 +302,12 @@ export function ConfiguratorWizard({
     useRequestStore.getState().clear();
     draftRef.current = emptyDraft();
     setDraft(emptyDraft());
-    setBudgetReset(false);
     setAttempted({});
     setNotice('');
     setMessage(null);
     setConfirmReset(false);
     moved.current = true;
-    setStep('goals');
+    setStep(CONFIGURATOR_STEPS[0]);
     headingRef.current?.focus();
   };
 
@@ -311,8 +324,8 @@ export function ConfiguratorWizard({
       >
         {header.title}
       </h1>
-      {step === 'goals' ? (
-        // Phones: the step's own hint says the same, and the first screen belongs to the goals.
+      {index === 0 ? (
+        // Phones: the step's own hint says the same, and the first screen belongs to the chips.
         <p className="mt-2 text-body leading-relaxed text-muted max-md:sr-only">{header.lead}</p>
       ) : null}
       {/* Always rendered, so screen readers announce the notice when it appears. */}
@@ -342,6 +355,22 @@ export function ConfiguratorWizard({
         </h2>
         <p className="mt-1.5 mb-5 text-sm leading-relaxed text-muted">{labels.hints[step]}</p>
 
+        {step === 'industry' ? (
+          <IndustryStep
+            model={model}
+            labels={labels}
+            draft={draft}
+            update={update}
+            onPick={(picked) => {
+              update(picked);
+              const target = neighbourStep(picked, 'industry', 1);
+              if (target) goTo(target, picked);
+            }}
+            onNext={next}
+            error={errorFor('industry')}
+          />
+        ) : null}
+
         {step === 'goals' ? (
           <GoalsStep
             model={model}
@@ -368,22 +397,11 @@ export function ConfiguratorWizard({
             model={model}
             labels={labels}
             services={services}
+            estimate={estimateText}
             manual={draft.mode === 'manual'}
             onRemove={(id) => update(removeService(draft, id, model))}
             onToggle={(id) => update(toggleService(draft, id, model))}
             onBackToGuided={backToGuided}
-          />
-        ) : null}
-
-        {step === 'plan' ? (
-          <PlanStep
-            model={model}
-            labels={labels}
-            draft={draft}
-            services={services}
-            update={update}
-            errorFor={errorFor}
-            budgetReset={budgetReset}
           />
         ) : null}
 

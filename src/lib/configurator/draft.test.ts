@@ -11,7 +11,6 @@ import {
   furthestEnterableStep,
   neighbourStep,
   prefillDraft,
-  reconcileBudget,
   refsFromSearch,
   removeService,
   sanitizeDraft,
@@ -24,7 +23,7 @@ import {
   validateStep,
   type ConfiguratorDraft,
 } from './draft';
-import { BUDGET_NOT_SURE, GOAL_UNSURE, HAVE_NONE, getConfiguratorModel } from './model';
+import { GOAL_UNSURE, HAVE_NONE, getConfiguratorModel } from './model';
 
 const model = getConfiguratorModel();
 
@@ -39,8 +38,6 @@ function completeDraft(): ConfiguratorDraft {
     added: ['automation/notifications-reminders'],
     industry: 'retail',
     industryOther: '',
-    budget: '5000-10000',
-    timeline: '1-3-months',
     contact: { name: '  Ola  ', comment: 'Potrzebujemy sklepu z integracją CRM.' },
   };
 }
@@ -95,36 +92,19 @@ describe('validateStep', () => {
     });
   });
 
-  it('plan: budget and timeline required and known; industry optional', () => {
-    expect(validateStep('plan', emptyDraft(), model)).toEqual({
-      budget: 'required',
-      timeline: 'required',
-    });
-    const draft = completeDraft();
-    expect(validateStep('plan', { ...draft, budget: 'gone', timeline: 'later' }, model)).toEqual({
-      budget: 'unknown',
-      timeline: 'unknown',
-    });
-    // Ranges of the complexity level of the selected services (level 3 here: custom CRM).
-    expect(validateStep('plan', { ...draft, budget: 'up-to-1500' }, model)).toEqual({
-      budget: 'unknown',
-    });
-    expect(validateStep('plan', { ...draft, budget: BUDGET_NOT_SURE }, model)).toEqual({});
-    expect(validateStep('plan', { ...draft, industry: null }, model)).toEqual({});
-    expect(validateStep('plan', { ...draft, industry: 'nope' }, model)).toEqual({
+  it('industry: optional, but a known id; "other" text up to the limit (D155)', () => {
+    expect(validateStep('industry', emptyDraft(), model)).toEqual({});
+    expect(validateStep('industry', { ...emptyDraft(), industry: 'food' }, model)).toEqual({});
+    expect(validateStep('industry', { ...emptyDraft(), industry: 'nope' }, model)).toEqual({
       industry: 'unknown',
     });
     expect(
-      validateStep('plan', { ...draft, industry: 'other', industryOther: 'x'.repeat(61) }, model),
+      validateStep(
+        'industry',
+        { ...emptyDraft(), industry: 'other', industryOther: 'x'.repeat(61) },
+        model,
+      ),
     ).toEqual({ industry: 'tooLong' });
-  });
-
-  it('plan: a request without services is a consultation (level 2 ranges)', () => {
-    const draft = { ...emptyDraft(), timeline: 'asap', budget: '3000-6000' };
-    expect(validateStep('plan', draft, model)).toEqual({});
-    expect(validateStep('plan', { ...draft, budget: '5000-10000' }, model)).toEqual({
-      budget: 'unknown',
-    });
   });
 
   it('contact: name required, 2–80 characters after trimming; comment up to the limit', () => {
@@ -165,7 +145,9 @@ describe('step navigation', () => {
     expect(canEnterStep('goals', emptyDraft(), model)).toBe(true);
     expect(canEnterStep('details', emptyDraft(), model)).toBe(false);
     expect(canEnterStep('contact', draft, model)).toBe(true);
-    expect(canEnterStep('contact', { ...draft, budget: null }, model)).toBe(false);
+    expect(canEnterStep('contact', { ...draft, industry: 'nope' }, model)).toBe(false);
+    // The industry is optional: an empty draft may start with the goals.
+    expect(canEnterStep('industry', emptyDraft(), model)).toBe(true);
     expect(canEnterStep('solution', { ...draft, answers: {} }, model)).toBe(false);
   });
 
@@ -177,31 +159,34 @@ describe('step navigation', () => {
     expect(neighbourStep(manual, 'goals', 1)).toBe('solution');
     expect(neighbourStep(manual, 'solution', -1)).toBe('goals');
     expect(neighbourStep(emptyDraft(), 'goals', 1)).toBe('details');
-    expect(neighbourStep(emptyDraft(), 'goals', -1)).toBeUndefined();
+    expect(neighbourStep(emptyDraft(), 'goals', -1)).toBe('industry');
+    expect(neighbourStep(emptyDraft(), 'industry', -1)).toBeUndefined();
+    expect(neighbourStep(manual, 'industry', 1)).toBe('goals');
     expect(neighbourStep(emptyDraft(), 'contact', 1)).toBeUndefined();
   });
 
   it('finds the first invalid step and the furthest enterable one', () => {
     expect(firstInvalidStep(completeDraft(), model)).toBeNull();
     expect(furthestEnterableStep(completeDraft(), model)).toBe('contact');
-    const noBudget = { ...completeDraft(), budget: null };
-    expect(firstInvalidStep(noBudget, model)).toBe('plan');
-    expect(furthestEnterableStep(noBudget, model)).toBe('plan');
+    const noName = { ...completeDraft(), contact: { name: '', comment: '' } };
+    expect(firstInvalidStep(noName, model)).toBe('contact');
+    expect(furthestEnterableStep(noName, model)).toBe('contact');
     expect(furthestEnterableStep(emptyDraft(), model)).toBe('goals');
     const manual = { ...emptyDraft(), mode: 'manual' as const };
-    expect(firstInvalidStep(manual, model)).toBe('plan');
+    expect(firstInvalidStep(manual, model)).toBe('contact');
+    expect(firstInvalidStep({ ...manual, industry: 'nope' }, model)).toBe('industry');
   });
 
   it('stepInMode maps a step the mode does not have to the first one', () => {
     expect(stepInMode(emptyDraft(), 'details')).toBe('details');
-    expect(stepInMode({ mode: 'manual' }, 'details')).toBe('goals');
-    expect(stepInMode({ mode: 'manual' }, 'plan')).toBe('plan');
+    expect(stepInMode({ mode: 'manual' }, 'details')).toBe('industry');
+    expect(stepInMode({ mode: 'manual' }, 'solution')).toBe('solution');
   });
 });
 
 describe('toggleGoal', () => {
   it('selects and deselects, switching to the guided mode', () => {
-    let draft = chooseManual(emptyDraft(), model);
+    let draft = chooseManual(emptyDraft());
     expect(draft.mode).toBe('manual');
     draft = toggleGoal(draft, 'booking', model);
     expect(draft).toMatchObject({ mode: 'guided', goals: ['booking'] });
@@ -247,17 +232,12 @@ describe('setAnswer', () => {
     expect(setAnswer(picked, 'less-routine', 'documents', model)).toBe(picked);
   });
 
-  it('changes the recommendation, and the budget follows the new level (D138)', () => {
+  it('changes the recommendation when the answer changes', () => {
     let draft = toggleGoal(emptyDraft(), 'client-order', model);
-    draft = setAnswer(draft, 'client-order', 'program-inconvenient', model); // custom CRM: level 3
-    draft = { ...draft, budget: '5000-10000' };
+    draft = setAnswer(draft, 'client-order', 'program-inconvenient', model);
     expect(servicesOf(draft, model)).toEqual(['crm/custom-crm']);
-    const cheaper = setAnswer(draft, 'client-order', 'head-notebook', model); // CRM implementation: level 3
-    expect(cheaper.budget).toBe('5000-10000');
-    let simple = toggleGoal(emptyDraft(), 'more-clients', model);
-    simple = { ...setAnswer(simple, 'more-clients', 'social-ads', model), budget: 'up-to-1500' };
-    const dearer = setAnswer(simple, 'more-clients', 'google', model); // corporate site: level 2
-    expect(dearer.budget).toBeNull();
+    draft = setAnswer(draft, 'client-order', 'head-notebook', model);
+    expect(servicesOf(draft, model)).toEqual(['crm/crm-implementation']);
   });
 });
 
@@ -279,7 +259,7 @@ describe('manual mode and picked services', () => {
     let draft = toggleGoal(emptyDraft(), 'booking', model);
     draft = setAnswer(draft, 'booking', 'phone', model);
     draft = addService(draft, 'web/landing-pages', model);
-    const manual = chooseManual(draft, model);
+    const manual = chooseManual(draft);
     expect(manual).toMatchObject({
       mode: 'manual',
       goals: [],
@@ -325,28 +305,6 @@ describe('manual mode and picked services', () => {
   });
 });
 
-describe('reconcileBudget (D138)', () => {
-  it('clears a budget that the services no longer offer; "not sure" stays', () => {
-    const draft = { ...completeDraft(), budget: '5000-10000' };
-    expect(reconcileBudget(draft, model)).toBe(draft);
-    const cheap = { ...draft, goals: [], answers: {}, added: ['web/landing-pages'] };
-    expect(reconcileBudget(cheap, model).budget).toBeNull();
-    expect(reconcileBudget({ ...cheap, budget: BUDGET_NOT_SURE }, model).budget).toBe(
-      BUDGET_NOT_SURE,
-    );
-    expect(reconcileBudget({ ...cheap, budget: null }, model).budget).toBeNull();
-  });
-
-  it('follows removal and addition of services', () => {
-    let draft = { ...emptyDraft(), mode: 'manual' as const, added: ['web/landing-pages'] };
-    draft = { ...draft, budget: 'up-to-1500' };
-    expect(addService(draft, 'web/online-stores', model).budget).toBeNull();
-    const dear = { ...draft, added: ['web/landing-pages', 'crm/custom-crm'], budget: '5000-10000' };
-    expect(removeService(dear, 'crm/custom-crm', model).budget).toBeNull();
-    expect(removeService(dear, 'web/landing-pages', model).budget).toBe('5000-10000');
-  });
-});
-
 describe('sanitizeDraft', () => {
   it('keeps a valid draft as it is', () => {
     const draft = { ...completeDraft(), contact: { name: 'Ola', comment: 'x' } };
@@ -371,8 +329,6 @@ describe('sanitizeDraft', () => {
         added: ['web/landing-pages', 'web/ghost', 'web/landing-pages', 7],
         industry: 'ghost',
         industryOther: 'text',
-        budget: 'gone',
-        timeline: 'later',
         contact: { name: 5, comment: 'ok' },
       },
       model,
@@ -386,8 +342,6 @@ describe('sanitizeDraft', () => {
       added: ['web/landing-pages'],
       industry: null,
       industryOther: '',
-      budget: null,
-      timeline: null,
       contact: { name: '', comment: 'ok' },
     });
   });
@@ -430,11 +384,14 @@ describe('sanitizeDraft', () => {
     });
   });
 
-  it('drops a budget the services do not offer, keeps "not sure"', () => {
-    const base = { mode: 'manual', added: ['web/landing-pages'] };
-    expect(sanitizeDraft({ ...base, budget: 'over-10000' }, model).budget).toBeNull();
-    expect(sanitizeDraft({ ...base, budget: 'up-to-1500' }, model).budget).toBe('up-to-1500');
-    expect(sanitizeDraft({ ...base, budget: BUDGET_NOT_SURE }, model).budget).toBe(BUDGET_NOT_SURE);
+  it('leaves out the budget and timeline of a v2 draft (D155)', () => {
+    const sanitized = sanitizeDraft(
+      { mode: 'manual', added: ['web/landing-pages'], budget: 'up-to-1500', timeline: 'asap' },
+      model,
+    );
+    expect(sanitized).not.toHaveProperty('budget');
+    expect(sanitized).not.toHaveProperty('timeline');
+    expect(configuratorDraftSchema.safeParse(sanitized).success).toBe(true);
   });
 
   it('always produces a draft that matches the schema', () => {

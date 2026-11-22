@@ -40,6 +40,8 @@ export interface Option {
   label: string;
   /** DNA accent shown as a dot (categories). */
   accent?: string;
+  /** A small mark under the label, part of its name ("Often chosen in your industry"). */
+  note?: string;
 }
 
 interface OptionGroupProps {
@@ -134,7 +136,14 @@ export function OptionGroup({
                   className="size-1.5 shrink-0 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
                 />
               ) : null}
-              <span className="min-w-0">{option.label}</span>
+              <span className="min-w-0">
+                {option.label}
+                {option.note ? (
+                  <span className="mt-0.5 block text-micro tracking-wide text-[var(--color-brand)]">
+                    {option.note}
+                  </span>
+                ) : null}
+              </span>
             </label>
           );
         })}
@@ -145,9 +154,10 @@ export function OptionGroup({
 }
 
 /**
- * Optional single choice as toggle chips (the industry): pressing the chosen
- * chip again clears it. Plain buttons with `aria-pressed`, in a group named by
- * the legend.
+ * Single choice as chips (the industry). Plain buttons with `aria-pressed`, in
+ * a group named by the legend. With `toggle` (default) pressing the chosen
+ * chip again clears it; without it every press picks (the industry step
+ * moves on after a pick, so pressing the chosen chip again moves on too).
  */
 export function ChipGroup({
   field,
@@ -157,6 +167,8 @@ export function ChipGroup({
   value,
   onChange,
   error,
+  toggle = true,
+  hideLegend = false,
 }: {
   field: string;
   legend: string;
@@ -165,12 +177,15 @@ export function ChipGroup({
   value: string | null;
   onChange: (value: string | null) => void;
   error?: string;
+  toggle?: boolean;
+  /** The step's heading already names the group: keep the legend for screen readers only. */
+  hideLegend?: boolean;
 }) {
   const id = fieldDomId(field);
   const hintId = hint ? `${id}-hint` : undefined;
   return (
     <div role="group" aria-labelledby={`${id}-legend`} aria-describedby={hintId}>
-      <p id={`${id}-legend`} className="text-body font-medium text-ink">
+      <p id={`${id}-legend`} className={hideLegend ? 'sr-only' : 'text-body font-medium text-ink'}>
         {legend}
       </p>
       {hint ? (
@@ -187,7 +202,7 @@ export function ChipGroup({
               id={`${id}-${index}`}
               type="button"
               aria-pressed={pressed}
-              onClick={() => onChange(pressed ? null : option.value)}
+              onClick={() => onChange(pressed && toggle ? null : option.value)}
               className={`min-h-11 rounded-full border px-4 text-sm transition-colors duration-150 ease-calm ${
                 pressed
                   ? 'border-[color-mix(in_srgb,var(--color-brand)_60%,transparent)] bg-[color-mix(in_srgb,var(--color-brand)_14%,transparent)] text-ink'

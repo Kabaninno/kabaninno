@@ -232,7 +232,7 @@ test.describe('mobile fixes', () => {
     await expect(next).toBeInViewport();
     await expect(page.getByText(ui[locale].configurator.lead)).toBeVisible();
 
-    await page.getByRole('checkbox', { name: categoryName(locale, first.id) }).check();
+    // The industry step is optional: Next moves on to the goals (round 3, D155).
     await next.click();
     await expect(page.locator('#cfg-step-title')).toBeFocused();
     await expect(page.getByText(ui[locale].configurator.lead)).toHaveCount(0);

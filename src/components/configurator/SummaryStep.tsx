@@ -8,7 +8,7 @@ import type { ConfiguratorStepId } from '@/lib/configurator-steps';
 import type { ConfiguratorDraft } from '@/lib/configurator/draft';
 import type { WizardLabels } from '@/lib/configurator/labels';
 import { GOAL_UNSURE } from '@/lib/configurator/model';
-import { buildLeadMessage, fitLeadMessage } from '@/lib/configurator/message';
+import { buildLeadMessage, fitLeadMessage, type LeadEstimate } from '@/lib/configurator/message';
 import { editButtonName } from '@/lib/a11y-names';
 import { isEditStale, messageText, type MessageEdit } from '@/lib/configurator/session';
 import {
@@ -16,6 +16,13 @@ import {
   type LeadSubmitter,
   type PreparedTelegramLink,
 } from '@/lib/configurator/submitters';
+import { telegramUrl } from '@/lib/configurator/telegram';
+import {
+  isValidWhatsappNumber,
+  prepareWhatsappLink,
+  whatsappUrl,
+  type PreparedWhatsappLink,
+} from '@/lib/configurator/whatsapp';
 import { fieldDomId, inputClass } from './fields';
 
 interface HandoffInput {
@@ -27,6 +34,10 @@ interface HandoffInput {
   locale: string;
   /** Telegram username used for the URL budget (any string works). */
   username: string;
+  /** `siteConfig.whatsappNumber`; empty or malformed: no WhatsApp button. */
+  whatsappNumber: string;
+  /** The estimate of the services, formatted (the message's "Indicative" line). */
+  estimate: LeadEstimate | null;
   /** The visitor's edit of the message (with its base), or null for the default. */
   edit: MessageEdit | null;
 }
@@ -42,7 +53,9 @@ export interface LeadHandoff {
   stale: boolean;
   /** A link submitter (Telegram) is configured with a valid username and produced a link. */
   prepared: PreparedTelegramLink | null;
-  /** The link had to shorten the text. */
+  /** The WhatsApp link, when the number is configured (round 3, B4). */
+  whatsapp: PreparedWhatsappLink | null;
+  /** A link had to shorten the text. */
   shortened: boolean;
   /** A link submitter without a valid username (only "Copy" works). */
   unconfigured: boolean;
@@ -68,20 +81,40 @@ export function useLeadHandoff({
   submitter,
   locale,
   username,
+  whatsappNumber,
+  estimate,
   edit,
 }: HandoffInput): LeadHandoff {
   const full = useMemo(
-    () => buildLeadMessage(draft, services, labels.lead),
-    [draft, services, labels.lead],
+    () => buildLeadMessage(draft, services, labels.lead, { estimate }),
+    [draft, services, labels.lead, estimate],
   );
   const fitted = useMemo(
-    () => fitLeadMessage(draft, services, labels.lead, { username }),
-    [draft, services, labels.lead, username],
+    () =>
+      fitLeadMessage(draft, services, labels.lead, {
+        estimate,
+        toUrl: (text) => telegramUrl(username, text),
+      }),
+    [draft, services, labels.lead, estimate, username],
+  );
+  const hasWhatsapp = isValidWhatsappNumber(whatsappNumber);
+  const fittedWhatsapp = useMemo(
+    () =>
+      hasWhatsapp
+        ? fitLeadMessage(draft, services, labels.lead, {
+            estimate,
+            toUrl: (text) => whatsappUrl(whatsappNumber, text),
+          })
+        : null,
+    [hasWhatsapp, draft, services, labels.lead, estimate, whatsappNumber],
   );
   const [status, setStatus] = useState('');
   const text = messageText(edit, full);
   const link = isLinkSubmitter(submitter) ? submitter : null;
   const prepared = link?.prepare(edit?.text ?? fitted.text) ?? null;
+  const whatsapp = fittedWhatsapp
+    ? prepareWhatsappLink(whatsappNumber, edit?.text ?? fittedWhatsapp.text)
+    : null;
 
   return {
     full,
@@ -89,8 +122,11 @@ export function useLeadHandoff({
     edited: edit !== null && edit.text !== full,
     stale: isEditStale(edit, full),
     prepared,
-    shortened: Boolean(prepared?.truncated) || (edit === null && fitted.truncated),
-    unconfigured: link !== null && !link.configured,
+    whatsapp,
+    shortened:
+      Boolean(prepared?.truncated || whatsapp?.truncated) ||
+      (edit === null && (fitted.truncated || Boolean(fittedWhatsapp?.truncated))),
+    unconfigured: link !== null && !link.configured && whatsapp === null,
     submits: link === null,
     status,
     copy: async () => {
@@ -119,8 +155,13 @@ export function useLeadHandoff({
  *   handler fire-and-forget, without preventing the navigation, so the new
  *   tab is never blocked. A hint under it says the text is already copied if
  *   Telegram did not prefill it (D135);
+ * - "Send via WhatsApp" beside it, of equal weight, when
+ *   `siteConfig.whatsappNumber` is set (round 3, B4, D157): the same copy and
+ *   `wa.me/<number>?text=…` link. With both buttons, narrow phones show just
+ *   "Telegram" / "WhatsApp" (the full wording stays the accessible name), so
+ *   the footer keeps one row;
  * - "Send" for a non-link submitter (a future API);
- * - "Copy text" only while Telegram is not configured, then as the primary
+ * - "Copy text" only while no messenger is configured, then as the primary
  *   one; otherwise it sits under the message (`SummaryStep`), together with the
  *   hint, so the sticky footer stays one row tall on phones.
  */
@@ -137,36 +178,64 @@ export function SummaryActions({
   /** "Send" pressed while the name is missing: show the error and focus the field. */
   onBlocked: () => void;
 }) {
-  const { prepared } = handoff;
-  const copyIsPrimary = !prepared && !handoff.submits;
+  const { prepared, whatsapp } = handoff;
+  const copyIsPrimary = !prepared && !whatsapp && !handoff.submits;
+  const both = Boolean(prepared && whatsapp);
+  const sendClass = `${primaryButton} min-h-12 flex-1 text-sm sm:flex-none sm:px-6 ${
+    both ? 'px-4' : 'px-5'
+  }`;
+  /** The full wording, or on narrow phones (both buttons) just the messenger's name. */
+  const sendText = (full: string, short: string) =>
+    both ? (
+      <>
+        <span aria-hidden="true" className="sm:hidden">
+          {short}
+        </span>
+        <span className="max-sm:sr-only">{full}</span>
+      </>
+    ) : (
+      full
+    );
+  const channels = [
+    prepared && {
+      via: 'telegram' as const,
+      url: prepared.url,
+      truncated: prepared.truncated,
+      text: sendText(labels.summary.send, 'Telegram'),
+    },
+    whatsapp && {
+      via: 'whatsapp' as const,
+      url: whatsapp.url,
+      truncated: whatsapp.truncated,
+      text: sendText(labels.summary.sendWhatsapp, 'WhatsApp'),
+    },
+  ].filter((channel) => channel !== null);
   return (
     <>
-      {prepared && !contactValid ? (
-        <button
-          type="button"
-          onClick={onBlocked}
-          className={`${primaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
-        >
-          {labels.summary.send}
-        </button>
-      ) : null}
-      {prepared && contactValid ? (
-        <a
-          href={prepared.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-describedby={SEND_HINT_ID}
-          onClick={() => {
-            // Fire-and-forget: the default navigation (new tab) must go ahead.
-            void handoff.copy();
-            analytics.track('lead_submit', { via: 'telegram', truncated: prepared.truncated });
-          }}
-          className={`${primaryButton} min-h-12 flex-1 px-5 text-sm sm:flex-none sm:px-6`}
-        >
-          {labels.summary.send}
-          <span className="sr-only"> ({labels.summary.newTab})</span>
-        </a>
-      ) : null}
+      {channels.map((channel) =>
+        contactValid ? (
+          <a
+            key={channel.via}
+            href={channel.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-describedby={SEND_HINT_ID}
+            onClick={() => {
+              // Fire-and-forget: the default navigation (new tab) must go ahead.
+              void handoff.copy();
+              analytics.track('lead_submit', { via: channel.via, truncated: channel.truncated });
+            }}
+            className={sendClass}
+          >
+            {channel.text}
+            <span className="sr-only"> ({labels.summary.newTab})</span>
+          </a>
+        ) : (
+          <button key={channel.via} type="button" onClick={onBlocked} className={sendClass}>
+            {channel.text}
+          </button>
+        ),
+      )}
       {handoff.submits ? (
         <button
           type="button"
@@ -232,6 +301,14 @@ export function SummaryStep({
 
   const guided = draft.mode === 'guided';
   const answers: { step: ConfiguratorStepId; label: string; value: string }[] = [];
+  if (draft.industry) {
+    const other = draft.industry === 'other' ? draft.industryOther.trim() : '';
+    answers.push({
+      step: 'industry',
+      label: labels.summary.rowIndustry,
+      value: other || (labels.industries[draft.industry] ?? ''),
+    });
+  }
   if (guided && draft.goals.length > 0) {
     answers.push({
       step: 'goals',
@@ -256,26 +333,6 @@ export function SummaryStep({
         ? services.map((id) => labels.services[id] ?? id).join(', ')
         : labels.summary.rowConsultation,
   });
-  answers.push(
-    {
-      step: 'plan',
-      label: labels.summary.rowBudget,
-      value: draft.budget ? (labels.budgets[draft.budget] ?? '') : '',
-    },
-    {
-      step: 'plan',
-      label: labels.summary.rowTimeline,
-      value: draft.timeline ? (labels.timelines[draft.timeline] ?? '') : '',
-    },
-  );
-  if (draft.industry) {
-    const other = draft.industry === 'other' ? draft.industryOther.trim() : '';
-    answers.push({
-      step: 'plan',
-      label: labels.summary.rowIndustry,
-      value: other || (labels.industries[draft.industry] ?? ''),
-    });
-  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -358,7 +415,7 @@ export function SummaryStep({
             {labels.summary.restoreDefault}
           </button>
         ) : null}
-        {handoff.prepared || handoff.submits ? (
+        {handoff.prepared || handoff.whatsapp || handoff.submits ? (
           <button
             type="button"
             onClick={handoff.copy}
@@ -367,7 +424,7 @@ export function SummaryStep({
             {labels.summary.copy}
           </button>
         ) : null}
-        {handoff.prepared ? (
+        {handoff.prepared || handoff.whatsapp ? (
           <p id={SEND_HINT_ID} className="mt-2 text-sm leading-snug text-muted">
             {labels.summary.sendHint}
           </p>
@@ -379,7 +436,7 @@ export function SummaryStep({
           {labels.summary.unconfigured}
         </p>
       ) : null}
-      {handoff.prepared && handoff.shortened ? (
+      {(handoff.prepared || handoff.whatsapp) && handoff.shortened ? (
         <p className="corner-brackets bg-white/[0.025] px-4 py-3 text-sm text-muted">
           {labels.summary.truncated}
         </p>

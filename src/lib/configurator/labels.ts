@@ -1,13 +1,9 @@
 import { CONFIGURATOR_STEPS, type ConfiguratorStepId } from '../configurator-steps';
 import { INDUSTRY_OTHER_MAX } from './draft';
+import { estimate, type TimelineTexts } from './estimate';
 import type { LeadLabels } from './message';
-import {
-  BUDGET_NOT_SURE,
-  OPTION_UNKNOWN,
-  allServices,
-  type BudgetRange,
-  type ConfiguratorModel,
-} from './model';
+import { OPTION_UNKNOWN, allServices, type ConfiguratorModel } from './model';
+import { MAX_DAYS_SHOWN_AS_DAYS } from '../timeline';
 
 /**
  * Every string the configurator wizard shows, resolved on the server for one
@@ -44,10 +40,19 @@ export interface WizardLabels {
     startOverYes: string;
     startOverNo: string;
   };
+  industry: {
+    legend: string;
+    /** "Other": the free-text field and its hint, and the "Next" beside it. */
+    other: string;
+    otherHint: string;
+    next: string;
+  };
   goals: {
     legend: string;
     /** "Pick up to 3." */
     hint: string;
+    /** The mark on the goals typical for the visitor's industry. */
+    typical: string;
     unsure: string;
     /** The link under the list: skip the questions and pick services yourself. */
     knowIt: string;
@@ -82,15 +87,17 @@ export interface WizardLabels {
     backToGuided: string;
     /** By service id `"<category>/<slug>"`: one line in plain words. */
     benefits: Record<string, string>;
+    /** The estimate block (round 3, B1, D156). */
+    estimate: {
+      price: string;
+      timeline: string;
+      note: string;
+      /** Without services or with "not sure yet". */
+      consultation: string;
+    };
   };
-  plan: {
-    budget: string;
-    timeline: string;
-    industry: string;
-    industryHint: string;
-    industryOther: string;
-    industryOtherHint: string;
-  };
+  /** Timeline phrases of the estimate, per number (`formatTimeline`). */
+  timeline: TimelineTexts;
   fields: {
     name: string;
     nameHint: string;
@@ -101,8 +108,6 @@ export interface WizardLabels {
   /** By service id `"<category>/<slug>"`. */
   services: Record<string, string>;
   industries: Record<string, string>;
-  budgets: Record<string, string>;
-  timelines: Record<string, string>;
   /** Field error messages, already formatted with their limits. */
   errors: {
     requiredMulti: string;
@@ -115,14 +120,14 @@ export interface WizardLabels {
     unknown: string;
   };
   prefilled: string;
-  /** The budget range was cleared after the selection changed (D138). */
-  budgetReset: string;
   summary: {
     choices: string;
     message: string;
     messageHint: string;
     restoreDefault: string;
     send: string;
+    /** "Send via WhatsApp" (shown only with `siteConfig.whatsappNumber`). */
+    sendWhatsapp: string;
     copy: string;
     copied: string;
     copyFailed: string;
@@ -142,8 +147,6 @@ export interface WizardLabels {
     rowGoals: string;
     rowHave: string;
     rowServices: string;
-    rowBudget: string;
-    rowTimeline: string;
     rowIndustry: string;
     /** The consultation, when there are no services. */
     rowConsultation: string;
@@ -159,6 +162,8 @@ export interface WizardLabelSources {
   t: Translate;
   /** `lead` namespace. */
   tLead: Translate;
+  /** `service` namespace (the timeline phrases of the service pages). */
+  tService: Translate;
   studio: string;
   category: (id: string) => CategoryLabel;
   serviceTitle: (categoryId: string, slug: string) => string;
@@ -171,24 +176,6 @@ export function fillTemplate(template: string, values: Record<string, string>): 
   return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
 }
 
-/** "5 000–15 000 PLN" style range label from the locale's templates. */
-export function formatBudgetLabel(
-  range: BudgetRange,
-  locale: string,
-  currency: string,
-  t: Translate,
-): string {
-  const amount = (value: number) =>
-    new Intl.NumberFormat(locale, { maximumFractionDigits: 0, useGrouping: 'always' }).format(
-      value,
-    );
-  if (range.min !== undefined && range.max !== undefined) {
-    return t('budget.range', { min: amount(range.min), max: amount(range.max), currency });
-  }
-  if (range.max !== undefined) return t('budget.upTo', { max: amount(range.max), currency });
-  return t('budget.from', { min: amount(range.min ?? 0), currency });
-}
-
 const byId = (ids: readonly string[], label: (id: string) => string): Record<string, string> =>
   Object.fromEntries(ids.map((id) => [id, label(id)]));
 
@@ -197,6 +184,7 @@ export function buildWizardLabels({
   model,
   t,
   tLead,
+  tService,
   studio,
   category,
   serviceTitle,
@@ -214,16 +202,6 @@ export function buildWizardLabels({
     ]),
   );
   const industries = byId(model.industries, (id) => t(`industries.${id}`));
-  const timelines = byId(model.timelines, (id) => t(`timelines.${id}`));
-  const budgets = {
-    ...Object.fromEntries(
-      model.budgetRanges.map((range) => [
-        range.id,
-        formatBudgetLabel(range, locale, model.currency, t),
-      ]),
-    ),
-    [BUDGET_NOT_SURE]: t('budget.notSure'),
-  };
   const goalNames = byId(
     model.goals.map((goal) => goal.id),
     (id) => t(`goals.items.${id}.name`),
@@ -245,6 +223,16 @@ export function buildWizardLabels({
       ),
     ]),
   );
+  // One sentence per answer for the message; "don't know" adds none.
+  const sentences = Object.fromEntries(
+    model.goals.map((goal) => [
+      goal.id,
+      byId(
+        goal.options.filter((option) => option.id !== OPTION_UNKNOWN).map((option) => option.id),
+        (id) => t(`goals.items.${goal.id}.sentences.${id}`),
+      ),
+    ]),
+  );
   const have = byId(model.have, (id) => t(`have.items.${id}`));
   const progress = (total: number) =>
     Array.from({ length: total }, (_, index) => t('progress', { current: index + 1, total }));
@@ -263,9 +251,16 @@ export function buildWizardLabels({
       startOverYes: t('nav.startOverYes'),
       startOverNo: t('nav.startOverNo'),
     },
+    industry: {
+      legend: t('industry.legend'),
+      other: t('industry.other'),
+      otherHint: t('industry.otherHint', { max: INDUSTRY_OTHER_MAX }),
+      next: t('nav.next'),
+    },
     goals: {
       legend: t('goals.legend'),
       hint: t('goals.hint', { max: model.maxGoals }),
+      typical: t('goals.typical'),
       unsure: t('goals.unsure'),
       knowIt: t('goals.knowIt'),
       names: goalNames,
@@ -290,15 +285,14 @@ export function buildWizardLabels({
       manualHint: t('solution.manualHint'),
       backToGuided: t('solution.backToGuided'),
       benefits,
+      estimate: {
+        price: t('solution.estimate.price'),
+        timeline: t('solution.estimate.timeline'),
+        note: t('solution.estimate.note'),
+        consultation: t('solution.estimate.consultation'),
+      },
     },
-    plan: {
-      budget: t('plan.budget'),
-      timeline: t('plan.timeline'),
-      industry: t('plan.industry'),
-      industryHint: t('plan.industryHint'),
-      industryOther: t('plan.industryOther'),
-      industryOtherHint: t('plan.industryOtherHint', { max: INDUSTRY_OTHER_MAX }),
-    },
+    timeline: timelineTexts(model, t, tService),
     fields: {
       name: t('fields.name'),
       nameHint: t('fields.nameHint'),
@@ -308,8 +302,6 @@ export function buildWizardLabels({
     categories,
     services,
     industries,
-    budgets,
-    timelines,
     errors: {
       requiredMulti: t('errors.requiredMulti'),
       requiredOne: t('errors.requiredOne'),
@@ -321,13 +313,13 @@ export function buildWizardLabels({
       unknown: t('errors.unknown'),
     },
     prefilled: t('prefilled'),
-    budgetReset: t('budget.reset'),
     summary: {
       choices: t('summary.choices'),
       message: t('summary.message'),
       messageHint: t('summary.messageHint'),
       restoreDefault: t('summary.restoreDefault'),
       send: t('summary.send'),
+      sendWhatsapp: t('summary.sendWhatsapp'),
       copy: t('summary.copy'),
       copied: t('summary.copied'),
       copyFailed: t('summary.copyFailed'),
@@ -343,35 +335,61 @@ export function buildWizardLabels({
       rowGoals: t('summary.rowGoals'),
       rowHave: t('summary.rowHave'),
       rowServices: t('summary.rowServices'),
-      rowBudget: t('summary.rowBudget'),
-      rowTimeline: t('summary.rowTimeline'),
       rowIndustry: t('summary.rowIndustry'),
       rowConsultation: t('summary.rowConsultation'),
     },
     lead: {
-      title: tLead('title', { studio }),
-      goals: tLead('goals'),
-      have: tLead('have'),
-      solution: tLead('solution'),
-      services: tLead('services'),
-      industry: tLead('industry'),
-      budget: tLead('budget'),
-      timeline: tLead('timeline'),
-      name: tLead('name'),
-      comment: tLead('comment'),
-      unsure: tLead('unsure'),
+      locale,
+      greeting: tLead('greeting'),
+      introName: tLead('introName', { name: '{name}' }),
+      intro: tLead('intro', { studio }),
+      business: tLead('business', { industry: '{industry}' }),
+      improve: tLead('improve', { goals: '{goals}' }),
+      have: tLead('have', { items: '{items}' }),
+      haveNone: tLead('haveNone'),
+      picked: tLead('picked', { combo: '{combo}', services: '{services}' }),
+      estimate: tLead('estimate', { price: '{price}', timeline: '{timeline}' }),
       consultation: tLead('consultation'),
-      goalNames,
-      answers: options,
+      closing: tLead('closing'),
+      goalPhrases: byId(
+        model.goals.map((goal) => goal.id),
+        (id) => t(`goals.items.${id}.phrase`),
+      ),
+      answers: sentences,
       haveNames: have,
       categories: Object.fromEntries(
         Object.entries(categories).map(([id, label]) => [id, label.name]),
       ),
       serviceNames: services,
       industries,
-      budgets,
-      timelines,
     },
+  };
+}
+
+/**
+ * Timeline phrases for every number the estimate can reach: days up to ten,
+ * weeks up to the estimate of all services together. Ranges come from the
+ * service pages' message (`service.timelineValue`, with `{min}` left for the
+ * client), exact numbers from `solution.estimate.exact`.
+ */
+function timelineTexts(model: ConfiguratorModel, t: Translate, tService: Translate): TimelineTexts {
+  const longest = estimate(allServices(model))?.days[1] ?? MAX_DAYS_SHOWN_AS_DAYS;
+  const weeks = Math.max(1, Math.round(longest / 7)) + 1;
+  const numbers = (count: number) => Array.from({ length: count }, (_, index) => index + 1);
+  const phrases = (unit: 'days' | 'weeks', count: number, exact: boolean) =>
+    Object.fromEntries(
+      numbers(count).map((n) => [
+        n,
+        exact
+          ? t('solution.estimate.exact', { unit, n })
+          : tService('timelineValue', { unit, min: '{min}', max: n }),
+      ]),
+    );
+  return {
+    days: phrases('days', MAX_DAYS_SHOWN_AS_DAYS, false),
+    weeks: phrases('weeks', weeks, false),
+    daysExact: phrases('days', MAX_DAYS_SHOWN_AS_DAYS, true),
+    weeksExact: phrases('weeks', weeks, true),
   };
 }
 

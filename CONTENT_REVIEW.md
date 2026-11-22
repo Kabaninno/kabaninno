@@ -494,3 +494,73 @@ uk:
 - `goals.knowIt` лишено дослівно за словами власника («Я знаю, що мені потрібно»).
 - Повідомлення в Telegram: «ще не знаю» у всіх трьох мовах від «ми» (pl «jeszcze nie wiemy, prosimy o poradę», uk «ще не знаємо, просимо порадити», en «we are not sure yet, please advise»); назви розділів («Уже є» тощо) безособові.
 - «Termin / Терміни», `stepsNav` («добору»), «clients/customers» — без змін (старі рішення, невидимі або несуттєві).
+
+## Round 3: галузь, оцінка, повідомлення від першої особи
+
+Вичитано нові й змінені тексти конфігуратора (раунд правок №3, D155–D158): крок «Галузь», позначка типових цілей, фрази цілей і речення-відповіді для повідомлення, блок оцінки, WhatsApp, увесь простір `lead`. Ключі, їхня кількість і `{плейсхолдери}` не змінювалися. Українські `lead.*` — шаблон власника, лишилися дослівно. Слова «netto / нетто / net» у словниках немає. Статус розділу: `TODO: вичитати` носієм мови.
+
+**Як тепер читається повідомлення** (pl, приклад відповідей):
+
+```
+Dzień dobry!
+Mam na imię Anna. Chcę skorzystać z usług KABANINNO.
+
+Moja branża: handel.
+Chcę poprawić: przyjmowanie zamówień i płatności online, zarządzanie klientami i zleceniami.
+W ofercie mamy od 20 do 200 produktów lub usług. Klientów i zlecenia prowadzę w programie, ale jest niewygodny.
+Mam już: stronę WWW.
+
+Na stronie dobrano dla mnie: Strony i aplikacje + CRM — Sklepy internetowe, CRM na zamówienie.
+Orientacyjnie: 7000–14000 zł, 2–5 tygodni.
+
+Czy możemy omówić szczegóły?
+```
+
+en з тими самими відповідями: «Hello! / My name is Anna. I'd like to work with KABANINNO. / My business: retail. / I'd like to improve: online orders and payments, how we keep track of clients and orders. / We have 20 to 200 products or services. I track clients and orders in a program, but it's inconvenient. / I already have: a website. / Your website recommended: Web Development + CRM — Online Stores, Custom CRM. / Estimate: …, 2–5 weeks. / Could we discuss the details?»
+
+**Що змінено і чому**
+
+- **Фрази цілей (`goals.items.*.phrase`)** мають граматично продовжувати «Chcę poprawić: … / I'd like to improve: … / Хочу покращити: …».
+  - uk `less-routine`: «роботу без зайвої рутини» → «організацію рутинної роботи». Покращують не «роботу без рутини» (це бажаний результат), а те, як організована рутинна робота.
+  - uk `see-numbers`: «звіти й контроль цифр» → «звіти й контроль показників» («контроль цифр» звучить неприродно).
+  - pl `client-order`: «porządek w klientach i zleceniach» → «zarządzanie klientami i zleceniami»; `less-routine`: «pracę bez zbędnej rutyny» → «organizację rutynowych zadań» (як в uk); `fast-replies`: «szybkość odpowiedzi dla klientów» → «szybkość odpowiadania klientom»; `see-numbers`: «raporty i kontrolę liczb» → «raportowanie i kontrolę wyników».
+  - en: після «improve» герундій звучав недоладно («improve getting customers online», «improve cutting routine work»). Тепер іменники або «how we …»: «how we attract customers online», «online orders and payments», «how we keep track of clients and orders», «how we handle routine tasks», «how quickly we reply to customers», «reporting and a clear view of the numbers». `booking` без змін.
+  - Без змін: uk `more-clients`, `online-orders`, `booking`, `client-order`, `fast-replies`; pl `more-clients`, `online-orders`, `booking`.
+- **Речення-відповіді (`goals.items.*.sentences.*`).** Усі в теперішньому часі або з «хочу / chcę / I want», без форм, що видають рід автора.
+  - `more-clients.messengers` у всіх мовах: було констатацією («Клієнти приходять переважно з месенджерів…»), тепер бажання, як у двох інших відповідях на питання «Звідки клієнти _мають_ про вас дізнаватися?»: «Хочу більше клієнтів із месенджерів і за рекомендаціями.» / «Chcę mieć więcej klientów z komunikatorów i z poleceń.» / «I want more customers through messaging apps and word of mouth.»
+  - `more-clients.social-ads` (uk, pl): прямий порядок слів: «Хочу залучати клієнтів через Instagram, Facebook і рекламу.», «Chcę pozyskiwać klientów z Instagrama, Facebooka i reklam.»
+  - `online-orders.*`: uk «Товарів чи послуг — до 20.» (телеграфний стиль) → «У нас до 20 товарів чи послуг.»; pl «Mamy do 20…» → «W ofercie mamy do 20 produktów lub usług.» (так само для 20–200 і понад 200).
+  - `booking.website-inconvenient` у всіх мовах — так само, як дві інші відповіді: «Зараз клієнти записуються через сайт, але це незручно.» / «Teraz klienci zapisują się przez stronę, ale to niewygodne.» / «Customers currently book through the website, but it's inconvenient.» en `booking.messengers` → «through messaging apps».
+  - `fast-replies`: uk «пишуть у кількох месенджерах і на пошту» (змішані відмінки) → «пишуть нам у кілька месенджерів і на пошту»; «однакові питання» → «одні й ті самі питання». pl: «przez stronę lub na czacie» (усталене «na czacie»), «przez kilka komunikatorów i mailem», «Klienci wciąż zadają te same pytania.» (як у варіанті «Wciąż z tymi samymi pytaniami»). en: «message us on Telegram» (в англійській «on Telegram», не «in»), «contact us through the website or a chat», «on several messaging apps», «ask the same questions over and over».
+  - en `client-order.head-notebook` → «I currently keep track of clients and orders in my head or in a notebook.»; `less-routine.reminders` → «Sending reminders to customers takes the most time.»; `see-numbers.*` → «I want clear numbers on sales and clients.» тощо («see … in numbers» — калька).
+  - Речення власника «Найбільше часу забирає перенесення даних між програмами.» — без змін. Решта uk-речень `client-order`, `less-routine`, `see-numbers`, `booking.phone/messengers`, `fast-replies.telegram/website-chat` і pl `client-order`, `less-routine`, `see-numbers` — без змін.
+- **Крок «Галузь».** `hints.industry`: «найближче до вашого бізнесу» → «найкраще описує ваш бізнес» (pl «najlepiej opisuje Twoją firmę», en «best describes your business, and we'll move straight on»). `industry.other`: pl «Jaka to branża?» → «W jakiej branży działasz?», en «Which industry?» → «What industry are you in?»; uk «Яка у вас галузь?» без змін. `steps.industry`, `titles.industry`, `industry.legend`, `industry.otherHint` — без змін.
+- **`hints.contact`:** en «How should we address you?» (офіційно) → «What should we call you?», «edit it if you like» → «edit it if needed». pl і uk без змін.
+- **`goals.typical`:** без змін у всіх мовах (uk — формулювання власника). Увага: e2e-тест будує з pl-тексту регулярний вираз, тож у ньому не можна ставити `.`, `?`, `(`, `+` тощо.
+- **Оцінка (`solution.estimate.*`).** Одне слово для ціни в межах блоку, як у підписі: pl `note`/`consultation` «cenę i terminy» → «koszt i czas realizacji» (як «Orientacyjny koszt», «Orientacyjny czas realizacji»); uk «ціну й терміни» → «вартість і терміни» (як «Орієнтовна вартість»). en без змін. `exact` (ICU plural) перевірено: категорії й форми правильні в усіх мовах, без змін.
+- **`summary.truncated`:** en «the messenger» → «the messaging app». `sendWhatsapp` без змін: «Wyślij przez WhatsApp» / «Send via WhatsApp» / «Надіслати у WhatsApp» («у» перед [в], як «у Viber»).
+- **`lead.*`, pl.** `have` «Co już mam:» → «Mam już:» (після «Mam już:» тепер ніколи не стоїть «Nic z tego», бо для цього є окреме речення `haveNone`, тож знахідний відмінок «stronę WWW» читається природно). `consultation`: «…— chcę skorzystać z konsultacji» повторювало «Chcę skorzystać z usług» з першого рядка → «Nie wiem jeszcze, czego dokładnie potrzebuję, więc proszę o konsultację.» Без змін: `greeting`, `introName`, `intro`, `estimate` (закріплені тестами), `business`, `improve`, `haveNone`, `picked`, `closing`.
+- **`lead.*`, en.** `intro` «I'd like to use the services of {studio}.» (калька) → «I'd like to work with {studio}.»; `have` «What I already have:» → «I already have:»; `picked` «The website suggested:» → «Your website recommended:» (як «We recommend» на кроці «Рішення»); `consultation` → «I'm not sure yet exactly what I need, so I'd like a consultation.»; `closing` «Can we…» → «Could we discuss the details?» (ввічливіше). Без змін: `greeting`, `introName`, `business`, `improve`, `haveNone`, `estimate`.
+- **`lead.*`, uk** — шаблон власника, без змін (явних помилок немає; «Поки не знаю, що саме потрібно, — хочу…»: кома з тире тут допустима).
+
+**Закріплено тестами (не змінювати без правки тестів):** pl `lead.greeting`, `introName`, `intro`, `estimate` («Orientacyjnie: …», e2e і юніт-тести); uk `lead.greeting`, `introName`, `intro`, `estimate`, `closing`; en `lead.greeting`; кожне речення-відповідь має закінчуватися на `.`, `!` або `?`; останній рядок повідомлення (`lead.closing`) — на `?`.
+
+**Глосарій Round 3**
+
+| Поняття                   | pl                               | en                            | uk                            |
+| ------------------------- | -------------------------------- | ----------------------------- | ----------------------------- |
+| Позначка типової цілі     | Często wybierane w Twojej branży | Often chosen in your industry | Часто обирають у вашій галузі |
+| Месенджер (у реченнях)    | komunikator                      | messaging app                 | месенджер                     |
+| Орієнтовна ціна (підпис)  | Orientacyjny koszt               | Estimated cost                | Орієнтовна вартість           |
+| Орієнтовно (повідомлення) | Orientacyjnie                    | Estimate                      | Орієнтовно                    |
+| Надіслати у WhatsApp      | Wyślij przez WhatsApp            | Send via WhatsApp             | Надіслати у WhatsApp          |
+
+**Прошу власника підтвердити**
+
+- **Крок «Галузь» можна пропустити** («Далі» внизу), але підказка про це не каже. Можна дописати: «Ten krok możesz też pominąć.» / «You can also skip this step.» / «Цей крок можна й пропустити.»
+- **«Я» і «ми» в одному повідомленні.** Людина пише від себе («Мене звати…», «Хочу…»), але про бізнес — інколи від «ми» («У нас до 20 товарів», «Клієнти пишуть нам»). Для власника малого бізнесу це природно. Якщо треба суворо від «я», заміню «у нас / mamy / we have» на «у мене / mam / I have».
+- **`more-clients.messengers`** тепер бажання, а не констатація (див. вище). Якщо мається на увазі «клієнти вже приходять із месенджерів, хочу це впорядкувати», краще повернути попередній варіант.
+- **uk `less-routine.phrase`** «організацію рутинної роботи». Альтернатива ближча до назви цілі: «роботу з рутинними задачами».
+- **en: «messaging apps» у повідомленні, але «messengers» у варіантах відповідей** (`options.*`, поза межами цього раунду). Пропоную так само змінити варіанти: «From messaging apps and word of mouth», «In messaging apps», «In several messaging apps and by email».
+- **en `lead.picked`** «Your website recommended: …». Альтернатива: «The configurator on your website suggested: …» (точніше, але довше). pl «Na stronie dobrano dla mnie: …» — альтернатива «Na Waszej stronie zaproponowano mi: …».
+- **`summary.truncated`.** Кнопка «Надіслати» вже копіює повний текст (D135), тож можна написати точніше: «…з’явиться скорочена версія. Повний текст уже скопійовано — вставте його замість скороченого.» Зараз лишилася порада скопіювати текст вручну (кнопкою «Скопіювати»), вона теж правильна.

@@ -5,18 +5,11 @@ import {
   type ConfiguratorMode,
   type ConfiguratorStepId,
 } from '../configurator-steps';
-import {
-  GOAL_UNSURE,
-  HAVE_NONE,
-  budgetIds,
-  findGoal,
-  findService,
-  type ConfiguratorModel,
-} from './model';
+import { GOAL_UNSURE, HAVE_NONE, findGoal, findService, type ConfiguratorModel } from './model';
 import { selectedServices } from './recommend';
 
 /**
- * The configurator draft (D149): what the visitor chose so far, as ids from
+ * The configurator draft (D149, round 3 D155): what the visitor chose so far, as ids from
  * the model. Pure helpers only; persistence is in `storage.ts`, the message in
  * `message.ts`, the recommendation in `recommend.ts`.
  *
@@ -31,23 +24,19 @@ export const INDUSTRY_OTHER_MAX = 60;
 
 export const configuratorDraftSchema = z.object({
   mode: z.enum(['guided', 'manual']),
-  /** Step 1: goal ids (up to `model.maxGoals`), or just `GOAL_UNSURE`. */
-  goals: z.array(z.string()),
-  /** Step 2: the chosen option id per goal id. */
-  answers: z.record(z.string(), z.string()),
-  /** Step 2: what the visitor already has (`have` ids; `HAVE_NONE` is exclusive). */
-  have: z.array(z.string()),
-  /** Step 3: recommended services the visitor dropped. */
-  removed: z.array(z.string()),
-  /** Step 3: services the visitor picked (`"<category>/<slug>"`). */
-  added: z.array(z.string()),
-  /** Step 4: an industry id (optional); `other` comes with free text. */
+  /** Step 1: an industry id (optional); `other` comes with free text. */
   industry: z.string().nullable(),
   industryOther: z.string(),
-  /** Step 4: a budget range id or `BUDGET_NOT_SURE`. */
-  budget: z.string().nullable(),
-  /** Step 4. */
-  timeline: z.string().nullable(),
+  /** Step 2: goal ids (up to `model.maxGoals`), or just `GOAL_UNSURE`. */
+  goals: z.array(z.string()),
+  /** Step 3: the chosen option id per goal id. */
+  answers: z.record(z.string(), z.string()),
+  /** Step 3: what the visitor already has (`have` ids; `HAVE_NONE` is exclusive). */
+  have: z.array(z.string()),
+  /** Step 4: recommended services the visitor dropped. */
+  removed: z.array(z.string()),
+  /** Step 4: services the visitor picked (`"<category>/<slug>"`). */
+  added: z.array(z.string()),
   /** Step 5. */
   contact: z.object({ name: z.string(), comment: z.string() }),
 });
@@ -57,15 +46,13 @@ export type ConfiguratorDraft = z.infer<typeof configuratorDraftSchema>;
 export function emptyDraft(): ConfiguratorDraft {
   return {
     mode: 'guided',
+    industry: null,
+    industryOther: '',
     goals: [],
     answers: {},
     have: [],
     removed: [],
     added: [],
-    industry: null,
-    industryOther: '',
-    budget: null,
-    timeline: null,
     contact: { name: '', comment: '' },
   };
 }
@@ -93,6 +80,13 @@ export function validateStep(
 ): StepErrors {
   const errors: StepErrors = {};
   switch (step) {
+    case 'industry':
+      // Optional (D155): a visitor from a planet lands on the solution step without one.
+      if (draft.industry !== null && !model.industries.includes(draft.industry)) {
+        errors.industry = 'unknown';
+      }
+      if (length(draft.industryOther.trim()) > INDUSTRY_OTHER_MAX) errors.industry = 'tooLong';
+      break;
     case 'goals': {
       if (draft.mode === 'manual') break;
       const unsure = draft.goals.includes(GOAL_UNSURE);
@@ -127,18 +121,6 @@ export function validateStep(
       // Never blocks: no services means "let's pick together on a consultation".
       if (draft.added.some((id) => !findService(model, id))) errors.services = 'unknown';
       break;
-    case 'plan': {
-      const services = servicesOf(draft, model);
-      if (draft.budget === null) errors.budget = 'required';
-      else if (!budgetIds(model, services).includes(draft.budget)) errors.budget = 'unknown';
-      if (draft.timeline === null) errors.timeline = 'required';
-      else if (!model.timelines.includes(draft.timeline)) errors.timeline = 'unknown';
-      if (draft.industry !== null && !model.industries.includes(draft.industry)) {
-        errors.industry = 'unknown';
-      }
-      if (length(draft.industryOther.trim()) > INDUSTRY_OTHER_MAX) errors.industry = 'tooLong';
-      break;
-    }
     case 'contact': {
       const name = length(draft.contact.name.trim());
       if (name === 0) errors['contact.name'] = 'required';
@@ -216,20 +198,6 @@ export function furthestEnterableStep(
 /* ------------------------------------------------------------------ */
 
 /**
- * Clears the budget when the ranges offered for the current services no
- * longer include it (the complexity level moved, D138). "Not sure" always
- * stays. Returns the same draft when nothing changes.
- */
-export function reconcileBudget(
-  draft: ConfiguratorDraft,
-  model: ConfiguratorModel,
-): ConfiguratorDraft {
-  if (draft.budget === null) return draft;
-  if (budgetIds(model, servicesOf(draft, model)).includes(draft.budget)) return draft;
-  return { ...draft, budget: null };
-}
-
-/**
  * Selects / deselects a goal and switches to the guided mode. "Not sure" is
  * exclusive: picking it clears the other goals, picking another goal clears it.
  * At most `model.maxGoals` goals; the answer of a deselected goal is dropped.
@@ -252,7 +220,7 @@ export function toggleGoal(
   const answers = Object.fromEntries(
     Object.entries(draft.answers).filter(([goal]) => goals.includes(goal)),
   );
-  return reconcileBudget({ ...draft, mode: 'guided', goals, answers }, model);
+  return { ...draft, mode: 'guided', goals, answers };
 }
 
 /** Answers a goal's question. Unknown goals (not selected) and options are ignored. */
@@ -265,7 +233,7 @@ export function setAnswer(
   const goal = findGoal(model, goalId);
   if (!goal || !draft.goals.includes(goalId)) return draft;
   if (!goal.options.some((option) => option.id === optionId)) return draft;
-  return reconcileBudget({ ...draft, answers: { ...draft.answers, [goalId]: optionId } }, model);
+  return { ...draft, answers: { ...draft.answers, [goalId]: optionId } };
 }
 
 /** Toggles an item of "What do you already have?"; "nothing of these" is exclusive. */
@@ -283,11 +251,8 @@ export function toggleHave(
 }
 
 /** "I know what I need": the manual mode; goals and answers go, picked services stay. */
-export function chooseManual(
-  draft: ConfiguratorDraft,
-  model: ConfiguratorModel,
-): ConfiguratorDraft {
-  return reconcileBudget({ ...draft, mode: 'manual', goals: [], answers: {}, removed: [] }, model);
+export function chooseManual(draft: ConfiguratorDraft): ConfiguratorDraft {
+  return { ...draft, mode: 'manual', goals: [], answers: {}, removed: [] };
 }
 
 /** Back to the guided mode (the goals step); picked services stay. */
@@ -303,10 +268,7 @@ export function removeService(
 ): ConfiguratorDraft {
   if (!findService(model, id)) return draft;
   const removed = draft.removed.includes(id) ? draft.removed : [...draft.removed, id];
-  return reconcileBudget(
-    { ...draft, removed, added: draft.added.filter((item) => item !== id) },
-    model,
-  );
+  return { ...draft, removed, added: draft.added.filter((item) => item !== id) };
 }
 
 /** Adds a service to the request (it stops being "removed"). Unknown ids are ignored. */
@@ -316,14 +278,11 @@ export function addService(
   model: ConfiguratorModel,
 ): ConfiguratorDraft {
   if (!findService(model, id)) return draft;
-  return reconcileBudget(
-    {
-      ...draft,
-      removed: draft.removed.filter((item) => item !== id),
-      added: draft.added.includes(id) ? draft.added : [...draft.added, id],
-    },
-    model,
-  );
+  return {
+    ...draft,
+    removed: draft.removed.filter((item) => item !== id),
+    added: draft.added.includes(id) ? draft.added : [...draft.added, id],
+  };
 }
 
 /** Adds or drops a service, depending on whether the request has it now. */
@@ -351,8 +310,6 @@ const looseDraftSchema = z
     added: z.array(z.unknown()).catch([]),
     industry: z.unknown(),
     industryOther: z.unknown(),
-    budget: z.unknown(),
-    timeline: z.unknown(),
     contact: z.object({ name: z.unknown(), comment: z.unknown() }).partial().catch({}),
   })
   .partial();
@@ -367,7 +324,8 @@ const strings = (values: readonly unknown[] | undefined): string[] =>
 /**
  * Turns anything (a stored draft from an older build, hand-edited storage)
  * into a valid draft shape: unknown or stale ids are dropped, wrong types
- * become empty, texts are clipped to their limits. Never throws.
+ * become empty, texts are clipped to their limits, fields of older shapes
+ * (the budget and timeline of v2) are left out. Never throws.
  */
 export function sanitizeDraft(raw: unknown, model: ConfiguratorModel): ConfiguratorDraft {
   const parsed = looseDraftSchema.safeParse(raw);
@@ -398,23 +356,20 @@ export function sanitizeDraft(raw: unknown, model: ConfiguratorModel): Configura
 
   const industry = pick(value.industry, model.industries);
   const contact = value.contact ?? {};
-  const draft: ConfiguratorDraft = {
+  return {
     mode,
+    industry,
+    industryOther: industry === 'other' ? clip(value.industryOther, INDUSTRY_OTHER_MAX) : '',
     goals,
     answers,
     have,
     removed,
     added,
-    industry,
-    industryOther: industry === 'other' ? clip(value.industryOther, INDUSTRY_OTHER_MAX) : '',
-    budget: null,
-    timeline: pick(value.timeline, model.timelines),
     contact: {
       name: clip(contact.name, model.limits.nameMax),
       comment: clip(contact.comment, model.limits.commentMax),
     },
   };
-  return { ...draft, budget: pick(value.budget, budgetIds(model, servicesOf(draft, model))) };
 }
 
 /**
