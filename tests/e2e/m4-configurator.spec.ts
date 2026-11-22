@@ -246,16 +246,19 @@ test.describe('the recommendation', () => {
       .check();
     await next(page).click();
 
-    const combo = `${categoryName('pl', 'web')} + ${categoryName('pl', 'telegram')}`;
+    // pl recommends no Telegram bots: booking is a web app with reminders (D160).
+    const combo = `${categoryName('pl', 'web')} + ${categoryName('pl', 'automation')}`;
     await expect(panel(page)).toContainText(cfg.solution.fits.replace('{combo}', combo));
     const store = serviceTitle('pl', 'web', 'online-stores');
-    const booking = serviceTitle('pl', 'telegram', 'booking');
+    const reminders = serviceTitle('pl', 'automation', 'notifications-reminders');
     await expect(panel(page)).toContainText(store);
-    await expect(panel(page)).toContainText(booking);
+    await expect(panel(page)).toContainText(serviceTitle('pl', 'web', 'web-apps'));
+    await expect(panel(page)).toContainText(reminders);
+    await expect(panel(page)).not.toContainText(serviceTitle('pl', 'telegram', 'booking'));
 
     // Remove one service; its category leaves the headline.
     await panel(page)
-      .getByRole('button', { name: cfg.solution.removeNamed.replace('{service}', booking) })
+      .getByRole('button', { name: cfg.solution.removeNamed.replace('{service}', reminders) })
       .click();
     await expect(panel(page)).toContainText(
       cfg.solution.fits.replace('{combo}', categoryName('pl', 'web')),
@@ -273,20 +276,50 @@ test.describe('the recommendation', () => {
     expect(request).not.toContain('web/online-stores');
   });
 
+  test('uk keeps the Telegram bots for the same answers (D160)', async ({ page }) => {
+    await seed(page, 'solution', {
+      ...DRAFT,
+      goals: ['booking'],
+      answers: { booking: 'messengers' },
+    });
+    await open(page, 'uk');
+    await expect(panel(page)).toContainText(serviceTitle('uk', 'telegram', 'booking'));
+    await expect(panel(page)).not.toContainText(serviceTitle('uk', 'web', 'web-apps'));
+  });
+
+  test('switching the language mid-way recomputes the recommendation and the estimate', async ({
+    page,
+  }) => {
+    await seedOnce(page, 'solution', {
+      ...DRAFT,
+      goals: ['booking'],
+      answers: { booking: 'messengers' },
+    });
+    await open(page, 'uk');
+    // uk: Telegram booking, 500–1 200 zł.
+    await expect(estimateBlock(page)).toContainText(/500–1\s200\szł/);
+    await page.waitForTimeout(500); // debounced save
+    await open(page, 'pl');
+    await expect(panel(page)).toContainText(serviceTitle('pl', 'web', 'web-apps'));
+    await expect(panel(page)).not.toContainText(serviceTitle('pl', 'telegram', 'booking'));
+    // pl: web app 2 000–4 000 + reminders 200–500.
+    await expect(estimateBlock(page)).toContainText(/2200–4500\szł/);
+  });
+
   test('removing every service leaves the consultation text; the contact still works', async ({
     page,
   }) => {
     await seed(page, 'solution', {
       ...DRAFT,
-      goals: ['booking'],
-      answers: { booking: 'messengers' },
+      goals: ['more-clients'],
+      answers: { 'more-clients': 'google' },
     });
     await open(page);
     await panel(page)
       .getByRole('button', {
         name: cfg.solution.removeNamed.replace(
           '{service}',
-          serviceTitle('pl', 'telegram', 'booking'),
+          serviceTitle('pl', 'web', 'corporate-websites'),
         ),
       })
       .click();
@@ -309,20 +342,20 @@ test.describe('the estimate (round 3, B1–B2)', () => {
     await open(page);
     const block = estimateBlock(page);
     await expect(block).toContainText(cfg.solution.estimate.price);
-    await expect(block).toContainText(/800–1500\s?zł/);
+    await expect(block).toContainText(/400–800\s?zł/);
     await expect(block).toContainText('2–5 dni');
     await expect(block).toContainText(cfg.solution.estimate.note);
-    // + AI assistant: 1 800–4 000 zł; max(10, round(0.7 × 15)) = 11 days → weeks.
+    // + AI assistant: 900–2 000 zł; max(10, round(0.7 × 15)) = 11 days → weeks.
     await panel(page).getByRole('button', { name: cfg.solution.addMore }).click();
     await panel(page)
       .getByRole('checkbox', { name: serviceTitle('pl', 'ai', 'ai-assistants'), exact: true })
       .check();
-    await expect(block).toContainText(/1800–4000\s?zł/);
+    await expect(block).toContainText(/900–2000\s?zł/);
     await expect(block).toContainText('1–2 tygodnie');
     await panel(page)
       .getByRole('checkbox', { name: serviceTitle('pl', 'web', 'landing-pages'), exact: true })
       .uncheck();
-    await expect(block).toContainText(/1000–2500\s?zł/);
+    await expect(block).toContainText(/500–1200\s?zł/);
     await expect(block).toContainText('5–10 dni');
     await expect(panel(page)).not.toContainText(/netto/i);
   });
@@ -451,9 +484,9 @@ test.describe('summary and hand-off', () => {
     expect(text).toContain(goal('online-orders').phrase);
     expect(text).toContain(goal('client-order').sentences['program-inconvenient']);
     expect(text).toContain(categoryName('pl', 'web'));
-    // Store 3 000–6 000 + custom CRM 4 000–8 000; max(28, round(0.7 × 49)) = 34 days ≈ 5 weeks.
-    // Polish groups five-digit numbers only (Intl): "7000–14 000 zł".
-    expect(text).toMatch(/Orientacyjnie: 7000–14\s000\szł, 2–5 tygodni\./);
+    // Store 1 500–3 000 + custom CRM 2 000–4 000; max(28, round(0.7 × 49)) = 34 days ≈ 5 weeks.
+    // Polish does not group four-digit numbers (Intl): "3500–7000 zł".
+    expect(text).toMatch(/Orientacyjnie: 3500–7000\szł, 2–5 tygodni\./);
     expect(text.split('\n').at(-1)).toBe(ui.pl.lead.closing);
     for (const id of DRAFT_SERVICES) {
       const [category, slug] = id.split('/') as [string, string];
@@ -511,7 +544,7 @@ test.describe('summary and hand-off', () => {
     expect(text).not.toContain('Mój własny tekst');
     expect(text.split('\n')[0]).toBe(ui.pl.lead.greeting);
     expect(text).not.toContain(serviceTitle('pl', 'crm', 'custom-crm'));
-    expect(text).toMatch(/Orientacyjnie: 3000–6000 zł, 1–3 tygodnie\./);
+    expect(text).toMatch(/Orientacyjnie: 1500–3000\szł, 1–3 tygodnie\./);
   });
 
   test('the message is in Ukrainian on /uk/', async ({ page }) => {
@@ -526,7 +559,7 @@ test.describe('summary and hand-off', () => {
     expect(text).toContain(
       `Мій бізнес: ${ui.uk.configurator.industries.retail.toLocaleLowerCase('uk')}.`,
     );
-    expect(text).toMatch(/Орієнтовно: 7\s000–14\s000 zł, 2–5 тижнів\./);
+    expect(text).toMatch(/Орієнтовно: 3\s500–7\s000\szł, 2–5 тижнів\./);
     expect(text.split('\n').at(-1)).toBe('Чи можемо обговорити деталі?');
   });
 

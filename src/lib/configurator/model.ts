@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getCategories } from '~/content';
 import {
   OPTION_UNKNOWN,
+  TELEGRAM_CATEGORY,
   configuratorData,
   type ConfiguratorDataInput,
 } from '~/content/configurator';
@@ -16,7 +17,12 @@ import { serviceRef } from '../request-draft';
  * and passed to the client wizard as a prop without shipping the content layer.
  */
 
-export { OPTION_UNKNOWN };
+export { OPTION_UNKNOWN, TELEGRAM_CATEGORY };
+
+/** A service of the Telegram bots category (recommended in `telegramLocales` only, D160). */
+export function isTelegramService(id: string): boolean {
+  return id.split('/')[0] === TELEGRAM_CATEGORY;
+}
 
 /** Sentinel goal id for "I don't know yet, advise me": exclusive with the real goals. */
 export const GOAL_UNSURE = 'unsure';
@@ -37,7 +43,10 @@ export interface ServiceOption {
 
 export interface GoalOptionModel {
   id: string;
-  /** Recommended service ids, most important first. */
+  /**
+   * Recommended service ids, most important first, already for the model's
+   * locale: without Telegram outside `telegramLocales` (D160).
+   */
   services: string[];
 }
 
@@ -49,6 +58,8 @@ export interface GoalModel {
 export interface ConfiguratorModel {
   /** Category ids, in content order. */
   categories: string[];
+  /** The goals may recommend Telegram services in this locale (D160). */
+  telegramRecommended: boolean;
   /** Services per category, in content order. */
   services: Record<string, ServiceOption[]>;
   /** The goals of step 1, with their question's options (step 2). */
@@ -74,7 +85,13 @@ const idListSchema = z
 const goalSchema = z.object({
   id: idSchema,
   options: z
-    .array(z.object({ id: idSchema, services: z.array(z.string()).min(1) }))
+    .array(
+      z.object({
+        id: idSchema,
+        services: z.array(z.string()).min(1),
+        servicesNoTelegram: z.array(z.string()).min(1).optional(),
+      }),
+    )
     .min(2)
     .refine((options) => new Set(options.map((option) => option.id)).size === options.length, {
       message: 'Duplicate option id',
@@ -91,6 +108,7 @@ export const configuratorDataSchema = z.object({
       message: 'Duplicate goal id',
     }),
   have: idListSchema,
+  telegramLocales: z.array(z.string()),
   industries: idListSchema,
   industryGoals: z.record(idSchema, z.array(idSchema).min(1).max(2)),
   contact: z.object({
@@ -113,13 +131,19 @@ export interface CategoryLike {
 /**
  * Builds the model. Throws on inconsistent data (a goal option pointing at an
  * unknown service, a goal without its "unknown" option, typical goals of an
- * unknown industry or pointing at an unknown goal), so a content mistake
- * fails the build and the tests instead of reaching visitors.
+ * unknown industry or pointing at an unknown goal, a Telegram answer without
+ * its no-Telegram list), so a content mistake fails the build and the tests
+ * instead of reaching visitors.
+ *
+ * `locale`: the interface locale. Outside `telegramLocales` every answer
+ * recommends its `servicesNoTelegram` (D160); without a locale (tests, tools)
+ * the lists stay as written.
  */
 export function buildConfiguratorModel(
   categories: readonly CategoryLike[],
   input: ConfiguratorDataInput = configuratorData,
   currency: string = siteConfig.currency,
+  locale?: string,
 ): ConfiguratorModel {
   const data = configuratorDataSchema.parse(input);
   const services: Record<string, ServiceOption[]> = {};
@@ -142,12 +166,15 @@ export function buildConfiguratorModel(
       throw new Error(`configurator: goal "${goal.id}" has no "${OPTION_UNKNOWN}" option`);
     }
     for (const option of goal.options) {
-      for (const id of option.services) {
-        if (!serviceIds.has(id)) {
-          throw new Error(
-            `configurator: goal "${goal.id}" option "${option.id}" points at unknown service "${id}"`,
-          );
-        }
+      const where = `configurator: goal "${goal.id}" option "${option.id}"`;
+      for (const id of [...option.services, ...(option.servicesNoTelegram ?? [])]) {
+        if (!serviceIds.has(id)) throw new Error(`${where} points at unknown service "${id}"`);
+      }
+      if (option.services.some(isTelegramService) && !option.servicesNoTelegram) {
+        throw new Error(`${where} recommends Telegram without "servicesNoTelegram"`);
+      }
+      if (option.servicesNoTelegram?.some(isTelegramService)) {
+        throw new Error(`${where}: "servicesNoTelegram" has a Telegram service`);
       }
     }
   }
@@ -165,12 +192,21 @@ export function buildConfiguratorModel(
       }
     }
   }
+  const telegramRecommended = locale === undefined || data.telegramLocales.includes(locale);
   return {
     categories: categories.map((category) => category.id),
+    telegramRecommended,
     services,
     goals: data.goals.map((goal) => ({
       id: goal.id,
-      options: goal.options.map((option) => ({ id: option.id, services: [...option.services] })),
+      options: goal.options.map((option) => ({
+        id: option.id,
+        services: [
+          ...(telegramRecommended
+            ? option.services
+            : (option.servicesNoTelegram ?? option.services)),
+        ],
+      })),
     })),
     have: data.have,
     maxGoals: data.maxGoals,
@@ -184,12 +220,20 @@ export function buildConfiguratorModel(
   };
 }
 
-let cached: ConfiguratorModel | null = null;
+const cached = new Map<string, ConfiguratorModel>();
 
-/** Server-side: the model of this build (content categories + configurator data). */
-export function getConfiguratorModel(): ConfiguratorModel {
-  cached ??= buildConfiguratorModel(getCategories());
-  return cached;
+/**
+ * Server-side: the model of this build (content categories + configurator
+ * data) for an interface locale (D160); without one, the lists as written.
+ */
+export function getConfiguratorModel(locale?: string): ConfiguratorModel {
+  const key = locale ?? '';
+  let model = cached.get(key);
+  if (!model) {
+    model = buildConfiguratorModel(getCategories(), configuratorData, siteConfig.currency, locale);
+    cached.set(key, model);
+  }
+  return model;
 }
 
 /** Every service of the model, in content order. */

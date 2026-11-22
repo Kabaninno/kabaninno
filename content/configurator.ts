@@ -20,11 +20,20 @@
  *   `configurator.goals.items.<goal>.{name,question,options.<option>}`.
  * - `have`: the shared question "What do you already have?". `none` is
  *   exclusive. Texts: `configurator.have.items.<id>`.
+ * - Telegram is little used in Europe (round 5, A2, D160): the configurator
+ *   recommends Telegram services only in `telegramLocales` (uk). Every answer
+ *   that leads to a Telegram service has `servicesNoTelegram`, the list used
+ *   in the other locales. In the manual mode every service stays available.
  */
 export interface GoalOptionInput {
   id: string;
   /** Recommended services (`"<category>/<slug>"`), most important first. */
   services: readonly string[];
+  /**
+   * The list for the locales without Telegram recommendations; required when
+   * `services` has a Telegram service, and itself without one.
+   */
+  servicesNoTelegram?: readonly string[];
 }
 
 export interface GoalInput {
@@ -40,6 +49,8 @@ export interface ConfiguratorDataInput {
   goals: readonly GoalInput[];
   /** Ids of "What do you already have?"; `none` is the exclusive "nothing of these". */
   have: readonly string[];
+  /** Locales whose recommendations may include Telegram services (D160). */
+  telegramLocales: readonly string[];
   /** Industry ids of the first step; `other` is the free-text one. */
   industries: readonly string[];
   /** Goals typical for an industry (1–2 each), marked on the goals step. */
@@ -50,6 +61,12 @@ export interface ConfiguratorDataInput {
 /** The ids shared by data, model and labels. */
 export const OPTION_UNKNOWN = 'unknown';
 
+/** The Telegram bots category: recommended only in `telegramLocales` (D160). */
+export const TELEGRAM_CATEGORY = 'telegram';
+
+/** Booking without Telegram: a web application with reminders (the owner's rule). */
+const BOOKING_NO_TELEGRAM = ['web/web-apps', 'automation/notifications-reminders'];
+
 export const configuratorData: ConfiguratorDataInput = {
   maxGoals: 3,
   maxRecommended: 4,
@@ -59,14 +76,24 @@ export const configuratorData: ConfiguratorDataInput = {
       options: [
         { id: 'google', services: ['web/corporate-websites'] },
         { id: 'social-ads', services: ['web/landing-pages'] },
-        { id: 'messengers', services: ['telegram/sales-orders'] },
+        // Sales through a messenger → an AI assistant on the website.
+        {
+          id: 'messengers',
+          services: ['telegram/sales-orders'],
+          servicesNoTelegram: ['ai/ai-assistants'],
+        },
         { id: OPTION_UNKNOWN, services: ['web/landing-pages'] },
       ],
     },
     {
       id: 'online-orders',
       options: [
-        { id: 'up-to-20', services: ['telegram/sales-orders'] },
+        // Orders with few products → a landing page.
+        {
+          id: 'up-to-20',
+          services: ['telegram/sales-orders'],
+          servicesNoTelegram: ['web/landing-pages'],
+        },
         { id: '20-200', services: ['web/online-stores'] },
         { id: 'over-200', services: ['web/online-stores', 'automation/api-integrations'] },
         { id: OPTION_UNKNOWN, services: ['web/online-stores'] },
@@ -78,13 +105,22 @@ export const configuratorData: ConfiguratorDataInput = {
         {
           id: 'phone',
           services: ['telegram/booking', 'automation/notifications-reminders'],
+          servicesNoTelegram: BOOKING_NO_TELEGRAM,
         },
-        { id: 'messengers', services: ['telegram/booking'] },
+        {
+          id: 'messengers',
+          services: ['telegram/booking'],
+          servicesNoTelegram: BOOKING_NO_TELEGRAM,
+        },
         {
           id: 'website-inconvenient',
           services: ['web/web-apps', 'automation/notifications-reminders'],
         },
-        { id: OPTION_UNKNOWN, services: ['telegram/booking'] },
+        {
+          id: OPTION_UNKNOWN,
+          services: ['telegram/booking'],
+          servicesNoTelegram: BOOKING_NO_TELEGRAM,
+        },
       ],
     },
     {
@@ -113,7 +149,12 @@ export const configuratorData: ConfiguratorDataInput = {
       // Row cut off in the brief ("Швидко відповідати…"); completed by us (D149).
       id: 'fast-replies',
       options: [
-        { id: 'telegram', services: ['telegram/customer-support'] },
+        // Customer support → an AI assistant.
+        {
+          id: 'telegram',
+          services: ['telegram/customer-support'],
+          servicesNoTelegram: ['ai/ai-assistants'],
+        },
         { id: 'website-chat', services: ['ai/ai-assistants'] },
         {
           id: 'many-channels',
@@ -122,6 +163,7 @@ export const configuratorData: ConfiguratorDataInput = {
         {
           id: 'repeated-questions',
           services: ['ai/ai-assistants', 'telegram/customer-support'],
+          servicesNoTelegram: ['ai/ai-assistants'],
         },
         { id: OPTION_UNKNOWN, services: ['ai/ai-assistants'] },
       ],
@@ -141,6 +183,7 @@ export const configuratorData: ConfiguratorDataInput = {
     },
   ],
   have: ['website', 'social', 'tracking', 'none'],
+  telegramLocales: ['uk'],
   industries: [
     'retail',
     'services',

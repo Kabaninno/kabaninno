@@ -274,14 +274,14 @@
           "name": "Szybko odpowiadać klientom",
           "question": "Jak klienci zwykle się z Tobą kontaktują?",
           "options": {
-            "telegram": "W Telegramie",
+            "telegram": "Na WhatsAppie lub Messengerze",
             "website-chat": "Na stronie lub w czacie",
             "many-channels": "W kilku komunikatorach i mailem",
             "repeated-questions": "Wciąż z tymi samymi pytaniami"
           },
           "phrase": "szybkość odpowiadania klientom",
           "sentences": {
-            "telegram": "Klienci zwykle piszą do nas na Telegramie.",
+            "telegram": "Klienci zwykle piszą do nas na WhatsAppie lub Messengerze.",
             "website-chat": "Klienci zwykle piszą do nas przez stronę lub na czacie.",
             "many-channels": "Klienci piszą do nas przez kilka komunikatorów i mailem.",
             "repeated-questions": "Klienci wciąż zadają te same pytania."

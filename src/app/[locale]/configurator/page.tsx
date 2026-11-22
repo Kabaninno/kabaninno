@@ -42,7 +42,8 @@ export default async function ConfiguratorPage({ params }: ConfiguratorPageProps
   const tLead = await getTranslations('lead');
   const tService = await getTranslations('service');
 
-  const model = getConfiguratorModel();
+  // Recommendations depend on the locale: no Telegram services outside uk (D160).
+  const model = getConfiguratorModel(locale);
   const labels = buildWizardLabels({
     locale,
     model,

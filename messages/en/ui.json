@@ -274,14 +274,14 @@
           "name": "Answer customers fast",
           "question": "How do customers usually contact you?",
           "options": {
-            "telegram": "In Telegram",
+            "telegram": "On WhatsApp or Messenger",
             "website-chat": "On the website or in a chat",
             "many-channels": "In several messengers and by email",
             "repeated-questions": "Mostly with the same questions"
           },
           "phrase": "how quickly we reply to customers",
           "sentences": {
-            "telegram": "Customers usually message us on Telegram.",
+            "telegram": "Customers usually message us on WhatsApp or Messenger.",
             "website-chat": "Customers usually contact us through the website or a chat.",
             "many-channels": "Customers write to us on several messaging apps and by email.",
             "repeated-questions": "Customers mostly ask the same questions over and over."

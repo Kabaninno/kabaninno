@@ -11,25 +11,25 @@ describe('estimate', () => {
   });
 
   it('one service: its own price and timeline', () => {
-    expect(estimate([service('web/landing-pages')])).toEqual({ price: [800, 1500], days: [2, 5] });
-    expect(estimate([service('web/web-apps')])).toEqual({ price: [4000, 8000], days: [14, 30] });
+    expect(estimate([service('web/landing-pages')])).toEqual({ price: [400, 800], days: [2, 5] });
+    expect(estimate([service('web/web-apps')])).toEqual({ price: [2000, 4000], days: [14, 30] });
   });
 
   it('sums the prices; the timeline is 70 % of the sum, never below the longest service', () => {
-    // Landing page 800–1 500 / 2–5 + AI assistant 1 000–2 500 / 5–10.
+    // Landing page 400–800 / 2–5 + AI assistant 500–1 200 / 5–10 (prices of round 5).
     expect(estimate([service('web/landing-pages'), service('ai/ai-assistants')])).toEqual({
-      price: [1800, 4000],
+      price: [900, 2000],
       // min: max(5, round(0.7 × 7) = 5); max: max(10, round(0.7 × 15) = 11).
       days: [5, 11],
     });
-    // Store 3 000–6 000 / 10–21 + integrations 600–2 000 / 2–7 + reminders 400–1 000 / 1–3.
+    // Store 1 500–3 000 / 10–21 + integrations 300–1 000 / 2–7 + reminders 200–500 / 1–3.
     expect(
       estimate([
         service('web/online-stores'),
         service('automation/api-integrations'),
         service('automation/notifications-reminders'),
       ]),
-    ).toEqual({ price: [4000, 9000], days: [10, 22] });
+    ).toEqual({ price: [2000, 4500], days: [10, 22] });
   });
 
   it('rounds prices to 100', () => {

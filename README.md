@@ -333,6 +333,9 @@ Everything that is not a sentence lives in [`content/configurator.ts`](content/c
   (`"<category>/<slug>"`, most important first). Every goal ends with an `unknown` option. At most
   `maxRecommended` services are recommended, taken rank by rank across the picked goals.
 - `have`, `industries`, `industryGoals` (1–2 typical goals per industry), `maxGoals`.
+- `telegramLocales` (`['uk']`): only these locales get Telegram bots recommended. An answer that
+  leads to a Telegram service needs `servicesNoTelegram`, the list for pl and en (D161); the model is
+  built per locale (`getConfiguratorModel(locale)`). The manual mode offers every service everywhere.
 - Prices and timelines are the services' own `pricePLN` and `timelineDays` (`content/categories.ts`):
   the estimate sums the prices (rounded to 100) and takes `max(longest, 0.7 × sum)` for the timeline.
 

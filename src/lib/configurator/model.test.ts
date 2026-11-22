@@ -10,6 +10,7 @@ import {
   findGoal,
   findService,
   getConfiguratorModel,
+  isTelegramService,
   typicalGoals,
 } from './model';
 
@@ -130,11 +131,11 @@ describe('configurator model', () => {
 
   it('carries the price and timeline of every service from the content (D156)', () => {
     expect(findService(model, 'web/landing-pages')).toMatchObject({
-      price: [800, 1500],
+      price: [400, 800],
       days: [2, 5],
     });
     expect(findService(model, 'telegram/mini-apps')).toMatchObject({
-      price: [2500, 5000],
+      price: [1200, 2500],
       days: [10, 21],
     });
     expect(model.currency).toBe('PLN');
@@ -162,6 +163,61 @@ describe('configurator model', () => {
         industryGoals: { food: ['ghost'] },
       }),
     ).toThrow('unknown goal "ghost"');
+  });
+
+  it('outside uk the answers recommend no Telegram services; uk keeps the lists (D160)', () => {
+    const uk = getConfiguratorModel('uk');
+    expect(uk.telegramRecommended).toBe(true);
+    expect(uk.goals).toEqual(model.goals);
+    for (const locale of ['pl', 'en']) {
+      const localized = getConfiguratorModel(locale);
+      expect(localized.telegramRecommended, locale).toBe(false);
+      for (const goal of localized.goals) {
+        for (const option of goal.options) {
+          expect(option.services.filter(isTelegramService), `${goal.id}/${option.id}`).toEqual([]);
+        }
+      }
+      // The services themselves stay: the manual mode can still pick Telegram bots.
+      expect(localized.services).toEqual(model.services);
+    }
+    const options = (locale: string, goal: string, option: string) =>
+      findGoal(getConfiguratorModel(locale), goal)!.options.find((item) => item.id === option)!
+        .services;
+    // The owner's replacements.
+    expect(options('pl', 'more-clients', 'messengers')).toEqual(['ai/ai-assistants']);
+    expect(options('pl', 'online-orders', 'up-to-20')).toEqual(['web/landing-pages']);
+    expect(options('en', 'booking', 'phone')).toEqual([
+      'web/web-apps',
+      'automation/notifications-reminders',
+    ]);
+    expect(options('en', 'fast-replies', 'telegram')).toEqual(['ai/ai-assistants']);
+    expect(options('uk', 'booking', 'messengers')).toEqual(['telegram/booking']);
+  });
+
+  it('rejects a Telegram answer without a no-Telegram list, or one with Telegram in it', () => {
+    const goal = configuratorData.goals[0]!;
+    const withOption = (option: {
+      id: string;
+      services: string[];
+      servicesNoTelegram?: string[];
+    }) =>
+      buildConfiguratorModel(getCategories(), {
+        ...configuratorData,
+        goals: [{ ...goal, options: [...goal.options.filter((item) => item.id !== 'x'), option] }],
+      });
+    expect(() => withOption({ id: 'x', services: ['telegram/booking'] })).toThrow(
+      /without "servicesNoTelegram"/,
+    );
+    expect(() =>
+      withOption({
+        id: 'x',
+        services: ['telegram/booking'],
+        servicesNoTelegram: ['telegram/mini-apps'],
+      }),
+    ).toThrow(/has a Telegram service/);
+    expect(() =>
+      withOption({ id: 'x', services: ['telegram/booking'], servicesNoTelegram: ['web/ghost'] }),
+    ).toThrow('unknown service "web/ghost"');
   });
 
   it('finds services and goals', () => {

@@ -1,7 +1,7 @@
 /**
  * The configurator's stored draft for specs (D149, round 3 D155). The ids come
  * from the content layer and `content/configurator.ts`; the draft leads to an
- * online store and a custom CRM (estimate 7 000–14 000 zł, 2–5 weeks).
+ * online store and a custom CRM (estimate 3 500–7 000 zł, 2–5 weeks).
  */
 export const CONFIGURATOR_KEY = 'kabaninno.configurator.v2';
 

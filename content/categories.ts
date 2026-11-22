@@ -16,7 +16,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'corporate-websites',
-        pricePLN: [1500, 3000],
+        pricePLN: [800, 1500],
         timelineDays: [5, 10],
         planet: {
           shape: 'icosahedron',
@@ -28,7 +28,7 @@ export const categoriesData = [
       },
       {
         slug: 'online-stores',
-        pricePLN: [3000, 6000],
+        pricePLN: [1500, 3000],
         timelineDays: [10, 21],
         planet: {
           shape: 'torus-knot',
@@ -40,7 +40,7 @@ export const categoriesData = [
       },
       {
         slug: 'landing-pages',
-        pricePLN: [800, 1500],
+        pricePLN: [400, 800],
         timelineDays: [2, 5],
         planet: {
           shape: 'octahedron',
@@ -52,7 +52,7 @@ export const categoriesData = [
       },
       {
         slug: 'web-apps',
-        pricePLN: [4000, 8000],
+        pricePLN: [2000, 4000],
         timelineDays: [14, 30],
         planet: {
           shape: 'sphere',
@@ -72,7 +72,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'crm-implementation',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'sphere',
@@ -84,7 +84,7 @@ export const categoriesData = [
       },
       {
         slug: 'custom-crm',
-        pricePLN: [4000, 8000],
+        pricePLN: [2000, 4000],
         timelineDays: [14, 28],
         planet: {
           shape: 'sphere',
@@ -99,7 +99,7 @@ export const categoriesData = [
       },
       {
         slug: 'sales-funnels',
-        pricePLN: [600, 1500],
+        pricePLN: [300, 700],
         timelineDays: [2, 5],
         planet: {
           shape: 'funnel',
@@ -111,7 +111,7 @@ export const categoriesData = [
       },
       {
         slug: 'reports-dashboards',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'cube-cluster',
@@ -130,7 +130,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'api-integrations',
-        pricePLN: [600, 2000],
+        pricePLN: [300, 1000],
         timelineDays: [2, 7],
         planet: {
           shape: 'gear',
@@ -142,7 +142,7 @@ export const categoriesData = [
       },
       {
         slug: 'document-automation',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'cube-cluster',
@@ -154,7 +154,7 @@ export const categoriesData = [
       },
       {
         slug: 'notifications-reminders',
-        pricePLN: [400, 1000],
+        pricePLN: [200, 500],
         timelineDays: [1, 3],
         planet: {
           shape: 'torus',
@@ -166,7 +166,7 @@ export const categoriesData = [
       },
       {
         slug: 'data-processing',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'sphere',
@@ -186,7 +186,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'ai-assistants',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'blob',
@@ -197,7 +197,7 @@ export const categoriesData = [
       },
       {
         slug: 'ai-document-processing',
-        pricePLN: [2000, 4000],
+        pricePLN: [1000, 2000],
         timelineDays: [10, 14],
         planet: {
           shape: 'crystal',
@@ -209,7 +209,7 @@ export const categoriesData = [
       },
       {
         slug: 'content-generation',
-        pricePLN: [600, 1500],
+        pricePLN: [300, 700],
         timelineDays: [2, 5],
         planet: {
           shape: 'blob',
@@ -222,7 +222,7 @@ export const categoriesData = [
       },
       {
         slug: 'ai-analytics',
-        pricePLN: [2000, 4000],
+        pricePLN: [1000, 2000],
         timelineDays: [10, 14],
         planet: {
           shape: 'torus-knot',
@@ -240,7 +240,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'sales-orders',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'dart',
@@ -252,7 +252,7 @@ export const categoriesData = [
       },
       {
         slug: 'booking',
-        pricePLN: [1000, 2500],
+        pricePLN: [500, 1200],
         timelineDays: [5, 10],
         planet: {
           shape: 'sphere',
@@ -264,7 +264,7 @@ export const categoriesData = [
       },
       {
         slug: 'customer-support',
-        pricePLN: [800, 1800],
+        pricePLN: [400, 900],
         timelineDays: [3, 7],
         planet: {
           shape: 'dart',
@@ -277,7 +277,7 @@ export const categoriesData = [
       },
       {
         slug: 'mini-apps',
-        pricePLN: [2500, 5000],
+        pricePLN: [1200, 2500],
         timelineDays: [10, 21],
         planet: {
           shape: 'cube-cluster',
