@@ -8,6 +8,13 @@
  * into the system core (it never shrinks or pops).
  */
 
+/** Share of the minimum on-screen core size each node kind gets. */
+export const MIN_CORE_SHARE = {
+  category: 1,
+  configurator: 0.75,
+  portfolio: 1.6,
+} as const;
+
 /** CSS px per world unit at view depth `depth` (vertical FOV in degrees). */
 export function pixelsPerUnit(viewportHeightPx: number, fovDeg: number, depth: number): number {
   const tan = Math.tan((fovDeg * Math.PI) / 360);

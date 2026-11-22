@@ -40,6 +40,7 @@ import {
 } from './runtime';
 import { SelectionLinks } from './SelectionLinks';
 import {
+  MIN_CORE_SHARE,
   coreWorldRadius,
   nodeVisualRadiusPx,
   orbitClearanceScale,
@@ -55,13 +56,6 @@ const BASE_RADIUS: Record<UniverseNode['kind'], number> = {
   portfolio: 1.1,
 };
 const PRESENCE_RATE = 6;
-
-/** Share of the minimum on-screen core size each kind gets. */
-const MIN_SIZE_SHARE: Record<UniverseNode['kind'], number> = {
-  category: 1,
-  configurator: 0.75,
-  portfolio: 1.6,
-};
 
 interface UniverseProps {
   model: UniverseModel;
@@ -266,7 +260,7 @@ export function Universe({
       const depth = rel.subVectors(world, cam.position).dot(forward);
       const ppu = pixelsPerUnit(viewportHeight, fov, depth);
       const base = BASE_RADIUS[node.kind] * (1 + 0.1 * focus);
-      const radius = coreWorldRadius(base, shared.minCorePx * MIN_SIZE_SHARE[node.kind], ppu);
+      const radius = coreWorldRadius(base, shared.minCorePx * MIN_CORE_SHARE[node.kind], ppu);
       rt.pxPerUnit[i] = ppu;
       rt.coreRadius[i] = radius;
       rt.corePx[i] = radius * 2 * ppu;

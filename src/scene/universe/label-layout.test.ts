@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   LABEL_INSET,
+  estimateLabelSize,
   formatOrdinal,
   insetBounds,
+  labelExtents,
   layoutLabel,
   type LabelInput,
   type LabelLayout,
+  type LabelSide,
 } from './label-layout';
 
 /** Desktop home free rect {616,68,824,564}, inset like NodeLabels does on desktop. */
@@ -139,5 +142,62 @@ describe('leader never crosses the text (S4)', () => {
       const leader = layout.leaderY;
       expect(leader <= top || leader >= bottom, JSON.stringify(layout)).toBe(true);
     }
+  });
+});
+
+describe('configurator selection labels (owner round 5, part B)', () => {
+  const placements: LabelSide[] = [
+    { side: 1, rise: 1 },
+    { side: 1, rise: -1 },
+    { side: -1, rise: 1 },
+    { side: -1, rise: -1 },
+  ];
+
+  it('places the text where the framing reserved room for it (labelExtents)', () => {
+    for (const prefer of placements) {
+      const i = input({ prefer });
+      const layout = layoutLabel(i);
+      expect(layout).toMatchObject({ side: prefer.side, rise: prefer.rise, compact: false });
+      const { text, whole } = labelExtents(i.coreRadiusPx, i.textWidth, i.textHeight, prefer);
+      const b = box(i, layout);
+      expect(b.left - i.x).toBeCloseTo(text.left, 9);
+      expect(b.top - i.y).toBeCloseTo(text.top, 9);
+      expect(b.right - i.x).toBeCloseTo(text.right, 9);
+      expect(b.bottom - i.y).toBeCloseTo(text.bottom, 9);
+      // The whole label (text and the leader's end) contains the text.
+      expect(whole.left).toBeLessThanOrEqual(text.left);
+      expect(whole.right).toBeGreaterThanOrEqual(text.right);
+      expect(whole.top).toBeLessThanOrEqual(text.top);
+      expect(whole.bottom).toBeGreaterThanOrEqual(text.bottom);
+    }
+  });
+
+  it('leaves the preferred placement when it does not fit', () => {
+    const layout = layoutLabel(input({ x: 1380, prefer: { side: 1, rise: 1 } }));
+    expect(layout.side).toBe(-1);
+  });
+
+  it('keeps the text off labels placed before it', () => {
+    const first = input({});
+    const placed = box(first, layoutLabel(first));
+    const second = input({ x: 905, y: 352 });
+    const layout = layoutLabel({ ...second, boxes: [placed] });
+    const b = box(second, layout);
+    const apart =
+      b.right <= placed.left ||
+      b.left >= placed.right ||
+      b.bottom <= placed.top ||
+      b.top >= placed.bottom;
+    expect(apart).toBe(true);
+  });
+
+  it('estimates a label block before it is measured', () => {
+    const desktop = estimateLabelSize('Веброзробка', false);
+    const touch = estimateLabelSize('Веброзробка', true);
+    expect(desktop.width).toBeGreaterThan(100);
+    expect(touch.width).toBeGreaterThan(desktop.width);
+    expect(touch.height).toBeGreaterThan(desktop.height);
+    // Short names are as wide as their index line ("01 / 05").
+    expect(estimateLabelSize('AI', false).width).toBeGreaterThan(50);
   });
 });

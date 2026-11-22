@@ -4,17 +4,21 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useSceneStore } from '@/store/scene';
 import type { SceneBus, SceneBusRef } from '../bus';
+import { isSceneDebugEnabled, type SceneLabelProbe } from '../debug/scene-stats';
 import { universeKeyForHighlight } from '../node-ids';
 import {
+  LABEL_FONT,
   LABEL_INSET,
+  LABEL_METRICS,
+  labelReticle,
+  TOUCH_LABEL_SCALE,
   formatOrdinal,
-  insetBounds,
   layoutLabel,
   type LabelBounds,
   type LabelLayout,
   type LabelObstacle,
 } from './label-layout';
-import type { UniverseModel } from './model';
+import type { CategoryNodeModel, UniverseModel } from './model';
 import type { UniverseRuntime, UniverseRuntimeRef } from './runtime';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -26,6 +30,10 @@ const NAME_SPACING = { normal: '0.2em', compact: '0.12em' } as const;
 const INK = 'var(--color-ink, #e8ecf5)';
 const MUTED = 'var(--color-muted, #9aa4bf)';
 const VOID_SHADOW = 'rgb(5 7 13)';
+/** A selected category shows its label once its selected state is past this. */
+const SELECTED_LABEL_THRESHOLD = 0.5;
+/** Selection labels are laid out again when a node moved more than this (CSS px). */
+const RELAYOUT_PX = 0.25;
 
 interface NodeLabelsProps {
   model: UniverseModel;
@@ -35,7 +43,6 @@ interface NodeLabelsProps {
 }
 
 interface LabelDom {
-  root: HTMLDivElement;
   anchor: HTMLDivElement;
   reticle: SVGPathElement;
   leader: SVGPathElement;
@@ -49,45 +56,73 @@ interface LabelDom {
 interface LabelState {
   key: string | null;
   visible: boolean;
-  hiddenAt: number;
   width: number;
   compactWidth: number;
   height: number;
   layout: LabelLayout | null;
   accent: string;
+  /** Text box of the current layout, CSS px (canvas space). */
+  box: LabelBounds;
+}
+
+/** A configurator selection label: one per category, content set once. */
+interface SelectionLabel {
+  node: CategoryNodeModel;
+  dom: LabelDom;
+  state: LabelState;
+  /** Wanted this frame (selected, on screen) and shown (it also fits the free area). */
+  wanted: boolean;
+  x: number;
+  y: number;
+  /** Placement the framing reserved (0 = none). */
+  preferSide: number;
+  preferRise: number;
+  /** Its core as an obstacle for the other labels (pooled), while wanted. */
+  disc: LabelObstacle | null;
 }
 
 /**
  * Canvas labels (art direction: thin spaced typography, a leader line from
  * the node, a reticle around it). One DOM overlay inside the aria-hidden
  * scene layer — the accessible equivalents are the HTML links, whose hover
- * and focus drive the same store highlight. Text changes only when the
- * highlighted node changes; per frame only transforms and, when the layout
- * shifts, two SVG paths are written. Shown in the overview while the camera
- * is settled (`bus.interactive`) and the node is not faded out under an
- * overlay (presence), in a settled system view for the planet of a
- * `service:<cat>/<slug>` highlight, and in the settled portfolio archive for
- * the card of a `project:<slug>` highlight (with no projects the cluster's
- * "coming soon" label stays up there). The text box stays inside the free
- * area, clear of the other cores, planets and cards (label-layout.ts).
+ * and focus drive the same store highlight.
+ *
+ * - The hover label: text changes only when the highlighted node changes;
+ *   per frame only transforms and, when the layout shifts, two SVG paths
+ *   are written. Shown in the overview while the camera is settled
+ *   (`bus.interactive`) and the node is not faded out under an overlay
+ *   (presence), in a settled system view for the planet of a
+ *   `service:<cat>/<slug>` highlight, and in the settled portfolio archive
+ *   for the card of a `project:<slug>` highlight (with no projects the
+ *   cluster's "coming soon" label stays up there).
+ * - Selection labels (owner round 5, part B): on the configurator every
+ *   selected category shows its name, so it is clear what the crystal is
+ *   connected to. The camera framing reserves room for each one on a given
+ *   side (`bus.selectionLabels`), which is tried first; labels never overlap
+ *   each other, and one that cannot fit the free area (a phone band of a
+ *   few dozen px) stays hidden. Their sizes are measured once (and again
+ *   when the web fonts arrive) and published for the framing
+ *   (`bus.labelSizes`). Laid out again only when something moved.
+ *
+ * Every text box stays inside the free area, clear of the other cores,
+ * planets and cards (label-layout.ts).
  */
 export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabelsProps) {
   const gl = useThree((state) => state.gl);
   const connected = useThree((state) => state.events.connected) as unknown;
   const domRef = useRef<LabelDom | null>(null);
-  const labelRef = useRef<LabelState>({
-    key: null,
-    visible: false,
-    hiddenAt: 0,
-    width: 0,
-    compactWidth: 0,
-    height: 0,
-    layout: null,
-    accent: '',
-  });
+  const labelRef = useRef<LabelState>(createLabelState());
+  const selectionRef = useRef<SelectionLabel[]>([]);
   const highlightRef = useRef<string | null>(null);
   const obstaclesRef = useRef<LabelObstacle[]>([]);
+  const obstaclePoolRef = useRef<LabelObstacle[]>([]);
+  const boxesRef = useRef<LabelBounds[]>([]);
   const targetRef = useRef<LabelTarget>(createTarget());
+  const boundsRef = useRef({
+    raw: { left: 0, top: 0, right: 0, bottom: 0 },
+    inset: { left: 0, top: 0, right: 0, bottom: 0 },
+    changed: true,
+  });
 
   useEffect(() => {
     highlightRef.current = useSceneStore.getState().highlighted;
@@ -99,98 +134,304 @@ export function NodeLabels({ model, runtime, busRef, reducedMotion }: NodeLabels
   useEffect(() => {
     const host =
       connected instanceof HTMLElement ? connected : (gl.domElement.parentElement ?? document.body);
-    const dom = createLabelDom(reducedMotion);
-    host.appendChild(dom.root);
+    const touch = !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const root = createLabelRoot(reducedMotion);
+    const dom = createLabelDom(touch);
+    root.appendChild(dom.anchor);
+    const selection = model.categories.map((node): SelectionLabel => {
+      const unit = createLabelDom(touch);
+      unit.name.textContent = node.label;
+      unit.index.textContent = formatOrdinal(node.ordinal, model.categories.length);
+      unit.sub.style.display = 'none';
+      unit.anchor.style.setProperty('--label-accent', node.color);
+      root.appendChild(unit.anchor);
+      return {
+        node,
+        dom: unit,
+        state: createLabelState(),
+        wanted: false,
+        x: Number.NaN,
+        y: Number.NaN,
+        preferSide: 0,
+        preferRise: 0,
+        disc: null,
+      };
+    });
+    host.appendChild(root);
     domRef.current = dom;
+    selectionRef.current = selection;
     const label = labelRef.current;
     const bus = busRef.current;
     label.key = null;
     label.visible = false;
     label.layout = null;
+    // Selection labels: measured here (content never changes), published for the framing.
+    const measureSelection = () => {
+      for (const unit of selection) {
+        measure(unit.dom, unit.state);
+        unit.state.layout = null;
+        bus.labelSizes.set(unit.node.key, { width: unit.state.width, height: unit.state.height });
+      }
+      bus.labelSizesVersion++;
+      boundsRef.current.changed = true;
+    };
+    measureSelection();
     // Re-measure once the web fonts have loaded: the fallback face is wider and
     // left the leader running past the text (visual L-02).
     const remeasure = () => {
       label.key = null;
+      measureSelection();
     };
     const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
     fonts?.addEventListener('loadingdone', remeasure);
     void fonts?.ready.then(remeasure);
+    const debug = isSceneDebugEnabled(window.location.search);
+    if (debug) window.__sceneLabels = () => labelProbes(labelRef.current, dom, selection);
     return () => {
       fonts?.removeEventListener('loadingdone', remeasure);
-      dom.root.remove();
+      root.remove();
       domRef.current = null;
+      selectionRef.current = [];
       bus.labelRect = null;
+      bus.labelSizes.clear();
+      bus.labelSizesVersion++;
+      if (debug) delete window.__sceneLabels;
     };
-  }, [gl, connected, reducedMotion, busRef]);
+  }, [gl, connected, reducedMotion, busRef, model]);
 
   useFrame((state) => {
     const dom = domRef.current;
     const rt = runtime.current;
     if (!dom || !rt) return;
     const bus = busRef.current;
-    const label = labelRef.current;
-    const target = targetRef.current;
-    const obstacles = obstaclesRef.current;
-    obstacles.length = 0;
-    const found = resolveTarget(model, rt, bus, highlightRef.current, target, obstacles);
-    const now = performance.now();
-
-    if (found && target.key !== label.key) {
-      setContent(dom, target);
-      label.key = target.key;
-      measure(dom, label);
-      label.layout = null;
-      label.accent = '';
-    }
-    const show = found;
-    if (show !== label.visible) {
-      label.visible = show;
-      if (!show) label.hiddenAt = now;
-      dom.root.dataset.visible = show ? 'true' : 'false';
-    }
-    if (!label.visible) {
-      bus.labelRect = null;
-      if (now - label.hiddenAt > FADE_MS + 50) return;
-      // Fading out: keep the last position.
-      return;
-    }
-
-    const { x, y } = target;
-    dom.anchor.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-    // The beacon's colour cycles: its leader follows it (visual N2-04).
-    if (target.color !== label.accent) {
-      label.accent = target.color;
-      dom.root.style.setProperty('--label-accent', target.color);
-    }
-    const layout = layoutLabel({
-      x,
-      y,
-      coreRadiusPx: target.radiusPx,
-      textWidth: label.width,
-      compactWidth: label.compactWidth,
-      textHeight: label.height,
-      bounds: freeBounds(state.size.width, state.size.height, state.size.left, state.size.top),
-      obstacles,
+    const bounds = boundsRef.current;
+    updateFreeBounds(bounds, state.size.width, state.size.height, state.size.left, state.size.top);
+    stepHoverLabel(model, rt, bus, dom, labelRef.current, highlightRef.current, targetRef.current, {
+      obstacles: obstaclesRef.current,
+      bounds: bounds.inset,
+      dpr: state.viewport.dpr,
+      height: state.size.height,
     });
-    if (!label.layout || layoutChanged(label.layout, layout)) {
-      label.layout = layout;
-      drawLayout(dom, layout, label);
-    }
-    // Links crossing the text dim under it (visual L-03): GL px, bottom-left origin.
-    const dpr = state.viewport.dpr;
-    const width = layout.compact ? label.compactWidth : label.width;
-    const left = x + layout.textX;
-    const top = y + layout.textY;
-    bus.labelRect = [
-      left * dpr,
-      (state.size.height - top - label.height) * dpr,
-      (left + width) * dpr,
-      (state.size.height - top) * dpr,
-    ];
+    stepSelectionLabels(
+      model,
+      rt,
+      bus,
+      selectionRef.current,
+      bounds,
+      obstaclesRef.current,
+      obstaclePoolRef.current,
+      boxesRef.current,
+    );
+    bounds.changed = false;
   });
 
   return null;
 }
+
+/* ------------------------------------------------------------------ */
+/* Hover label                                                         */
+/* ------------------------------------------------------------------ */
+
+function stepHoverLabel(
+  model: UniverseModel,
+  rt: UniverseRuntime,
+  bus: SceneBus,
+  dom: LabelDom,
+  label: LabelState,
+  highlight: string | null,
+  target: LabelTarget,
+  frame: { obstacles: LabelObstacle[]; bounds: LabelBounds; dpr: number; height: number },
+) {
+  const obstacles = frame.obstacles;
+  obstacles.length = 0;
+  const found = resolveTarget(model, rt, bus, highlight, target, obstacles);
+
+  if (found && target.key !== label.key) {
+    setContent(dom, target);
+    label.key = target.key;
+    measure(dom, label);
+    label.layout = null;
+    label.accent = '';
+  }
+  if (found !== label.visible) {
+    label.visible = found;
+    dom.anchor.dataset.visible = found ? 'true' : 'false';
+  }
+  if (!label.visible) {
+    // Fading out: keep the last position.
+    bus.labelRect = null;
+    return;
+  }
+
+  const { x, y } = target;
+  dom.anchor.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+  // The beacon's colour cycles: its leader follows it (visual N2-04).
+  if (target.color !== label.accent) {
+    label.accent = target.color;
+    dom.anchor.style.setProperty('--label-accent', target.color);
+  }
+  const layout = layoutLabel({
+    x,
+    y,
+    coreRadiusPx: target.radiusPx,
+    textWidth: label.width,
+    compactWidth: label.compactWidth,
+    textHeight: label.height,
+    bounds: frame.bounds,
+    obstacles,
+  });
+  if (!label.layout || layoutChanged(label.layout, layout)) {
+    label.layout = layout;
+    drawLayout(dom, layout, label);
+  }
+  // Links crossing the text dim under it (visual L-03): GL px, bottom-left origin.
+  const dpr = frame.dpr;
+  const width = layout.compact ? label.compactWidth : label.width;
+  const left = x + layout.textX;
+  const top = y + layout.textY;
+  setBox(label.box, left, top, left + width, top + label.height);
+  bus.labelRect = [
+    left * dpr,
+    (frame.height - top - label.height) * dpr,
+    (left + width) * dpr,
+    (frame.height - top) * dpr,
+  ];
+}
+
+/* ------------------------------------------------------------------ */
+/* Selection labels (configurator)                                     */
+/* ------------------------------------------------------------------ */
+
+function stepSelectionLabels(
+  model: UniverseModel,
+  rt: UniverseRuntime,
+  bus: SceneBus,
+  units: readonly SelectionLabel[],
+  bounds: { raw: LabelBounds; inset: LabelBounds; changed: boolean },
+  obstacles: LabelObstacle[],
+  pool: LabelObstacle[],
+  boxes: LabelBounds[],
+) {
+  if (units.length === 0) return;
+  let dirty = bounds.changed;
+  let any = false;
+  for (const unit of units) {
+    const i = unit.node.index;
+    const wanted =
+      !bus.flying &&
+      (rt.selected[i] ?? 0) > SELECTED_LABEL_THRESHOLD &&
+      rt.inFront[i] === true &&
+      (rt.presence[i] ?? 1) >= 0.5;
+    if (wanted !== unit.wanted) {
+      unit.wanted = wanted;
+      dirty = true;
+    }
+    if (!wanted) continue;
+    any = true;
+    const x = rt.screenX[i] ?? 0;
+    const y = rt.screenY[i] ?? 0;
+    if (!(Math.abs(x - unit.x) <= RELAYOUT_PX && Math.abs(y - unit.y) <= RELAYOUT_PX)) {
+      unit.x = x;
+      unit.y = y;
+      unit.dom.anchor.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+      dirty = true;
+    }
+    const prefer = bus.selectionLabels.get(unit.node.key);
+    const side = prefer?.side ?? 0;
+    const rise = prefer?.rise ?? 0;
+    if (side !== unit.preferSide || rise !== unit.preferRise || !unit.state.layout) {
+      unit.preferSide = side;
+      unit.preferRise = rise;
+      dirty = true;
+    }
+  }
+
+  if (dirty && any) {
+    // Obstacles: the crystal's core and every selected node's reticle, as the camera
+    // framing assumed (pooled discs, no per-frame garbage).
+    obstacles.length = 0;
+    let used = 0;
+    const disc = (index: number, reticle: boolean) => {
+      const obstacle = (pool[used] ??= { x: 0, y: 0, r: 0 });
+      used++;
+      const core = (rt.corePx[index] ?? 0) / 2;
+      obstacle.x = rt.screenX[index] ?? 0;
+      obstacle.y = rt.screenY[index] ?? 0;
+      obstacle.r = reticle
+        ? Math.max(core, labelReticle(core) + 2 - LABEL_METRICS.obstaclePadding)
+        : core;
+      return obstacle;
+    };
+    const beacon = model.configurator.index;
+    if (rt.inFront[beacon]) obstacles.push(disc(beacon, false));
+    for (const unit of units) {
+      unit.disc = unit.wanted ? disc(unit.node.index, true) : null;
+      if (unit.disc) obstacles.push(unit.disc);
+    }
+    // The cores of the other visible nodes (unselected categories, portfolio).
+    for (const node of model.nodes) {
+      const j = node.index;
+      if (j === beacon || !rt.inFront[j] || (rt.presence[j] ?? 1) < 0.3) continue;
+      if (node.kind === 'category' && units[node.ordinal - 1]?.wanted) continue;
+      obstacles.push(disc(j, false));
+    }
+    boxes.length = 0;
+    for (const unit of units) {
+      if (!unit.wanted) continue;
+      // Its own core is no obstacle to its label (a negative radius never collides).
+      const ownDisc = unit.disc;
+      const ownRadius = ownDisc?.r ?? 0;
+      if (ownDisc) ownDisc.r = -1e9;
+      const label = unit.state;
+      const layout = layoutLabel({
+        x: unit.x,
+        y: unit.y,
+        coreRadiusPx: (rt.corePx[unit.node.index] ?? 16) / 2,
+        textWidth: label.width,
+        compactWidth: label.compactWidth,
+        textHeight: label.height,
+        bounds: bounds.inset,
+        obstacles,
+        boxes,
+        prefer:
+          unit.preferSide !== 0
+            ? { side: unit.preferSide as 1 | -1, rise: unit.preferRise as 1 | -1 }
+            : null,
+      });
+      if (ownDisc) ownDisc.r = ownRadius;
+      if (!label.layout || layoutChanged(label.layout, layout)) {
+        label.layout = layout;
+        drawLayout(unit.dom, layout, label);
+      }
+      const width = layout.compact ? label.compactWidth : label.width;
+      const left = unit.x + layout.textX;
+      const top = unit.y + layout.textY;
+      setBox(label.box, left, top, left + width, top + label.height);
+      // A label the free area cannot hold (a band of a few dozen px) stays hidden.
+      const raw = bounds.raw;
+      const fits =
+        left >= raw.left - 0.5 &&
+        left + width <= raw.right + 0.5 &&
+        top >= raw.top - 0.5 &&
+        top + label.height <= raw.bottom + 0.5;
+      setVisible(unit, fits);
+      if (fits) boxes.push(label.box);
+    }
+  }
+  for (const unit of units) {
+    if (!unit.wanted) setVisible(unit, false);
+  }
+}
+
+function setVisible(unit: SelectionLabel, visible: boolean) {
+  if (unit.state.visible === visible) return;
+  unit.state.visible = visible;
+  unit.dom.anchor.dataset.visible = visible ? 'true' : 'false';
+}
+
+/* ------------------------------------------------------------------ */
+/* Hover label targets                                                 */
+/* ------------------------------------------------------------------ */
 
 /** What a label points at: a universe node (overview) or a planet (settled system view). */
 interface LabelTarget {
@@ -206,6 +447,19 @@ interface LabelTarget {
 
 function createTarget(): LabelTarget {
   return { key: '', x: 0, y: 0, radiusPx: 0, color: '#e8ecf5', label: '', index: null, sub: null };
+}
+
+function createLabelState(): LabelState {
+  return {
+    key: null,
+    visible: false,
+    width: 0,
+    compactWidth: 0,
+    height: 0,
+    layout: null,
+    accent: '',
+    box: { left: 0, top: 0, right: 0, bottom: 0 },
+  };
 }
 
 /**
@@ -321,21 +575,43 @@ function resolveArchiveTarget(
   return true;
 }
 
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
 let finePointerQuery: MediaQueryList | null = null;
 
-/** The free area for label text, in canvas px, inset by the platform margin. */
-function freeBounds(width: number, height: number, left: number, top: number): LabelBounds {
+/**
+ * The free area for label text in canvas px (`raw`) and inset by the
+ * platform margin (`inset`), written in place; `changed` when it moved.
+ */
+function updateFreeBounds(
+  out: { raw: LabelBounds; inset: LabelBounds; changed: boolean },
+  width: number,
+  height: number,
+  left: number,
+  top: number,
+) {
   const rect = useSceneStore.getState().safeRect;
-  const bounds = rect
-    ? {
-        left: rect.x - left,
-        top: rect.y - top,
-        right: rect.x - left + rect.width,
-        bottom: rect.y - top + rect.height,
-      }
-    : { left: 0, top: 0, right: width, bottom: height };
+  const l = rect ? rect.x - left : 0;
+  const t = rect ? rect.y - top : 0;
+  const r = rect ? rect.x - left + rect.width : width;
+  const b = rect ? rect.y - top + rect.height : height;
+  const raw = out.raw;
+  if (raw.left !== l || raw.top !== t || raw.right !== r || raw.bottom !== b) {
+    setBox(raw, l, t, r, b);
+    out.changed = true;
+  }
   finePointerQuery ??= window.matchMedia('(hover: hover) and (pointer: fine)');
-  return insetBounds(bounds, finePointerQuery.matches ? LABEL_INSET.desktop : LABEL_INSET.touch);
+  const inset = finePointerQuery.matches ? LABEL_INSET.desktop : LABEL_INSET.touch;
+  setBox(out.inset, l + inset, t + inset, r - inset, b - inset);
+}
+
+function setBox(box: LabelBounds, left: number, top: number, right: number, bottom: number) {
+  box.left = left;
+  box.top = top;
+  box.right = right;
+  box.bottom = bottom;
 }
 
 function layoutChanged(a: LabelLayout, b: LabelLayout): boolean {
@@ -353,7 +629,7 @@ function layoutChanged(a: LabelLayout, b: LabelLayout): boolean {
 function setContent(dom: LabelDom, target: LabelTarget) {
   // Planet and card labels sit among orbit lines and glass: a subtle plate (visual mn1).
   const plate = target.key.startsWith('service:') || target.key.startsWith('project:');
-  dom.root.dataset.plate = plate ? 'true' : 'false';
+  dom.anchor.dataset.plate = plate ? 'true' : 'false';
   dom.name.textContent = target.label;
   dom.index.textContent = target.index ?? '';
   dom.index.style.display = target.index ? '' : 'none';
@@ -401,20 +677,27 @@ function drawLayout(dom: LabelDom, layout: LabelLayout, label: LabelState) {
   dom.text.style.width = `${width}px`;
 }
 
-/**
- * Label faces (px). D147 raised them by 20 % with the rest of the type scale (index 12 px is the
- * micro-label floor); phones and tablets read at arm's length, so they get a little more on top.
- */
-const LABEL_FONT = { index: 12, name: 15, sub: 13.2 };
-const TOUCH_LABEL_SCALE = 1.08;
+/** Debug-only: the visible labels' text boxes (CSS px, canvas space). */
+function labelProbes(
+  hover: LabelState,
+  hoverDom: LabelDom,
+  selection: readonly SelectionLabel[],
+): SceneLabelProbe[] {
+  const probes: SceneLabelProbe[] = [];
+  if (hover.visible && hover.key) {
+    probes.push({ key: hover.key, text: hoverDom.name.textContent ?? '', ...hover.box });
+  }
+  for (const unit of selection) {
+    if (!unit.state.visible) continue;
+    probes.push({ key: unit.node.key, text: unit.node.label, ...unit.state.box });
+  }
+  return probes;
+}
 
-function createLabelDom(reducedMotion: boolean): LabelDom {
-  const touch = !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-  const scale = touch ? TOUCH_LABEL_SCALE : 1;
+function createLabelRoot(reducedMotion: boolean): HTMLDivElement {
   const root = document.createElement('div');
   root.setAttribute('aria-hidden', 'true');
   root.dataset.sceneLabels = '';
-  root.dataset.visible = 'false';
   const fade = `${FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
   Object.assign(root.style, {
     position: 'absolute',
@@ -427,17 +710,22 @@ function createLabelDom(reducedMotion: boolean): LabelDom {
   const style = document.createElement('style');
   style.textContent = `
 [data-scene-labels] .sl-anchor { opacity: 0; transition: opacity ${fade}; }
-[data-scene-labels][data-visible='true'] .sl-anchor { opacity: 1; }
+[data-scene-labels] .sl-anchor[data-visible='true'] { opacity: 1; }
 [data-scene-labels] .sl-text { transition: opacity ${fade}, filter ${fade}, translate ${fade};
   opacity: 0; ${reducedMotion ? '' : 'filter: blur(2px); translate: 0 6px;'} }
-[data-scene-labels][data-visible='true'] .sl-text { opacity: 1; filter: none; translate: 0 0; }
-[data-scene-labels][data-plate='true'] .sl-text { background: rgb(5 7 13 / 0.64);
+[data-scene-labels] .sl-anchor[data-visible='true'] .sl-text { opacity: 1; filter: none; translate: 0 0; }
+[data-scene-labels] .sl-anchor[data-plate='true'] .sl-text { background: rgb(5 7 13 / 0.64);
   padding: 5px 9px 6px; border-radius: 6px; box-shadow: 0 0 0 1px rgb(232 236 245 / 0.07); }
 `;
   root.appendChild(style);
+  return root;
+}
 
+function createLabelDom(touch: boolean): LabelDom {
+  const scale = touch ? TOUCH_LABEL_SCALE : 1;
   const anchor = document.createElement('div');
   anchor.className = 'sl-anchor';
+  anchor.dataset.visible = 'false';
   Object.assign(anchor.style, {
     position: 'absolute',
     left: '0',
@@ -499,6 +787,5 @@ function createLabelDom(reducedMotion: boolean): LabelDom {
   });
   text.append(index, name, sub);
   anchor.append(svg, text);
-  root.appendChild(anchor);
-  return { root, anchor, reticle, leader, tick, text, index, name, sub };
+  return { anchor, reticle, leader, tick, text, index, name, sub };
 }

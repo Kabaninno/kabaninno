@@ -58,6 +58,19 @@ export interface SceneBus {
   /** Text box of the visible canvas label, device px, GL origin (bottom-left), or null. */
   labelRect: [number, number, number, number] | null;
   /**
+   * Measured text block of each category's canvas label (CSS px, by node key),
+   * published by NodeLabels; `labelSizesVersion` grows on every re-measure
+   * (web fonts loaded). The configurator framing reserves room for them.
+   */
+  labelSizes: Map<string, { width: number; height: number }>;
+  labelSizesVersion: number;
+  /**
+   * Configurator view with connections: the side each selected category's
+   * label was framed for (by node key), published by the camera director;
+   * empty otherwise. NodeLabels tries that placement first.
+   */
+  selectionLabels: Map<string, { side: 1 | -1; rise: 1 | -1 }>;
+  /**
    * A universe node that keeps full presence while the camera is close to it
    * even though it fills the free frame (the intro starts inside the first
    * category's system, B1); null otherwise.
@@ -109,6 +122,9 @@ export function createSceneBus(): SceneBus {
     projectTargets: new Map(),
     readyContent: new Set(),
     labelRect: null,
+    labelSizes: new Map(),
+    labelSizesVersion: 0,
+    selectionLabels: new Map(),
     presenceKey: null,
     gyro: createGyroInput(),
   };

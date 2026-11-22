@@ -2,11 +2,12 @@
  * Placement of the hover label (pure, three-free). The label hangs off a
  * leader line that leaves the node's reticle diagonally and then runs
  * horizontally under (or over) the text (art direction: leader lines,
- * reticle). Candidates, in order: right-up, right-down, left-up, left-down;
- * the first whose text box stays inside the free area and clear of the other
- * nodes' cores wins. If none fits at the normal letter-spacing, the compact
- * spacing is tried; as a last resort the best candidate is clamped inside
- * the free area (visual V2-03, V2-04).
+ * reticle). Candidates, in order: right-up, right-down, left-up, left-down
+ * (a preferred placement, when given, is tried first); the first whose text
+ * box stays inside the free area and clear of the other nodes' cores and of
+ * the other labels' boxes wins. If none fits at the normal letter-spacing,
+ * the compact spacing is tried; as a last resort the best candidate is
+ * clamped inside the free area (visual V2-03, V2-04).
  */
 export interface LabelBounds {
   left: number;
@@ -22,6 +23,12 @@ export interface LabelObstacle {
   r: number;
 }
 
+/** Where a label hangs off its node: 1 = right / up, -1 = left / down. */
+export interface LabelSide {
+  side: 1 | -1;
+  rise: 1 | -1;
+}
+
 export interface LabelInput {
   /** Node centre, CSS px. */
   x: number;
@@ -34,6 +41,10 @@ export interface LabelInput {
   /** Free area, already inset by the caller's margin. */
   bounds: LabelBounds;
   obstacles: readonly LabelObstacle[];
+  /** Boxes to keep the text off (labels already placed), CSS px. */
+  boxes?: readonly LabelBounds[];
+  /** Placement tried first (the configurator framing reserved room for it). */
+  prefer?: LabelSide | null;
 }
 
 export interface LabelLayout {
@@ -68,14 +79,40 @@ export const LABEL_METRICS = {
   minRun: 44,
   /** Gap between the leader and the text. */
   gap: 6,
+  /** Gap between the end of the diagonal leg and the text's near edge. */
+  textOffset: 4,
   /** Padding around obstacle discs. */
   obstaclePadding: 6,
+  /** Padding between two label boxes. */
+  boxPadding: 4,
 } as const;
 
 /** Margin between the text box and the free-area edge: phones / desktop (V2-03, V2-04). */
 export const LABEL_INSET = { touch: 12, desktop: 24 } as const;
 
-const CANDIDATES: ReadonlyArray<{ side: 1 | -1; rise: 1 | -1 }> = [
+/**
+ * Label faces (px). D147 raised them by 20 % with the rest of the type scale (index 12 px is the
+ * micro-label floor); phones and tablets read at arm's length, so they get a little more on top.
+ */
+export const LABEL_FONT = { index: 12, name: 15, sub: 13.2 } as const;
+export const TOUCH_LABEL_SCALE = 1.08;
+
+/**
+ * Rough text block size (CSS px) of a category label — index line over the
+ * spaced uppercase name — for when it has not been measured yet (the camera
+ * framing uses the measured size as soon as NodeLabels publishes it).
+ */
+export function estimateLabelSize(name: string, touch: boolean): { width: number; height: number } {
+  const scale = touch ? TOUCH_LABEL_SCALE : 1;
+  const nameWidth = name.length * LABEL_FONT.name * scale * 0.86;
+  const indexWidth = 7 * LABEL_FONT.index * scale * 0.78;
+  return {
+    width: Math.ceil(Math.max(nameWidth, indexWidth)),
+    height: Math.ceil((LABEL_FONT.index + 3 + LABEL_FONT.name * 1.15) * scale),
+  };
+}
+
+const CANDIDATES: ReadonlyArray<LabelSide> = [
   { side: 1, rise: 1 },
   { side: 1, rise: -1 },
   { side: -1, rise: 1 },
@@ -89,17 +126,54 @@ interface Box {
   bottom: number;
 }
 
-export function layoutLabel(input: LabelInput): LabelLayout {
+/** Reticle half size for a core of on-screen radius `coreRadiusPx`. */
+export function labelReticle(coreRadiusPx: number): number {
+  return Math.max(LABEL_METRICS.minReticle, coreRadiusPx * LABEL_METRICS.reticleFactor);
+}
+
+/**
+ * What a label placed at `placement` occupies relative to its node centre
+ * (CSS px, y down): the text box, and the whole label (text plus the leader's
+ * diagonal end). The camera framing reserves room for it (configurator).
+ */
+export function labelExtents(
+  coreRadiusPx: number,
+  width: number,
+  height: number,
+  placement: LabelSide,
+): { text: LabelBounds; whole: LabelBounds } {
   const m = LABEL_METRICS;
-  const reticle = Math.max(m.minReticle, input.coreRadiusPx * m.reticleFactor);
+  const reticle = labelReticle(coreRadiusPx);
+  const reach = reticle + m.diagonal;
+  const near = reach + m.textOffset;
+  const left = placement.side > 0 ? near : -near - width;
+  const top = placement.rise > 0 ? -reach - m.gap - height : reach + m.gap;
+  const text = { left, top, right: left + width, bottom: top + height };
+  const whole = {
+    left: placement.side > 0 ? reach : text.left,
+    right: placement.side > 0 ? text.right : -reach,
+    top: placement.rise > 0 ? text.top : reach,
+    bottom: placement.rise > 0 ? -reach : text.bottom,
+  };
+  return { text, whole };
+}
+
+export function layoutLabel(input: LabelInput): LabelLayout {
+  const reticle = labelReticle(input.coreRadiusPx);
   let best: { layout: LabelLayout; score: number } | null = null;
+  const prefer = input.prefer ?? null;
 
   for (const compact of [false, true]) {
     const width = compact ? input.compactWidth : input.textWidth;
-    for (const { side, rise } of CANDIDATES) {
-      const layout = place(input, reticle, width, side, rise, compact);
+    for (let c = prefer ? -1 : 0; c < CANDIDATES.length; c++) {
+      const candidate = c < 0 ? prefer! : CANDIDATES[c]!;
+      if (c >= 0 && prefer && samePlacement(candidate, prefer)) continue;
+      const layout = place(input, reticle, width, candidate.side, candidate.rise, compact);
       const box = textBox(input, layout, width);
-      const score = overflow(box, input.bounds) * 4 + collisions(box, input.obstacles);
+      const score =
+        overflow(box, input.bounds) * 4 +
+        collisions(box, input.obstacles) +
+        boxCollisions(box, input.boxes);
       if (score === 0) return layout;
       if (!best || score < best.score) best = { layout, score };
     }
@@ -124,6 +198,10 @@ export function layoutLabel(input: LabelInput): LabelLayout {
   };
 }
 
+function samePlacement(a: LabelSide, b: LabelSide): boolean {
+  return a.side === b.side && a.rise === b.rise;
+}
+
 function place(
   input: LabelInput,
   reticle: number,
@@ -136,7 +214,7 @@ function place(
   const run = Math.max(m.minRun, width + m.gap);
   const x1 = side * (reticle + m.diagonal);
   const y1 = -rise * (reticle + m.diagonal);
-  const textX = side > 0 ? x1 + 4 : x1 - 4 - width;
+  const textX = side > 0 ? x1 + m.textOffset : x1 - m.textOffset - width;
   const textY = rise > 0 ? y1 - m.gap - input.textHeight : y1 + m.gap;
   return {
     side,
@@ -178,6 +256,19 @@ function collisions(box: Box, obstacles: readonly LabelObstacle[]): number {
     const ny = Math.min(Math.max(y, box.top), box.bottom);
     const distance = Math.hypot(x - nx, y - ny);
     if (distance < radius) total += radius - distance;
+  }
+  return total;
+}
+
+/** Overlap depth of the box with other (padded) boxes (0 = clear). */
+function boxCollisions(box: Box, boxes: readonly LabelBounds[] | undefined): number {
+  if (!boxes) return 0;
+  let total = 0;
+  const pad = LABEL_METRICS.boxPadding;
+  for (const other of boxes) {
+    const x = Math.min(box.right, other.right + pad) - Math.max(box.left, other.left - pad);
+    const y = Math.min(box.bottom, other.bottom + pad) - Math.max(box.top, other.top - pad);
+    if (x > 0 && y > 0) total += Math.min(x, y);
   }
   return total;
 }

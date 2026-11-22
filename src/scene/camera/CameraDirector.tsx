@@ -8,7 +8,7 @@ import { Spherical, Vector3, type PerspectiveCamera } from 'three';
 import type { SceneTarget } from '@/lib/route-state';
 import { useSceneStore, type SafeRect } from '@/store/scene';
 import { keepAlive, type SceneBus, type SceneBusRef } from '../bus';
-import { debugSlowMotion } from '../debug/scene-stats';
+import { debugSlowMotion, isSceneDebugEnabled } from '../debug/scene-stats';
 import { CAMERA, MOTION } from '../config';
 import { focusKeyForTarget } from '../node-ids';
 import { isPerspectiveCamera } from '../three-utils';
@@ -37,11 +37,14 @@ import {
   type FlightKind,
   type OrbitPose,
 } from './flight';
+import { CONFIGURATOR_FRAMING, type ConfiguratorViewMemo } from './configurator-framing';
 import {
   FULL_FRAME,
   PHONE_CORE_BOOST,
   computeCameraGoal,
+  configuratorLinkCount,
   freeAreaCenter,
+  freeAreaRect,
   SYSTEM_SWAY,
   isPortrait,
   overviewSwayAmplitude,
@@ -95,11 +98,20 @@ const INTRO_SNAP_SECONDS = 0.5;
 /** CameraControls' smoothing of programmatic moves and inertia (seconds). */
 const CONTROLS_SMOOTH_TIME = 0.5;
 /**
- * Configurator dolly after a selection change (CONFIGURATOR_DOLLY): critically
- * damped with this smoothing, the move is ~95 % done after 0.85 s and ~97 %
- * after 1 s; the smoothing applies for `ms`.
+ * Configurator reframe after a selection change (configurator-framing.ts):
+ * critically damped with this smoothing, the move is ~95 % done after 1.0 s
+ * and ~98 % after 1.2 s (owner round 5: "smooth, 1–1.2 s"); the smoothing
+ * applies for `ms`.
  */
-const EMPHASIS_DOLLY = { smoothTime: 0.36, ms: 1500 } as const;
+const EMPHASIS_REFRAME = { smoothTime: 0.42, ms: 2000 } as const;
+/** A selection must stay unchanged this long before the camera retargets (rapid clicks). */
+const EMPHASIS_DEBOUNCE_MS = 250;
+/**
+ * While the free zone keeps changing (sheet drag, window resize) the framed
+ * configurator view only re-solves its current azimuth; the full search runs
+ * once it has been quiet this long.
+ */
+const AREA_QUIET_MS = 250;
 /** Frame changes below this (viewport fractions) are ignored. */
 const FRAME_EPSILON = 1e-4;
 /** Idle auto-rotate: delay after the last input, sway / spin per focus. */
@@ -187,6 +199,18 @@ interface DirectorState {
   goalPlanetAngle: number | undefined;
   /** Configurator selection the goal was fitted to (store `emphasis`, D81). */
   goalEmphasis: readonly string[] | undefined;
+  /** Latest store selection and when it changed (the goal follows it after the debounce). */
+  pendingEmphasis: readonly string[] | undefined;
+  pendingSince: number;
+  /** `bus.labelSizesVersion` the goal was fitted with. */
+  goalLabelVersion: number;
+  /** Configurator view with connections: chosen azimuth and label sides (hysteresis). */
+  configuratorView: ConfiguratorViewMemo;
+  /** The goal is the framed configurator view (crystal with its connected categories). */
+  framed: boolean;
+  /** The last goal only re-solved the current azimuth; `performance.now()` of the last area change. */
+  goalQuick: boolean;
+  areaChangedAt: number;
   /** Planet focus: the viewing side chosen for the parking planet (hysteresis). */
   planetView: PlanetViewMemo;
   /** Visitor's azimuth deviation carried into focused views (approach from their side). */
@@ -229,10 +253,12 @@ interface DirectorState {
   refreshHover: boolean;
   /** `performance.now()` until which a settled reframe uses the fast smoothing (S3). */
   fastReframeUntil: number;
-  /** `performance.now()` until which the controls use the configurator dolly smoothing. */
-  emphasisDollyUntil: number;
+  /** `performance.now()` until which the controls use the configurator reframe smoothing. */
+  emphasisReframeUntil: number;
   /** Centre of the free area itself (`freeAreaCenter`), viewport fractions. */
   freeCenter: { x: number; y: number };
+  /** The free area itself (`freeAreaRect`), viewport fractions. */
+  freeRect: SafeFrame;
 }
 
 /**
@@ -270,6 +296,7 @@ export function CameraDirector({
   const connected = useThree((state) => state.events.connected) as unknown;
   // `?debug=1&slowmo=N`: slower flights for frame-series captures (read once).
   const [slowMotion] = useState(() => debugSlowMotion(window.location.search));
+  const [debug] = useState(() => isSceneDebugEnabled(window.location.search));
 
   // Leave the shared camera clean and the store idle when the director goes away.
   useEffect(
@@ -382,6 +409,12 @@ export function CameraDirector({
         Math.abs(freeCenter.x - d.freeCenter.x) > FRAME_EPSILON ||
         Math.abs(freeCenter.y - d.freeCenter.y) > FRAME_EPSILON;
       if (freeCenterChanged) d.freeCenter = freeCenter;
+      // The free area itself (the framed configurator view fits into it).
+      const freeRect = freeAreaRect(local, width, height);
+      if (!sameFrame(freeRect, d.freeRect)) {
+        d.freeRect = freeRect;
+        freeCenterChanged = true;
+      }
     }
     const minCore = minCoreDiameterPx(
       d.frame.width * width,
@@ -411,6 +444,8 @@ export function CameraDirector({
       }
       d.target = target;
       d.targetPath = path;
+      // A new visit to the configurator chooses its side afresh.
+      d.configuratorView = {};
     }
 
     // 3. Goal for the current target and frame (pure; cached). On a planet
@@ -422,15 +457,33 @@ export function CameraDirector({
     const angleChanged =
       planetAngle !== undefined &&
       (d.goalPlanetAngle === undefined || Math.abs(planetAngle - d.goalPlanetAngle) > 1e-5);
-    // On the configurator each selected category dollies the beacon view back a little
-    // (the crystal stays centred); under reduced motion a selection never moves the camera.
-    const emphasis =
-      target.mode === 'configurator' && !reducedMotion
-        ? useSceneStore.getState().emphasis
-        : undefined;
+    // On the configurator the selected categories are framed with the crystal (also under
+    // reduced motion: the camera then cuts to the new view). Settled, a selection change waits
+    // EMPHASIS_DEBOUNCE_MS so rapid clicks retarget once; during a flight it applies at once.
+    const now = performance.now();
+    const configurator = target.mode === 'configurator';
+    const storeEmphasis = configurator ? useSceneStore.getState().emphasis : undefined;
+    if (storeEmphasis !== d.pendingEmphasis) {
+      d.pendingEmphasis = storeEmphasis;
+      d.pendingSince = now;
+    }
+    const moving = d.goal === null || targetChanged || d.flight !== null || d.cut !== null;
+    const emphasis = !configurator
+      ? undefined
+      : moving || now - d.pendingSince >= EMPHASIS_DEBOUNCE_MS
+        ? d.pendingEmphasis
+        : d.goalEmphasis;
+    // frameloop="demand": wake up for the debounced retarget.
+    if (emphasis !== d.pendingEmphasis) keepAlive(shared, EMPHASIS_DEBOUNCE_MS + 50);
     const emphasisChanged = emphasis !== d.goalEmphasis;
-    // Only the configurator framing follows the free band's own centre.
-    const areaChanged = frameChanged || (freeCenterChanged && target.mode === 'configurator');
+    // Only the configurator framing follows the free band itself.
+    const areaChanged = frameChanged || (freeCenterChanged && configurator);
+    if (areaChanged) d.areaChangedAt = now;
+    const labelsChanged = configurator && shared.labelSizesVersion !== d.goalLabelVersion;
+    // The framed view re-solves only its azimuth while the area keeps changing, then searches.
+    const quick = configurator && d.framed && areaChanged && !emphasisChanged && !targetChanged;
+    const quietRefit = d.goalQuick && now - d.areaChangedAt >= AREA_QUIET_MS;
+    if (d.goalQuick && !quietRefit) keepAlive(shared, AREA_QUIET_MS + 50);
     let goalChanged = false;
     if (
       d.goal === null ||
@@ -439,11 +492,13 @@ export function CameraDirector({
       aspect !== d.goalAspect ||
       areaChanged ||
       angleChanged ||
-      emphasisChanged
+      emphasisChanged ||
+      labelsChanged ||
+      quietRefit
     ) {
-      // A selection change alone: a short, smooth dolly (~0.9 s), not the default reframe.
+      // A selection change alone: a smooth reframe (~1–1.2 s), not the default one.
       if (d.goal !== null && emphasisChanged && !targetChanged && !areaChanged) {
-        d.emphasisDollyUntil = performance.now() + EMPHASIS_DOLLY.ms;
+        d.emphasisReframeUntil = now + EMPHASIS_REFRAME.ms;
       }
       d.goal = computeCameraGoal(target, model, aspect, d.frame, {
         sway: reducedMotion ? 0 : IDLE.overview.amplitude,
@@ -451,14 +506,27 @@ export function CameraDirector({
         emphasis,
         reducedMotion,
         freeCenter: d.freeCenter,
+        freeRect: d.freeRect,
         planetView: d.planetView,
         viewport: { width, height },
+        minCorePx: minCore,
+        labelSizes: shared.labelSizes,
+        finePointer,
+        configuratorView: d.configuratorView,
+        configuratorQuick: quick,
       });
+      d.goalQuick = quick;
+      d.framed = configurator && configuratorLinkCount(model, emphasis) > 0;
+      // The framed view's azimuth is chosen for the framing: no carried rotation on top.
+      if (d.framed) d.azimuthOffset = 0;
+      publishSelectionLabels(shared, d.framed ? d.configuratorView : null);
+      if (debug) publishFramingDebug(d, target);
       d.goalPose = poseFromLookAt(d.goal.position, d.goal.lookAt);
       d.goalModel = model;
       d.goalAspect = aspect;
       d.goalPlanetAngle = planetAngle;
       d.goalEmphasis = emphasis;
+      d.goalLabelVersion = shared.labelSizesVersion;
       goalChanged = true;
     }
     const goal = d.goal;
@@ -535,15 +603,17 @@ export function CameraDirector({
       }
     } else {
       // A frame change (sheet collapsing, panel resizing) reframes fast (S3).
-      if (goalChanged && areaChanged) d.fastReframeUntil = performance.now() + FAST_REFRAME.ms;
-      const now = performance.now();
+      if (goalChanged && areaChanged) d.fastReframeUntil = now + FAST_REFRAME.ms;
       const controlsSmooth = reframeSmoothTime(
         now,
         d.fastReframeUntil,
-        now < d.emphasisDollyUntil ? EMPHASIS_DOLLY.smoothTime : CONTROLS_SMOOTH_TIME,
+        now < d.emphasisReframeUntil ? EMPHASIS_REFRAME.smoothTime : CONTROLS_SMOOTH_TIME,
       );
       if (controls.smoothTime !== controlsSmooth) controls.smoothTime = controlsSmooth;
-      if (goalChanged) reframe(d, controls, target, goalPose, reducedMotion);
+      // The configurator's framed view is only right from its own angle and distance:
+      // re-aim (and drop the visitor's zoom) whenever it changes or the selection does.
+      const aim = configurator && (d.framed || emphasisChanged);
+      if (goalChanged) reframe(d, controls, target, goalPose, reducedMotion, aim);
       if (reducedMotion) {
         d.fov = { value: goal.fov, velocity: 0 };
         snapCenter(d, center);
@@ -987,21 +1057,37 @@ function stepCut(
 /* Settled behaviour                                                   */
 /* ------------------------------------------------------------------ */
 
-/** The frame or viewport changed while settled: refit, keeping the visitor's rotation and zoom. */
+/**
+ * The frame or viewport changed while settled: refit, keeping the visitor's
+ * rotation and zoom — unless `aim` (the configurator's framed view): then the
+ * camera turns to the goal's own angles and distance.
+ */
 function reframe(
   d: DirectorState,
   controls: CameraControlsImpl,
   target: SceneTarget,
   goalPose: OrbitPose,
   reducedMotion: boolean,
+  aim = false,
 ) {
   const endRadius = controls.getSpherical(scratchSpherical, true).radius;
-  const zoom = Math.min(Math.max(endRadius / Math.max(d.settledRadius, 1e-3), 0.3), 3);
+  const zoom = aim ? 1 : Math.min(Math.max(endRadius / Math.max(d.settledRadius, 1e-3), 0.3), 3);
   setLimits(controls, target, goalPose);
   d.settledRadius = goalPose.radius;
   const animate = !reducedMotion;
   void controls.setTarget(goalPose.target[0], goalPose.target[1], goalPose.target[2], animate);
   void controls.dollyTo(goalPose.radius * zoom, animate);
+  if (aim) {
+    markAimed(d, goalPose);
+    const azimuth = controls.azimuthAngle;
+    void controls.rotateTo(
+      azimuth + shortestAngleDelta(azimuth, goalPose.azimuth),
+      goalPose.polar,
+      animate,
+    );
+    d.swayApplied = 0;
+    return;
+  }
   // The home layout can change with the frame (a phone turned sideways: tall ↔ landscape view):
   // re-aim the angles then, but never fight a visitor's own rotation over small refits.
   if (isOverview(target)) {
@@ -1053,6 +1139,7 @@ function idleMotion(
     return;
   }
   // Short free areas (phone band): systems sway instead of spinning (their fit covers it).
+  // The framed configurator view sways only as far as its fit covers.
   const { amplitude, period } =
     target.mode === 'planet'
       ? IDLE.planet
@@ -1060,7 +1147,9 @@ function idleMotion(
         ? { amplitude: SYSTEM_SWAY, period: IDLE.anchor.period }
         : isOverview(target)
           ? { amplitude: overviewAmplitude, period: IDLE.overview.period }
-          : IDLE.anchor;
+          : target.mode === 'configurator' && d.framed
+            ? { amplitude: CONFIGURATOR_FRAMING.sway, period: IDLE.anchor.period }
+            : IDLE.anchor;
   const sway = idleSway(d.idleClock, amplitude, period, IDLE.rampIn);
   void controls.rotate(sway - d.swayApplied, 0, false);
   d.swayApplied = sway;
@@ -1195,6 +1284,33 @@ function applyProjection(
   }
 }
 
+/** Label sides the framed configurator view reserved room for (NodeLabels prefers them). */
+function publishSelectionLabels(shared: SceneBus, memo: ConfiguratorViewMemo | null) {
+  shared.selectionLabels.clear();
+  if (!memo || memo.band) return;
+  for (const { key, side, rise } of memo.labels ?? [])
+    shared.selectionLabels.set(key, { side, rise });
+}
+
+/** Debug-only (`?debug=1`): the configurator framing chosen last (azimuth, distance, checks). */
+function publishFramingDebug(d: DirectorState, target: SceneTarget) {
+  const memo = d.configuratorView;
+  const chosen = d.framed ? memo.candidate : undefined;
+  window.__sceneFraming =
+    target.mode !== 'configurator'
+      ? null
+      : {
+          mode: !chosen ? 'close-up' : memo.band ? 'band' : 'framed',
+          azimuthDeg: chosen ? Math.round((chosen.azimuth * 180) / Math.PI) : null,
+          distance: chosen?.distance ?? null,
+          fits: chosen?.fits ?? null,
+          linksClear: chosen?.linksClear ?? null,
+          labelsClear: chosen?.labelsClear ?? null,
+          scorePx: chosen?.score ?? null,
+          labels: chosen?.labels.map(({ key, side, rise }) => ({ key, side, rise })) ?? [],
+        };
+}
+
 function publishFlight(active: boolean, progress: number, to: string | null) {
   const store = useSceneStore.getState();
   const value = quantizeProgress(progress);
@@ -1215,10 +1331,18 @@ function createDirectorState(target: SceneTarget, path: string): DirectorState {
     goalAspect: 0,
     goalPlanetAngle: undefined,
     goalEmphasis: undefined,
+    pendingEmphasis: undefined,
+    pendingSince: 0,
+    goalLabelVersion: 0,
+    configuratorView: {},
+    framed: false,
+    goalQuick: false,
+    areaChangedAt: 0,
     planetView: {},
     fastReframeUntil: 0,
-    emphasisDollyUntil: 0,
+    emphasisReframeUntil: 0,
     freeCenter: { x: 0.5, y: 0.5 },
+    freeRect: FULL_FRAME,
     azimuthOffset: 0,
     settledRadius: 1,
     safeRect: undefined,

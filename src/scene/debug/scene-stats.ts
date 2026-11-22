@@ -48,12 +48,39 @@ export interface SceneNodeProbe {
   presence: number;
 }
 
+/** Debug-only (`?debug=1`): the configurator camera framing chosen last. */
+export interface SceneFramingProbe {
+  /** `close-up`: no selection; `framed`: crystal with its categories; `band`: a free zone too low for labels. */
+  mode: 'close-up' | 'framed' | 'band';
+  azimuthDeg: number | null;
+  /** Camera to look target, world units. */
+  distance: number | null;
+  fits: boolean | null;
+  linksClear: boolean | null;
+  labelsClear: boolean | null;
+  /** Smallest on-screen crystal-to-node distance, CSS px. */
+  scorePx: number | null;
+  labels: Array<{ key: string; side: 1 | -1; rise: 1 | -1 }>;
+}
+
+/** Debug-only (`?debug=1`): a visible canvas label's text box (CSS px, canvas space). */
+export interface SceneLabelProbe {
+  key: string;
+  text: string;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 declare global {
   interface Window {
     __sceneStats?: SceneStats;
     __scenePrewarm?: ScenePrewarmReport;
     __sceneDebug?: SceneDebugControls;
     __sceneNodes?: () => SceneNodeProbe[];
+    __sceneFraming?: SceneFramingProbe | null;
+    __sceneLabels?: () => SceneLabelProbe[];
   }
 }
 

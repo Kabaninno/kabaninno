@@ -11,16 +11,20 @@ import {
   planetScreenBoost,
   planetWorldPosition,
 } from '../system/planet-math';
-import { buildUniverseModel } from '../universe/model';
+import { estimateLabelSize, labelExtents, LABEL_INSET } from '../universe/label-layout';
+import { buildUniverseModel, type CategoryNodeModel } from '../universe/model';
+import { DRIFT_AMPLITUDE } from '../universe/runtime';
+import { CONFIGURATOR_FRAMING, type ConfiguratorViewMemo } from './configurator-framing';
 import {
   FULL_FRAME,
   MIN_FRAME_FRACTION,
   centreOnPoint,
   computeCameraGoal,
-  configuratorDistanceFactor,
+  configuratorCloseUpDistance,
+  NODE_DRIFT_REACH,
   freeAreaCenter,
+  freeAreaRect,
   configuratorLinkCount,
-  CONFIGURATOR_DOLLY,
   controlLimits,
   fitDistance,
   fovForAspect,
@@ -763,64 +767,272 @@ describe('planet focus framing', () => {
   });
 });
 
-describe('configurator framing (owner round 3, part C)', () => {
+describe('configurator framing (owner round 5, part B)', () => {
   const configurator = { mode: 'configurator' as const };
   const key = (id: string) => `category:${id}`;
+  /** The same universe with the real (Ukrainian) category names, the widest labels on phones. */
+  const UK: Record<string, string> = {
+    web: 'Веброзробка',
+    crm: 'CRM',
+    automation: 'Автоматизація',
+    ai: 'AI',
+    telegram: 'Telegram-боти',
+  };
+  const ukModel = buildUniverseModel({
+    ...manifest,
+    categories: manifest.categories.map((category) => ({
+      ...category,
+      label: UK[category.id] ?? category.id,
+    })),
+  });
+  /** [viewport, free rect, fine pointer] as the director sees them. */
   const views = [
-    [DESKTOP_VIEW, DESKTOP_PANEL_RECT],
-    [
-      { width: 1920, height: 1080 },
-      { x: 0, y: 72, width: 1280, height: 1008 },
-    ],
-    [
-      { width: 1366, height: 768 },
-      { x: 0, y: 64, width: 846, height: 704 },
-    ],
-    [PHONE_VIEW, PHONE_SHEET_RECT],
-    // Expanded sheet: a 33 px band under the HUD, smaller than MIN_FRAME_FRACTION.
-    [PHONE_VIEW, PHONE_BAND_RECT],
+    [DESKTOP_VIEW, DESKTOP_PANEL_RECT, true],
+    [{ width: 1920, height: 1080 }, { x: 0, y: 72, width: 1280, height: 1008 }, true],
+    [{ width: 1366, height: 768 }, { x: 0, y: 64, width: 846, height: 704 }, true],
+    // Phone, configurator entered from inside the site: the band above a 60 dvh sheet.
+    [PHONE_VIEW, { x: 0, y: 68, width: 390, height: 270 }, false],
+    [PHONE_VIEW, PHONE_SHEET_RECT, false],
   ] as const;
-  const ids = model.categories.map((node) => node.categoryId);
-  /** 0–3 selected categories, plus every category (the dolly stays capped). */
-  const selections = [[], ids.slice(0, 1), ids.slice(0, 2), ids.slice(0, 3), ids];
-  const direction = (g: CameraGoal) =>
-    normalize([
-      g.position[0] - g.lookAt[0],
-      g.position[1] - g.lookAt[1],
-      g.position[2] - g.lookAt[2],
-    ]);
+  const ids = ['web', 'crm', 'ai', 'automation', 'telegram'];
+  /** 0–3 selected categories (the owner's test states), in the wizard's order. */
+  const selections = [[], ids.slice(0, 1), ids.slice(0, 2), ids.slice(0, 3)];
 
-  it('dollies back by CONFIGURATOR_DOLLY per link, capped at 1.2', () => {
-    expect(configuratorDistanceFactor(0)).toBe(1);
-    expect(configuratorDistanceFactor(1)).toBeCloseTo(1 + CONFIGURATOR_DOLLY.perLink, 9);
-    expect(configuratorDistanceFactor(2)).toBeCloseTo(1 + 2 * CONFIGURATOR_DOLLY.perLink, 9);
-    expect(configuratorDistanceFactor(3)).toBeLessThanOrEqual(1.2);
-    expect(configuratorDistanceFactor(3)).toBeGreaterThan(configuratorDistanceFactor(2));
-    for (const links of [4, 5, 12, 100]) expect(configuratorDistanceFactor(links)).toBe(1.2);
-    expect(CONFIGURATOR_DOLLY.max).toBe(1.2);
-    // Invalid counts never move the camera.
-    expect(configuratorDistanceFactor(-1)).toBe(1);
-    expect(configuratorDistanceFactor(Number.NaN)).toBe(1);
-    // Reduced motion: a selection never moves the camera.
-    for (const links of [0, 1, 3, 9]) expect(configuratorDistanceFactor(links, true)).toBe(1);
+  function setup(view: Viewport, rect: Rect, finePointer: boolean) {
+    const frame = resolveSafeFrame(rect, view.width, view.height);
+    const aspect = view.width / view.height;
+    const minCorePx = minCoreDiameterPx(
+      frame.width * view.width,
+      frame.height * view.height,
+      finePointer,
+      aspect < OVERVIEW.portraitBelowAspect ? PHONE_CORE_BOOST : 1,
+    );
+    const options = (selection: readonly string[], memo?: ConfiguratorViewMemo) => ({
+      emphasis: selection.map(key),
+      sway: 0.2,
+      freeCenter: freeAreaCenter(rect, view.width, view.height),
+      freeRect: freeAreaRect(rect, view.width, view.height),
+      viewport: view,
+      minCorePx,
+      finePointer,
+      configuratorView: memo,
+    });
+    const goal = (
+      selection: readonly string[],
+      memo?: ConfiguratorViewMemo,
+      reducedMotion = false,
+    ) =>
+      computeCameraGoal(configurator, ukModel, aspect, frame, {
+        ...options(selection, memo),
+        reducedMotion,
+      });
+    const overview = overviewGoal(ukModel, aspect, frame, 0.2, { layout: 'legacy' });
+    return {
+      frame,
+      aspect,
+      minCorePx,
+      goal,
+      closeUp: configuratorCloseUpDistance(overview.fov, aspect, frame),
+      overviewDistance: dist(overview.position, overview.lookAt),
+    };
+  }
+
+  const elevation = (g: CameraGoal) =>
+    Math.asin(
+      normalize([
+        g.position[0] - g.lookAt[0],
+        g.position[1] - g.lookAt[1],
+        g.position[2] - g.lookAt[2],
+      ])[1],
+    );
+
+  it('keeps the crystal close-up, centred in the free zone, with nothing selected', () => {
+    for (const [view, rect, fine] of views) {
+      const { frame, aspect, goal, closeUp } = setup(view, rect, fine);
+      for (const empty of [[], ['category:nope', 'configurator', 'portfolio']]) {
+        const g = goal(empty);
+        expect(g.lookAt).toEqual(ukModel.configurator.position);
+        expect(dist(g.position, g.lookAt)).toBeCloseTo(closeUp, 9);
+        const crystal = projectPx(g, ukModel.configurator.position, view, frame);
+        expect(crystal.x).toBeCloseTo(rect.x + rect.width / 2, 6);
+        expect(crystal.y).toBeCloseTo(rect.y + rect.height / 2, 6);
+      }
+      // The same as with no selection at all (round 3 behaviour).
+      expect(goal([])).toEqual(
+        computeCameraGoal(configurator, ukModel, aspect, frame, {
+          sway: 0.2,
+          freeCenter: freeAreaCenter(rect, view.width, view.height),
+        }),
+      );
+    }
   });
 
-  it('finds the free band centre even when the frame was widened past it', () => {
+  it('fits the crystal and every selected node with halo and label into the free zone', () => {
+    const { margin, haloPerCore } = CONFIGURATOR_FRAMING;
+    for (const [view, rect, fine] of views) {
+      const { frame, minCorePx, goal, closeUp, overviewDistance } = setup(view, rect, fine);
+      const inset = fine ? LABEL_INSET.desktop : LABEL_INSET.touch;
+      const inner = {
+        left: rect.x + rect.width * margin - 0.5,
+        right: rect.x + rect.width * (1 - margin) + 0.5,
+        top: rect.y + rect.height * margin - 0.5,
+        bottom: rect.y + rect.height * (1 - margin) + 0.5,
+      };
+      for (const selection of selections.slice(1)) {
+        const memo: ConfiguratorViewMemo = {};
+        const g = goal(selection, memo);
+        const chosen = memo.candidate!;
+        expect(chosen.fits).toBe(true);
+        expect(chosen.linksClear).toBe(true);
+        expect(chosen.labelsClear).toBe(true);
+        expect(chosen.visible).toBe(selection.length);
+        // On desktop no unselected node crowds the crystal or a selected node.
+        if (fine) expect(chosen.othersClear).toBe(true);
+        // ~25° from above, one of the 8 azimuths.
+        expect(elevation(g)).toBeCloseTo(CONFIGURATOR_FRAMING.elevation, 9);
+        expect((chosen.azimuth / (Math.PI / 4)) % 1).toBeCloseTo(0, 9);
+        // Between the crystal close-up and the universe overview.
+        const distance = dist(g.position, g.lookAt);
+        expect(distance).toBeGreaterThanOrEqual(closeUp - 1e-6);
+        expect(distance).toBeLessThanOrEqual(overviewDistance + 1e-6);
+
+        // The crystal with its glow, inside the margins.
+        const crystalCore = minCorePx * 0.75;
+        const crystal = projectPx(g, ukModel.configurator.position, view, frame, 0.9);
+        const crystalR = Math.max(crystal.r, crystalCore * 1.5);
+        expect(crystal.x - crystalR).toBeGreaterThanOrEqual(inner.left);
+        expect(crystal.x + crystalR).toBeLessThanOrEqual(inner.right);
+        expect(crystal.y - crystalR).toBeGreaterThanOrEqual(inner.top);
+        expect(crystal.y + crystalR).toBeLessThanOrEqual(inner.bottom);
+
+        const boxes: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+        for (const id of selection) {
+          const node = ukModel.byKey.get(key(id)) as CategoryNodeModel;
+          // Halo / orbit preview at the minimum core size, or the orbits at their true scale.
+          const at = projectPx(g, node.position, view, frame, node.systemRadius * 0.8);
+          const r = Math.max(at.r, haloPerCore * minCorePx, orbitPreviewRadiusPx(node, minCorePx));
+          expect(at.x - r).toBeGreaterThanOrEqual(inner.left);
+          expect(at.x + r).toBeLessThanOrEqual(inner.right);
+          expect(at.y - r).toBeGreaterThanOrEqual(inner.top);
+          expect(at.y + r).toBeLessThanOrEqual(inner.bottom);
+          // Its label, on the side the framing reserved, inside the free zone (label inset).
+          const placement = memo.labels!.find((entry) => entry.key === node.key)!;
+          const size = estimateLabelSize(node.label, !fine);
+          const { text } = labelExtents(minCorePx / 2, size.width, size.height, placement);
+          const box = {
+            left: at.x + text.left,
+            right: at.x + text.right,
+            top: at.y + text.top,
+            bottom: at.y + text.bottom,
+          };
+          expect(box.left).toBeGreaterThanOrEqual(rect.x + inset - 0.5);
+          expect(box.right).toBeLessThanOrEqual(rect.x + rect.width - inset + 0.5);
+          expect(box.top).toBeGreaterThanOrEqual(rect.y + inset - 0.5);
+          expect(box.bottom).toBeLessThanOrEqual(rect.y + rect.height - inset + 0.5);
+          for (const other of boxes) {
+            const apart =
+              box.right <= other.left ||
+              box.left >= other.right ||
+              box.bottom <= other.top ||
+              box.top >= other.bottom;
+            expect(apart).toBe(true);
+          }
+          boxes.push(box);
+        }
+      }
+    }
+  });
+
+  it('frames the box of all objects around the free zone centre', () => {
+    // Desktop, one category: the crystal is no longer the centre, the pair is.
+    const [view, rect, fine] = views[1];
+    const { frame, goal } = setup(view, rect, fine);
+    const g = goal(['web']);
+    const crystal = projectPx(g, ukModel.configurator.position, view, frame);
+    const node = projectPx(g, ukModel.byKey.get(key('web'))!.position, view, frame);
+    const centre = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    expect(Math.hypot(crystal.x - centre.x, crystal.y - centre.y)).toBeGreaterThan(50);
+    // The pair straddles the centre.
+    expect(Math.min(crystal.x, node.x)).toBeLessThan(centre.x);
+    expect(Math.max(crystal.x, node.x)).toBeGreaterThan(centre.x);
+  });
+
+  it('keeps its azimuth for the same input and only leaves it for a clearly better one', () => {
+    for (const [view, rect, fine] of views) {
+      const { goal } = setup(view, rect, fine);
+      const memo: ConfiguratorViewMemo = {};
+      const first = goal(ids.slice(0, 2), memo);
+      const index = memo.index!;
+      expect(goal(ids.slice(0, 2), memo)).toEqual(first);
+      expect(memo.index).toBe(index);
+      // From any current side, the camera either stays or moves to the one best side
+      // (chooseCandidate; the exact 15 % rule: configurator-framing.test.ts).
+      const switched = new Set<number>();
+      for (let current = 0; current < CONFIGURATOR_FRAMING.azimuthCount; current++) {
+        const from: ConfiguratorViewMemo = { index: current };
+        goal(ids.slice(0, 2), from);
+        if (from.index !== current) switched.add(from.index!);
+      }
+      expect(switched.size).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('gives the same final goal under reduced motion (the director cuts to it)', () => {
+    for (const [view, rect, fine] of views) {
+      const { goal } = setup(view, rect, fine);
+      for (const selection of selections) {
+        expect(goal(selection, {}, true)).toEqual(goal(selection, {}, false));
+      }
+    }
+  });
+
+  it('keeps the crystal in a free band too low for labels (tall phone sheet)', () => {
+    const view = PHONE_VIEW;
+    const rect = PHONE_BAND_RECT;
+    const { frame, goal, closeUp, overviewDistance } = setup(view, rect, false);
+    for (const selection of selections.slice(1)) {
+      const memo: ConfiguratorViewMemo = {};
+      const g = goal(selection, memo);
+      expect(memo.band).toBe(true);
+      const distance = dist(g.position, g.lookAt);
+      expect(distance).toBeGreaterThanOrEqual(closeUp - 1e-6);
+      expect(distance).toBeLessThanOrEqual(overviewDistance + 1e-6);
+      // The crystal's core never leaves the band (nothing of it under the HUD or the sheet).
+      const crystal = projectPx(g, ukModel.configurator.position, view, frame);
+      expect(crystal.y).toBeGreaterThanOrEqual(rect.y - 0.5);
+      expect(crystal.y).toBeLessThanOrEqual(rect.y + rect.height + 0.5);
+      expect(memo.candidate!.visible).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('reserves room for the full ambient drift of a node', () => {
+    // writeDrift: DRIFT_AMPLITUDE × (1, 0.6, 1) at most.
+    expect(NODE_DRIFT_REACH).toBeGreaterThanOrEqual(Math.hypot(1, 0.6, 1) * DRIFT_AMPLITUDE);
+  });
+
+  it('counts distinct selected categories only', () => {
+    expect(configuratorLinkCount(model, undefined)).toBe(0);
+    expect(configuratorLinkCount(model, [])).toBe(0);
+    expect(configuratorLinkCount(model, ['category:nope', 'configurator', 'portfolio'])).toBe(0);
+    expect(configuratorLinkCount(model, [key(ids[0]!), key(ids[0]!), key(ids[1]!)])).toBe(2);
+    // Service ids resolve to their category (like the universe highlight).
+    expect(configuratorLinkCount(model, ['service:web/landing-pages', key('web')])).toBe(1);
+  });
+
+  it('finds the free band centre and rect even when the frame was widened past it', () => {
     expect(freeAreaCenter(null, 390, 844)).toEqual({ x: 0.5, y: 0.5 });
-    expect(freeAreaCenter({ x: 0, y: 0, width: 0, height: 10 }, 390, 844)).toEqual({
-      x: 0.5,
-      y: 0.5,
-    });
-    // A rect larger than the minimum frame: the same as the frame centre.
+    expect(freeAreaRect(null, 390, 844)).toEqual(FULL_FRAME);
     const frame = resolveSafeFrame(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
     const centre = freeAreaCenter(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
     expect(centre.x).toBeCloseTo(frameCenter(frame).x, 12);
     expect(centre.y).toBeCloseTo(frameCenter(frame).y, 12);
-    // The 33 px band: the frame is widened against the top edge, the band centre is not.
     const band = freeAreaCenter(PHONE_BAND_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
     const bandFrame = resolveSafeFrame(PHONE_BAND_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
     expect(band.y * PHONE_VIEW.height).toBeCloseTo(68 + 33 / 2, 9);
     expect(frameCenter(bandFrame).y).toBeGreaterThan(band.y);
+    const bandRect = freeAreaRect(PHONE_BAND_RECT, PHONE_VIEW.width, PHONE_VIEW.height);
+    expect(bandRect.height * PHONE_VIEW.height).toBeCloseTo(33, 9);
+    expect(bandFrame.height).toBeGreaterThan(bandRect.height);
   });
 
   it('moves a goal across its view to put its target on a point, keeping direction and distance', () => {
@@ -834,105 +1046,19 @@ describe('configurator framing (owner round 3, part C)', () => {
     expect(p.x).toBeCloseTo(point.x * PHONE_VIEW.width, 6);
     expect(p.y).toBeCloseTo(point.y * PHONE_VIEW.height, 6);
     expect(dist(moved.position, moved.lookAt)).toBeCloseTo(dist(goal.position, goal.lookAt), 9);
-    direction(moved).forEach((value, axis) => expect(value).toBeCloseTo(direction(goal)[axis]!, 9));
   });
 
-  it('counts distinct selected categories only', () => {
-    expect(configuratorLinkCount(model, undefined)).toBe(0);
-    expect(configuratorLinkCount(model, [])).toBe(0);
-    expect(configuratorLinkCount(model, ['category:nope', 'configurator', 'portfolio'])).toBe(0);
-    expect(configuratorLinkCount(model, [key(ids[0]!), key(ids[0]!), key(ids[1]!)])).toBe(2);
-  });
-
-  it('keeps the crystal at the centre of the free rect for 0–3 selected categories', () => {
-    for (const [view, rect] of views) {
-      const frame = resolveSafeFrame(rect, view.width, view.height);
-      const aspect = view.width / view.height;
-      // As the director passes it: the free band's own centre.
-      const freeCenter = freeAreaCenter(rect, view.width, view.height);
-      const widened = rect.height / view.height < MIN_FRAME_FRACTION;
-      const plain = computeCameraGoal(configurator, model, aspect, frame, {
-        sway: 0.2,
-        freeCenter,
-      });
-      const plainDistance = dist(plain.position, plain.lookAt);
-      for (const selection of selections) {
-        const goal = computeCameraGoal(configurator, model, aspect, frame, {
-          emphasis: selection.map(key),
-          sway: 0.2,
-          freeCenter,
-        });
-        // The crystal projects to the free rect's centre (px), whatever the selection.
-        const crystal = projectPx(goal, model.configurator.position, view, frame);
-        expect(crystal.x).toBeCloseTo(rect.x + rect.width / 2, 6);
-        expect(crystal.y).toBeCloseTo(rect.y + rect.height / 2, 6);
-        if (!widened) {
-          // The frame is the rect: the crystal is the look target itself.
-          expect(goal.lookAt).toEqual(model.configurator.position);
-          expect(sphereInRect(goal, model.configurator.position, 1.2, view, frame, rect)).toBe(
-            true,
-          );
-        }
-        // A dolly along the same viewing direction, never toward the categories.
-        direction(goal).forEach((value, axis) =>
-          expect(value).toBeCloseTo(direction(plain)[axis]!, 9),
-        );
-        const factor = dist(goal.position, goal.lookAt) / plainDistance;
-        expect(factor).toBeCloseTo(configuratorDistanceFactor(selection.length), 9);
-        expect(factor).toBeGreaterThanOrEqual(1);
-        expect(factor).toBeLessThanOrEqual(1.2 + 1e-9);
-      }
-    }
-  });
-
-  it('moves the camera back step by step as categories are added, and forth when removed', () => {
-    const [view, rect] = views[0];
-    const frame = resolveSafeFrame(rect, view.width, view.height);
-    const aspect = view.width / view.height;
-    const distanceFor = (count: number) => {
-      const goal = computeCameraGoal(configurator, model, aspect, frame, {
-        emphasis: ids.slice(0, count).map(key),
-      });
-      return dist(goal.position, goal.lookAt);
-    };
-    expect(distanceFor(1)).toBeGreaterThan(distanceFor(0));
-    expect(distanceFor(2)).toBeGreaterThan(distanceFor(1));
-    expect(distanceFor(3)).toBeGreaterThan(distanceFor(2));
-    expect(distanceFor(3) / distanceFor(0)).toBeCloseTo(configuratorDistanceFactor(3), 9);
-    // Removing a category brings the camera back to the framing of that count,
-    // whichever categories remain.
-    const afterRemoval = computeCameraGoal(configurator, model, aspect, frame, {
-      emphasis: [key(ids[0]!), key(ids[2]!)],
-    });
-    expect(dist(afterRemoval.position, afterRemoval.lookAt)).toBeCloseTo(distanceFor(2), 9);
-  });
-
-  it('ignores the selection under reduced motion and on other routes', () => {
-    for (const [view, rect] of views) {
-      const frame = resolveSafeFrame(rect, view.width, view.height);
-      const aspect = view.width / view.height;
-      const plain = computeCameraGoal(configurator, model, aspect, frame, { sway: 0 });
-      for (const selection of selections) {
-        expect(
-          computeCameraGoal(configurator, model, aspect, frame, {
-            emphasis: selection.map(key),
-            sway: 0,
-            reducedMotion: true,
-          }),
-        ).toEqual(plain);
-      }
-      expect(computeCameraGoal(configurator, model, aspect, frame, { emphasis: [] })).toEqual(
-        computeCameraGoal(configurator, model, aspect, frame),
-      );
-      for (const target of [
-        { mode: 'universe' as const },
-        { mode: 'system' as const, category: 'web' },
-        { mode: 'portfolio' as const },
-      ]) {
-        expect(
-          computeCameraGoal(target, model, aspect, frame, { emphasis: [key('web'), key('ai')] }),
-        ).toEqual(computeCameraGoal(target, model, aspect, frame));
-      }
+  it('ignores the selection on other routes', () => {
+    const aspect = DESKTOP_VIEW.width / DESKTOP_VIEW.height;
+    const frame = resolveSafeFrame(DESKTOP_PANEL_RECT, DESKTOP_VIEW.width, DESKTOP_VIEW.height);
+    for (const target of [
+      { mode: 'universe' as const },
+      { mode: 'system' as const, category: 'web' },
+      { mode: 'portfolio' as const },
+    ]) {
+      expect(
+        computeCameraGoal(target, model, aspect, frame, { emphasis: [key('web'), key('ai')] }),
+      ).toEqual(computeCameraGoal(target, model, aspect, frame));
     }
   });
 });

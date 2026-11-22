@@ -8,11 +8,25 @@ import {
   archiveCenterOffset,
   archiveExtents,
 } from '../portfolio/archive-layout';
-import { COMET_TAIL_CAPSULE, CORE_CORONA_RADIUS, CORE_KEEP_OUT } from '../system/constants';
+import {
+  COMET_TAIL_CAPSULE,
+  CORE_CORONA_RADIUS,
+  CORE_KEEP_OUT,
+  NODE_CORE_RADIUS,
+} from '../system/constants';
 import { CORE_STYLES } from '../universe/core-styles';
+import { estimateLabelSize, LABEL_INSET } from '../universe/label-layout';
+import { MIN_CORE_SHARE } from '../universe/screen-size';
+import { universeKeyForHighlight } from '../node-ids';
 import { planetReach, planetWorldPosition } from '../system/planet-math';
 import type { Vec3 } from '../types';
 import type { CategoryNodeModel, UniverseModel, UniverseNode } from '../universe/model';
+import {
+  CONFIGURATOR_FRAMING,
+  frameConfigurator,
+  type ConfiguratorViewMemo,
+  type FramingSubject,
+} from './configurator-framing';
 
 /**
  * Pure mapping from the URL-driven SceneTarget (plus the free part of the
@@ -548,23 +562,43 @@ function fitPoints(
 }
 
 /**
- * Configurator framing (owner feedback round 3, part C): the beacon crystal
- * always sits at the centre of the free frame, on every step and for every
- * selection; the camera never turns toward the selected categories. Each
- * selected category (store `emphasis`, D81) moves the camera back along its
- * viewing direction by `perLink` of the beacon focus distance, at most `max`
- * in total, so the links entering the crystal stay visible (the categories
- * themselves may stay off-screen).
+ * Configurator framing (owner feedback round 5, part B; replaces round 3's
+ * dolly). With no selected category the crystal close-up of round 3 (the
+ * crystal centred in the free zone). With selected categories (store
+ * `emphasis`, D81) the camera frames the crystal with every selected node —
+ * halos and labels included — inside the free zone (configurator-framing.ts).
  */
-export const CONFIGURATOR_DOLLY = { perLink: 0.07, max: 1.2 } as const;
+export const CONFIGURATOR_CLOSE_UP = {
+  /** Half extents fitted around the crystal, and the shortest distance. */
+  halfWidth: 4.6,
+  halfHeight: 4.2,
+  minDistance: 8.5,
+  /** Lift of the approach direction from the overview side. */
+  lift: 0.18,
+} as const;
+
+/** World radius of the beacon's visible crystal and glow (BEACON_CORE_RADIUS × 1.1 focus × 3). */
+const BEACON_VISUAL_RADIUS = 1;
 
 /**
- * Distance factor of the configurator view for `links` selected categories.
- * Under reduced motion a selection never moves the camera (always 1).
+ * Farthest a category node's centre drifts from its position (runtime
+ * `writeDrift`: DRIFT_AMPLITUDE × (1, 0.6, 1)), world units; the framing keeps
+ * that much extra room. The focused crystal does not drift.
  */
-export function configuratorDistanceFactor(links: number, reducedMotion = false): number {
-  if (reducedMotion || !(links > 0)) return 1;
-  return Math.min(1 + CONFIGURATOR_DOLLY.perLink * Math.floor(links), CONFIGURATOR_DOLLY.max);
+export const NODE_DRIFT_REACH = 0.37;
+
+/** Distinct selected category nodes of a configurator selection, in model order. */
+export function configuratorLinks(
+  model: UniverseModel,
+  emphasis: readonly string[] | undefined,
+): CategoryNodeModel[] {
+  if (!emphasis?.length) return [];
+  const keys = new Set<string>();
+  for (const id of emphasis) {
+    const key = universeKeyForHighlight(id);
+    if (key) keys.add(key);
+  }
+  return model.categories.filter((node) => keys.has(node.key));
 }
 
 /** Distinct category nodes of a configurator selection (unknown ids and other kinds ignored). */
@@ -572,12 +606,133 @@ export function configuratorLinkCount(
   model: UniverseModel,
   emphasis: readonly string[] | undefined,
 ): number {
-  if (!emphasis?.length) return 0;
-  const keys = new Set<string>();
-  for (const key of emphasis) {
-    if (model.byKey.get(key)?.kind === 'category') keys.add(key);
-  }
-  return keys.size;
+  return configuratorLinks(model, emphasis).length;
+}
+
+/** Distance of the crystal close-up for a frame (the configurator view's lower bound). */
+export function configuratorCloseUpDistance(
+  fov: number,
+  aspect: number,
+  frame: SafeFrame = FULL_FRAME,
+): number {
+  const { halfWidth, halfHeight, minDistance } = CONFIGURATOR_CLOSE_UP;
+  return Math.max(fitDistance(halfWidth, halfHeight, fov, aspect, frame), minDistance);
+}
+
+/**
+ * Free zone itself in viewport fractions (clamped, never widened like the
+ * frame); the frame when the rect is missing or invalid.
+ */
+export function freeAreaRect(
+  rect: SafeRect | null | undefined,
+  viewportWidth: number,
+  viewportHeight: number,
+): SafeFrame {
+  const frame = resolveSafeFrame(rect, viewportWidth, viewportHeight);
+  if (!rect || frame === FULL_FRAME) return frame;
+  const left = clamp(rect.x / viewportWidth, 0, 1);
+  const right = clamp((rect.x + rect.width) / viewportWidth, 0, 1);
+  const top = clamp(rect.y / viewportHeight, 0, 1);
+  const bottom = clamp((rect.y + rect.height) / viewportHeight, 0, 1);
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+export interface ConfiguratorFramingOptions {
+  /** The free zone itself (`freeAreaRect`); default: the frame. */
+  freeRect?: SafeFrame;
+  /** Viewport in CSS px; a phone-sized one when absent. */
+  viewport?: { width: number; height: number };
+  /** Minimum on-screen core diameter (camera director); estimated when absent. */
+  minCorePx?: number;
+  /** Measured label text blocks by node key (NodeLabels); estimated when absent. */
+  labelSizes?: ReadonlyMap<string, { width: number; height: number }>;
+  /** Mouse / trackpad primary pointer (desktop label inset); default: landscape. */
+  finePointer?: boolean;
+  /** Hysteresis memo (camera director). */
+  configuratorView?: ConfiguratorViewMemo;
+  /** Only re-solve the current azimuth (the free zone is changing continuously). */
+  configuratorQuick?: boolean;
+}
+
+/**
+ * The framed configurator view (see configurator-framing.ts): the subjects'
+ * extents come from what the universe draws — a node's halo and orbit
+ * preview at its minimum on-screen core size, the crystal with its glow —
+ * and, in free zones too low for labels (a phone band above a tall sheet),
+ * just the cores, without labels or margins.
+ */
+function configuratorFramingGoal(
+  model: UniverseModel,
+  links: readonly CategoryNodeModel[],
+  aspect: number,
+  frame: SafeFrame,
+  fov: number,
+  bounds: { minDistance: number; maxDistance: number; seedAzimuth: number },
+  options: ConfiguratorFramingOptions,
+): CameraGoal {
+  const viewport = options.viewport ?? { width: aspect * 844, height: 844 };
+  const free = options.freeRect ?? frame;
+  const touch = options.finePointer === undefined ? isPortrait(aspect) : !options.finePointer;
+  const minCore =
+    options.minCorePx ??
+    minCoreDiameterPx(
+      frame.width * viewport.width,
+      frame.height * viewport.height,
+      !touch,
+      isPortrait(aspect) ? PHONE_CORE_BOOST : 1,
+    );
+  const band = free.height * viewport.height < CONFIGURATOR_FRAMING.bandMaxPx;
+  const crystalCore = minCore * MIN_CORE_SHARE.configurator;
+  const crystal: FramingSubject = {
+    key: model.configurator.key,
+    position: model.configurator.position,
+    radius: band ? 0 : BEACON_VISUAL_RADIUS,
+    radiusPx: band ? crystalCore / 2 : crystalCore * 1.5,
+    corePx: crystalCore,
+    label: null,
+  };
+  const haloWorld = CONFIGURATOR_FRAMING.haloPerCore * 2 * NODE_CORE_RADIUS;
+  const nodes = links.map((node): FramingSubject => {
+    const core = minCore * MIN_CORE_SHARE.category;
+    return {
+      key: node.key,
+      position: node.position,
+      radius: band ? 0 : Math.max(node.systemRadius * 0.8, haloWorld),
+      radiusPx: band
+        ? core / 2
+        : Math.max(CONFIGURATOR_FRAMING.haloPerCore * core, orbitPreviewRadiusPx(node, core)),
+      corePx: core,
+      label: band
+        ? null
+        : (options.labelSizes?.get(node.key) ?? estimateLabelSize(node.label, touch)),
+      drift: NODE_DRIFT_REACH,
+    };
+  });
+  const linked = new Set(links.map((node) => node.key));
+  const others = model.nodes
+    .filter((node) => node.kind !== 'configurator' && !linked.has(node.key))
+    .map((node) => ({ position: node.position, corePx: minCore * MIN_CORE_SHARE[node.kind] }));
+  const chosen = frameConfigurator(
+    {
+      crystal,
+      nodes,
+      others,
+      fov,
+      viewport,
+      frame,
+      free,
+      margin: band ? 0 : CONFIGURATOR_FRAMING.margin,
+      labelInsetPx: touch ? LABEL_INSET.touch : LABEL_INSET.desktop,
+      minDistance: bounds.minDistance,
+      maxDistance: bounds.maxDistance,
+      sway: CONFIGURATOR_FRAMING.sway,
+    },
+    options.configuratorView,
+    bounds.seedAzimuth,
+    options.configuratorQuick,
+  );
+  if (options.configuratorView) options.configuratorView.band = band;
+  return { position: chosen.position, lookAt: chosen.lookAt, fov };
 }
 
 /**
@@ -586,19 +741,20 @@ export function configuratorLinkCount(
  * `sway`: idle auto-rotate amplitude the overview fit must cover.
  * `planetAngle`: live orbit angle of the focused planet (planet mode).
  * `emphasis`: configurator selection (store `emphasis`, D81), configurator mode
- * only: dollies the beacon view back (CONFIGURATOR_DOLLY), never under
- * `reducedMotion`.
+ * only: with selected categories the view frames the crystal with them
+ * (`configuratorFramingGoal`); the same goal under reduced motion (the
+ * director cuts to it instead of moving).
  */
 export function computeCameraGoal(
   target: SceneTarget,
   model: UniverseModel,
   aspect: number,
   frame: SafeFrame = FULL_FRAME,
-  options: {
+  options: ConfiguratorFramingOptions & {
     sway?: number;
     planetAngle?: number;
     emphasis?: readonly string[];
-    /** prefers-reduced-motion: a configurator selection never moves the camera. */
+    /** prefers-reduced-motion: accepted, never changes a goal (the director snaps to it). */
     reducedMotion?: boolean;
     /**
      * Centre of the free area (`freeAreaCenter`, viewport fractions): the
@@ -608,8 +764,6 @@ export function computeCameraGoal(
     freeCenter?: { x: number; y: number };
     /** Planet focus: keeps the chosen viewing side stable while the planet parks. */
     planetView?: PlanetViewMemo;
-    /** Viewport in CSS px: the phone's tall overview sizes its nodes on screen. */
-    viewport?: { width: number; height: number };
   } = {},
 ): CameraGoal {
   // Systems, the archive and the beacon are approached from the landscape overview's side
@@ -654,17 +808,36 @@ export function computeCameraGoal(
         fov,
       );
     case 'configurator': {
-      // The crystal is the look target, so it projects to the free frame's centre (D28) —
-      // or to the free band's own centre when the frame had to be widened past it; a
-      // selection only dollies the camera back along the same direction.
+      // No selection: the crystal close-up, the crystal as the look target at the free
+      // frame's centre (D28) — or at the free band's own centre when the frame had to be
+      // widened past it. With selected categories: the crystal and its links framed.
       const anchor = model.configurator;
-      const factor = configuratorDistanceFactor(
-        configuratorLinkCount(model, options.emphasis),
-        options.reducedMotion,
+      const distance = configuratorCloseUpDistance(fov, aspect, frame);
+      const focus = approach(
+        anchor.position,
+        overview.position,
+        distance,
+        fov,
+        CONFIGURATOR_CLOSE_UP.lift,
       );
-      const distance = Math.max(fitDistance(4.6, 4.2, fov, aspect, frame), 8.5) * factor;
-      const focus = approach(anchor.position, overview.position, distance, fov, 0.18);
-      return options.freeCenter ? centreOnPoint(focus, options.freeCenter, aspect, frame) : focus;
+      const links = configuratorLinks(model, options.emphasis);
+      if (links.length === 0) {
+        return options.freeCenter ? centreOnPoint(focus, options.freeCenter, aspect, frame) : focus;
+      }
+      const back = sub(focus.position, focus.lookAt);
+      return configuratorFramingGoal(
+        model,
+        links,
+        aspect,
+        frame,
+        fov,
+        {
+          minDistance: distance,
+          maxDistance: Math.max(Math.hypot(...sub(overview.position, overview.lookAt)), distance),
+          seedAzimuth: Math.atan2(back[0], back[2]),
+        },
+        options,
+      );
     }
     default:
       return home();
