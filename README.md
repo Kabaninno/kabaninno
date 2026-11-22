@@ -297,7 +297,7 @@ Unit tests for helpers live next to the code (`src/lib/*.test.ts`).
 Content is data: no component or scene code changes.
 
 1. In [`content/categories.ts`](content/categories.ts), add an entry to the category's
-   `services`: a URL `slug`, `timelineWeeks: [min, max]` and the planet's look (`planet`: `shape`,
+   `services`: a URL `slug`, `timelineDays: [min, max]` (days; shown as days up to 10, otherwise as rounded weeks) and the planet's look (`planet`: `shape`,
    `material`, `size`, optional `rings`/`moons`/`shell`, and `orbit: { radius, tilt, speed,
 phase }`). Reuse the existing shape/material/moon values (listed in `content/schema.ts`) and
    pick an orbit radius that does not collide with the neighbours.

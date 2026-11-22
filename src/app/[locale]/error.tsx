@@ -40,11 +40,11 @@ export default function LocaleError({ retry }: LocaleErrorProps) {
       <p className="eyebrow">{t('eyebrow')}</p>
       <h1
         id="error-title"
-        className="mt-3 font-display text-[1.625rem] leading-tight font-medium text-ink md:text-[1.875rem]"
+        className="mt-3 font-display text-title leading-tight font-medium text-ink md:text-title-lg"
       >
         {bindShortWords(t('title'), locale)}
       </h1>
-      <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted">
+      <p className="mt-3 text-body leading-relaxed text-muted">
         {bindShortWords(t('body'), locale)}
       </p>
       <div className="mt-6 flex flex-wrap gap-2">

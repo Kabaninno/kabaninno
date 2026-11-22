@@ -58,7 +58,7 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
           className="group flex h-11 items-center gap-2.5 rounded-xl px-2 text-ink transition-colors duration-150 hover:bg-white/[0.04] active:bg-white/[0.08]"
         >
           <NodeMark className="size-6 transition-transform duration-200 ease-calm group-hover:rotate-12" />
-          <span className="font-display text-[0.8125rem] font-medium tracking-[0.22em]">
+          <span className="font-display text-body-s font-medium tracking-[0.22em]">
             {studioName}
           </span>
         </Link>
@@ -98,7 +98,7 @@ export function Hud({ categories, studioName, homeLabel }: HudProps) {
           <Link
             href={paths.configurator()}
             onClick={() => analytics.track('cta_click', { placement: 'hud' })}
-            className={`${primaryButton} h-10 px-5 text-[0.8125rem] max-lg:hidden pointer-coarse:h-11`}
+            className={`${primaryButton} hud-cta h-10 px-5 text-body-s max-lg:hidden pointer-coarse:h-11`}
           >
             {t('cta')}
           </Link>

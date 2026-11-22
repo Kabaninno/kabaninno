@@ -109,7 +109,7 @@ export function MobileMenu({ categories, studioName, className }: MobileMenuProp
           <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/[0.06] pr-1.5 pl-3">
             <span className="flex items-center gap-2.5" aria-hidden="true">
               <NodeMark className="size-6 text-ink" />
-              <span className="font-display text-[0.8125rem] font-medium tracking-[0.22em]">
+              <span className="font-display text-body-s font-medium tracking-[0.22em]">
                 {studioName}
               </span>
             </span>

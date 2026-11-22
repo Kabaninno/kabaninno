@@ -10,15 +10,16 @@ export interface BreadcrumbItem {
  * Breadcrumb trail. The first item is the explicit «← Universe» button of
  * system and planet panels (BRIEF scene 2: an outlined pill, not just a
  * crumb). The trail stays on one line, so a wrapped line never starts with
- * a bare "/": the pill keeps its width, other ancestors and the current page
- * (repeated by the h1 right below) truncate with an ellipsis. In the narrow
- * bottom sheet the current page is left to screen readers only, so a
- * collapsed sheet never shows a clipped "Strony fi…" crumb (visual mn6).
+ * a bare "/": the pill keeps its width and the ancestors truncate with an
+ * ellipsis. The current page is left to screen readers only at every width:
+ * the h1 right below repeats it, and with the larger type scale (D147) it no
+ * longer fits next to the pill in a side column or a collapsed sheet (it
+ * showed as a clipped "Landi…", visual mn6).
  */
 export function Breadcrumbs({ label, items }: { label: string; items: readonly BreadcrumbItem[] }) {
   return (
     <nav aria-label={label} className="mb-5">
-      <ol className="flex min-w-0 items-center gap-1 text-[0.8125rem] text-muted">
+      <ol className="flex min-w-0 items-center gap-1 text-body-s text-muted">
         {items.map((item, index) => (
           <li
             key={`${index}-${item.label}`}
@@ -28,7 +29,7 @@ export function Breadcrumbs({ label, items }: { label: string; items: readonly B
                 : item.href
                   ? 'min-w-0'
                   : // The current page gives way first (it repeats the h1 below).
-                    'sr-only min-w-0 shrink-[8] side:not-sr-only'
+                    'sr-only min-w-0'
             }`}
           >
             {index > 0 ? (

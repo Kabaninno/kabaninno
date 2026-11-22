@@ -45,7 +45,7 @@ export default function NotFound() {
             className="mb-10 inline-flex min-h-11 items-center gap-2.5 rounded-xl px-2 text-ink transition-colors duration-150 hover:bg-white/[0.04] active:bg-white/[0.08]"
           >
             <NodeMark className="size-6" />
-            <span className="font-display text-[0.8125rem] font-medium tracking-[0.22em]">
+            <span className="font-display text-body-s font-medium tracking-[0.22em]">
               {siteConfig.studioName}
             </span>
           </a>

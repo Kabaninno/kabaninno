@@ -111,12 +111,12 @@ export function IntroControl({ label }: { label: string }) {
         useSceneStore.getState().skipIntro();
         analytics.track('intro_skip', { via: 'button' });
       }}
-      className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40 inline-flex min-h-11 items-center gap-2.5 rounded-full glass px-4 text-[0.8125rem] text-ink transition-[opacity,background-color] duration-300 ease-calm hover:bg-[rgb(10_14_28/0.8)] active:bg-[rgb(10_14_28/0.9)] md:right-auto md:bottom-10 md:left-1/2 md:-translate-x-1/2 starting:opacity-0"
+      className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40 inline-flex min-h-11 items-center gap-2.5 rounded-full glass px-4 text-body-s text-ink transition-[opacity,background-color] duration-300 ease-calm hover:bg-[rgb(10_14_28/0.8)] active:bg-[rgb(10_14_28/0.9)] md:right-auto md:bottom-10 md:left-1/2 md:-translate-x-1/2 starting:opacity-0"
     >
       {label}
       <kbd
         aria-hidden="true"
-        className="rounded-md border border-white/15 px-1.5 py-0.5 font-mono text-[0.625rem] tracking-[0.1em] text-muted"
+        className="rounded-md border border-white/15 px-1.5 py-0.5 font-mono text-micro tracking-[0.1em] text-muted"
       >
         ESC
       </kbd>

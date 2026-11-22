@@ -112,10 +112,13 @@ export const categoryDnaSchema = z.object({
 
 export const serviceSchema = z.object({
   slug: slugSchema,
-  /** Indicative delivery time in weeks: [min, max]. */
-  timelineWeeks: z
+  /**
+   * Indicative delivery time in days: [min, max], counted from receiving the
+   * client's materials. Shown in days up to 10, otherwise in rounded weeks.
+   */
+  timelineDays: z
     .tuple([z.int().positive(), z.int().positive()])
-    .refine(([min, max]) => min <= max, 'timelineWeeks: min must be <= max'),
+    .refine(([min, max]) => min <= max, 'timelineDays: min must be <= max'),
   planet: planetSchema,
 });
 

@@ -274,7 +274,7 @@ export function SummaryStep({
       </section>
 
       <div>
-        <label htmlFor={messageId} className="text-[0.9375rem] font-medium text-ink">
+        <label htmlFor={messageId} className="text-body font-medium text-ink">
           {labels.summary.message}
         </label>
         <p id={`${messageId}-hint`} className="mt-1 text-sm text-muted">

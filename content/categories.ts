@@ -16,7 +16,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'corporate-websites',
-        timelineWeeks: [3, 6],
+        timelineDays: [7, 14],
         planet: {
           shape: 'icosahedron',
           material: 'glass',
@@ -27,7 +27,7 @@ export const categoriesData = [
       },
       {
         slug: 'online-stores',
-        timelineWeeks: [6, 12],
+        timelineDays: [14, 28],
         planet: {
           shape: 'torus-knot',
           material: 'glass',
@@ -38,7 +38,7 @@ export const categoriesData = [
       },
       {
         slug: 'landing-pages',
-        timelineWeeks: [1, 3],
+        timelineDays: [3, 7],
         planet: {
           shape: 'octahedron',
           material: 'hologram',
@@ -49,7 +49,7 @@ export const categoriesData = [
       },
       {
         slug: 'web-apps',
-        timelineWeeks: [8, 16],
+        timelineDays: [21, 42],
         planet: {
           shape: 'sphere',
           material: 'glass',
@@ -68,7 +68,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'crm-implementation',
-        timelineWeeks: [2, 6],
+        timelineDays: [7, 14],
         planet: {
           shape: 'sphere',
           material: 'hologram',
@@ -79,7 +79,7 @@ export const categoriesData = [
       },
       {
         slug: 'custom-crm',
-        timelineWeeks: [8, 16],
+        timelineDays: [21, 35],
         planet: {
           shape: 'sphere',
           material: 'liquid-metal',
@@ -93,7 +93,7 @@ export const categoriesData = [
       },
       {
         slug: 'sales-funnels',
-        timelineWeeks: [1, 3],
+        timelineDays: [3, 7],
         planet: {
           shape: 'funnel',
           material: 'glass',
@@ -104,7 +104,7 @@ export const categoriesData = [
       },
       {
         slug: 'reports-dashboards',
-        timelineWeeks: [2, 4],
+        timelineDays: [7, 14],
         planet: {
           shape: 'cube-cluster',
           material: 'hologram',
@@ -122,7 +122,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'api-integrations',
-        timelineWeeks: [1, 4],
+        timelineDays: [3, 10],
         planet: {
           shape: 'gear',
           material: 'liquid-metal',
@@ -133,7 +133,7 @@ export const categoriesData = [
       },
       {
         slug: 'document-automation',
-        timelineWeeks: [2, 5],
+        timelineDays: [7, 14],
         planet: {
           shape: 'cube-cluster',
           material: 'liquid-metal',
@@ -144,7 +144,7 @@ export const categoriesData = [
       },
       {
         slug: 'notifications-reminders',
-        timelineWeeks: [1, 2],
+        timelineDays: [2, 5],
         planet: {
           shape: 'torus',
           material: 'emissive',
@@ -155,7 +155,7 @@ export const categoriesData = [
       },
       {
         slug: 'data-processing',
-        timelineWeeks: [2, 6],
+        timelineDays: [7, 14],
         planet: {
           shape: 'sphere',
           material: 'liquid-metal',
@@ -174,7 +174,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'ai-assistants',
-        timelineWeeks: [2, 6],
+        timelineDays: [7, 14],
         planet: {
           shape: 'blob',
           material: 'iridescent',
@@ -184,7 +184,7 @@ export const categoriesData = [
       },
       {
         slug: 'ai-document-processing',
-        timelineWeeks: [3, 8],
+        timelineDays: [14, 21],
         planet: {
           shape: 'crystal',
           material: 'iridescent',
@@ -195,7 +195,7 @@ export const categoriesData = [
       },
       {
         slug: 'content-generation',
-        timelineWeeks: [1, 3],
+        timelineDays: [3, 7],
         planet: {
           shape: 'blob',
           material: 'iridescent',
@@ -207,7 +207,7 @@ export const categoriesData = [
       },
       {
         slug: 'ai-analytics',
-        timelineWeeks: [3, 8],
+        timelineDays: [14, 21],
         planet: {
           shape: 'torus-knot',
           material: 'hologram',
@@ -224,7 +224,7 @@ export const categoriesData = [
     services: [
       {
         slug: 'sales-orders',
-        timelineWeeks: [2, 5],
+        timelineDays: [7, 14],
         planet: {
           shape: 'dart',
           material: 'glass',
@@ -235,7 +235,7 @@ export const categoriesData = [
       },
       {
         slug: 'booking',
-        timelineWeeks: [2, 4],
+        timelineDays: [7, 14],
         planet: {
           shape: 'sphere',
           material: 'hologram',
@@ -246,7 +246,7 @@ export const categoriesData = [
       },
       {
         slug: 'customer-support',
-        timelineWeeks: [2, 4],
+        timelineDays: [5, 10],
         planet: {
           shape: 'dart',
           material: 'emissive',
@@ -258,7 +258,7 @@ export const categoriesData = [
       },
       {
         slug: 'mini-apps',
-        timelineWeeks: [4, 10],
+        timelineDays: [14, 28],
         planet: {
           shape: 'cube-cluster',
           material: 'glass',

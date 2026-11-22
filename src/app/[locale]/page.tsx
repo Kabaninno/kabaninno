@@ -102,16 +102,16 @@ export default async function HomePage({ params }: HomePageProps) {
             aria-hidden="true"
             className="pointer-events-none absolute -top-16 -right-4 -bottom-12 -left-4 -z-10 hero-scrim md:-top-20 md:-right-28 md:-bottom-10 md:-left-24 short:-top-8 short:-right-12 short:-left-4 shorter:-top-4"
           />
-          <p className="mb-3 eyebrow md:mb-4 compact:mb-3 short:mb-1.5 shorter:mb-1">
+          <p className="mb-3 eyebrow md:mb-4 compact:mb-3 short:mb-1.5 shorter:mb-1 [@media(max-width:47.99rem)_and_(max-height:53rem)]:sr-only">
             {t('eyebrow')}
           </p>
           <h1
             id="home-title"
-            className="font-display text-[1.625rem] leading-[1.15] font-medium tracking-[-0.01em] text-balance text-ink xs:text-[1.875rem] md:text-[2.75rem] lg:text-[3.25rem] compact:text-[clamp(2.25rem,6.2vh,3.25rem)] short:text-[1.375rem] short:leading-[1.18] shorter:text-[1.1875rem]"
+            className="font-display text-title leading-[1.15] font-medium tracking-[-0.01em] text-balance text-ink xs:text-title-lg md:text-display lg:text-display-lg compact:text-[clamp(2.5rem,6.9vh,var(--text-display-lg))] short:text-display-sm short:leading-[1.18] shorter:text-display-xs"
           >
             {bindShortWords(t('title'), locale)}
           </h1>
-          <p className="mt-3 max-w-md text-[0.9375rem] leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-[0.8125rem] short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only [@media(max-width:47.99rem)_and_(min-height:30.0625rem)]:sr-only">
+          <p className="mt-3 max-w-md text-body leading-relaxed text-muted md:mt-5 md:text-base compact:mt-3 compact:max-w-[34rem] short:mt-2 short:max-w-sm short:text-body-s short:leading-snug shorter:mt-1.5 shorter:text-xs shorter:leading-[1.4] [@media(max-height:19rem)]:sr-only [@media(max-width:47.99rem)_and_(min-height:30.0625rem)]:sr-only">
             {bindShortWords(t('lead'), locale)}
           </p>
         </section>

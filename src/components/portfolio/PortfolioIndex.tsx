@@ -37,11 +37,11 @@ export async function PortfolioIndex({ locale, projects }: PortfolioIndexProps) 
       <p className="eyebrow">{t('eyebrow')}</p>
       <h1
         id="portfolio-title"
-        className="mt-3 font-display text-[1.75rem] leading-tight font-medium text-ink md:text-[2rem]"
+        className="mt-3 font-display text-title-md leading-tight font-medium text-ink md:text-title-xl"
       >
         {t('title')}
       </h1>
-      <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted">
+      <p className="mt-3 text-body leading-relaxed text-muted">
         {bindShortWords(t('lead'), locale)}
       </p>
 

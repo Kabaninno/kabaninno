@@ -1,4 +1,5 @@
 import { HighlightLink } from '@/components/nav/HighlightLink';
+import { HeroCtaWatch } from './HeroCtaWatch';
 import { ctaArrow, primaryButton } from '@/components/ui/styles';
 import type { NavCategory } from '@/lib/nav';
 import { paths } from '@/lib/routes';
@@ -27,7 +28,7 @@ const HINT_ID = 'home-explore';
  * Short viewports (landscape phones): a compact pill, no caption.
  */
 const CARD =
-  'group relative flex min-h-11 w-full items-center gap-2 rounded-xl glass px-2.5 py-1.5 text-left text-ink ' +
+  'group relative flex min-h-11 w-full items-center gap-1.5 rounded-xl glass px-2 py-1.5 text-left text-ink ' +
   'transition-[background-color,border-color,scale] duration-200 ease-calm ' +
   'hover:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] hover:bg-[rgb(10_14_28/0.8)] ' +
   'data-highlighted:border-[color-mix(in_srgb,var(--accent)_55%,transparent)] data-highlighted:bg-[rgb(10_14_28/0.8)] ' +
@@ -44,7 +45,7 @@ function Chevron() {
     <svg
       viewBox="0 0 24 24"
       aria-hidden="true"
-      className="size-4 shrink-0 text-faint transition-[translate,color] duration-200 ease-calm group-hover:translate-x-0.5 group-hover:text-[var(--accent)] group-data-highlighted:translate-x-0.5 group-data-highlighted:text-[var(--accent)] short:hidden"
+      className="size-4 shrink-0 text-faint transition-[translate,color] duration-200 ease-calm group-hover:translate-x-0.5 group-hover:text-[var(--accent)] group-data-highlighted:translate-x-0.5 group-data-highlighted:text-[var(--accent)] max-sm:hidden short:hidden"
     >
       <path
         d="m9 6 6 6-6 6"
@@ -69,14 +70,14 @@ function CardText({
 }) {
   return (
     <span className="min-w-0 flex-1">
-      <span className="block text-[0.8125rem] leading-tight font-medium text-pretty sm:text-sm">
+      <span className="block text-body-s leading-tight font-medium text-pretty sm:text-sm">
         {name}
       </span>
       {/* Described-by instead of part of the name keeps the link's name short (D129). */}
       <span
         id={captionId}
         aria-hidden="true"
-        className="mt-0.5 block truncate text-[0.6875rem] leading-tight text-muted md:text-xs short:hidden"
+        className="mt-0.5 block truncate text-label leading-tight text-muted md:text-xs short:hidden"
       >
         {caption}
       </span>
@@ -174,6 +175,7 @@ export function CategoryIndex({
           href={paths.configurator()}
           highlightId={sceneNodeId.configurator}
           aria-describedby="home-cta-note"
+          data-hero-cta=""
           className={`${primaryButton} min-h-12 px-6 text-sm short:min-h-11 short:px-5`}
         >
           {cta.label}
@@ -184,6 +186,7 @@ export function CategoryIndex({
         <p id="home-cta-note" className="text-center text-xs text-muted text-halo short:sr-only">
           {cta.note}
         </p>
+        <HeroCtaWatch />
       </div>
     </nav>
   );

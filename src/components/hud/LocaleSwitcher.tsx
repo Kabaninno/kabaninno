@@ -124,7 +124,7 @@ function LocaleLinks({
   const itemClass =
     size === 'large'
       ? 'min-h-11 min-w-14 px-3 text-xs'
-      : 'h-8 min-w-9 px-2 text-[0.6875rem] pointer-coarse:h-11 pointer-coarse:min-w-11';
+      : 'h-8 min-w-9 px-2 text-label pointer-coarse:h-11 pointer-coarse:min-w-11';
 
   return (
     <nav aria-label={t('language')} className={className}>
@@ -226,7 +226,7 @@ function LocaleMenu({
               <span aria-hidden="true">{t(`languageNames.${locale}`)}</span>
               <span
                 aria-hidden="true"
-                className="font-mono text-[0.6875rem] tracking-[0.12em] text-faint"
+                className="font-mono text-label tracking-[0.12em] text-faint"
               >
                 {LOCALE_CODES[locale]}
               </span>

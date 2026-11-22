@@ -77,14 +77,14 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       </p>
       <h1
         id="category-title"
-        className="mt-3 font-display text-[1.75rem] leading-tight font-medium text-ink md:text-[2rem]"
+        className="mt-3 font-display text-title-md leading-tight font-medium text-ink md:text-title-xl"
       >
         {text.name}
       </h1>
       <p className="mt-2 text-base text-[color-mix(in_srgb,var(--accent)_70%,var(--color-ink))]">
         {text.tagline}
       </p>
-      <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted">{text.description}</p>
+      <p className="mt-4 text-body leading-relaxed text-muted">{text.description}</p>
 
       <h2 className="mt-8 mb-3 eyebrow">{t('servicesHeading')}</h2>
       <ol className="flex flex-col gap-2">
@@ -104,7 +104,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                   {formatIndex(index + 1)}
                 </span>
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className="font-display text-[0.9375rem] font-medium text-ink">
+                  <span className="font-display text-body font-medium text-ink">
                     {serviceText.title}
                   </span>
                   <span className="text-sm leading-relaxed text-muted">{serviceText.summary}</span>

@@ -77,11 +77,11 @@ export async function ProjectDetail({ locale, project }: { locale: Locale; proje
       </p>
       <h1
         id="project-title"
-        className="mt-3 font-display text-[1.5rem] leading-tight font-medium text-ink md:text-[1.75rem]"
+        className="mt-3 font-display text-title-sm leading-tight font-medium text-ink md:text-title-md"
       >
         {text.title}
       </h1>
-      <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink/90">{text.summary}</p>
+      <p className="mt-3 text-body leading-relaxed text-ink/90">{text.summary}</p>
 
       <dl className="mt-6 grid grid-cols-2 gap-4 border-y border-white/[0.07] py-5 sm:grid-cols-3">
         {facts.map(([label, value]) => (
@@ -96,7 +96,7 @@ export async function ProjectDetail({ locale, project }: { locale: Locale; proje
         {story.map(([key, label, value]) => (
           <section key={key}>
             <h2 className="mb-2 eyebrow">{label}</h2>
-            <p className="text-[0.9375rem] leading-relaxed text-muted">{value}</p>
+            <p className="text-body leading-relaxed text-muted">{value}</p>
           </section>
         ))}
 

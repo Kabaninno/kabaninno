@@ -165,7 +165,7 @@ function PortfolioView({
                 <span className="sr-only">{card.categoryNames}</span>
                 <span className="flex items-center gap-2">
                   {card.draft ? (
-                    <span className="rounded-full border border-white/15 px-2 py-0.5 text-[0.6875rem] text-muted">
+                    <span className="rounded-full border border-white/15 px-2 py-0.5 text-label text-muted">
                       {labels.draft}
                     </span>
                   ) : null}
@@ -180,7 +180,7 @@ function PortfolioView({
                 {card.stack.slice(0, 4).map((item) => (
                   <span
                     key={item}
-                    className="rounded-full border border-white/10 px-2 py-0.5 text-[0.6875rem] text-ink/80"
+                    className="rounded-full border border-white/10 px-2 py-0.5 text-label text-ink/80"
                   >
                     {item}
                   </span>

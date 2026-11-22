@@ -37,7 +37,7 @@ export function ConfiguratorLinkText({
       <span aria-hidden="true">{text}</span>
       <span
         aria-hidden="true"
-        className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 font-mono text-[0.625rem] leading-none font-medium text-void tabular-nums"
+        className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 font-mono text-micro leading-none font-medium text-void tabular-nums"
       >
         {count}
       </span>

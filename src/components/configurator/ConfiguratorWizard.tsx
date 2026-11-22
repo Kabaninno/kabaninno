@@ -283,12 +283,12 @@ export function ConfiguratorWizard({
       <p className="eyebrow">{header.eyebrow}</p>
       <h1
         id="configurator-title"
-        className="mt-2 font-display text-[1.625rem] leading-tight font-medium text-ink md:text-[1.75rem]"
+        className="mt-2 font-display text-title leading-tight font-medium text-ink md:text-title-md"
       >
         {header.title}
       </h1>
       {step === 'type' ? (
-        <p className="mt-2 text-[0.9375rem] leading-relaxed text-muted">{header.lead}</p>
+        <p className="mt-2 text-body leading-relaxed text-muted">{header.lead}</p>
       ) : null}
       {/* Always rendered, so screen readers announce the notice when it appears. */}
       <p role="status" className="text-sm text-muted [&:not(:empty)]:mt-2">
@@ -441,7 +441,7 @@ export function ConfiguratorWizard({
             <div>
               <label
                 htmlFor={fieldDomId('contact.name')}
-                className="text-[0.9375rem] font-medium text-ink"
+                className="text-body font-medium text-ink"
               >
                 {labels.fields.name}
               </label>
@@ -469,7 +469,7 @@ export function ConfiguratorWizard({
             <div>
               <label
                 htmlFor={fieldDomId('contact.comment')}
-                className="text-[0.9375rem] font-medium text-ink"
+                className="text-body font-medium text-ink"
               >
                 {labels.fields.comment}
               </label>

@@ -12,6 +12,7 @@ import { getCategoryText, getProjectText, getServiceText } from '@/lib/content-t
 import { buildPageMetadata } from '@/lib/metadata';
 import { serviceRef } from '@/lib/request-draft';
 import { paths } from '@/lib/routes';
+import { timelineDisplay } from '@/lib/timeline';
 import { sceneNodeId } from '@/scene/node-ids';
 import { accentStyle, formatIndex } from '@/lib/style';
 
@@ -52,7 +53,7 @@ export default async function ServicePage({ params }: ServicePageProps) {
   const tCommon = await getTranslations('common');
   const categoryText = getCategoryText(locale, category.id);
   const text = getServiceText(locale, category.id, service.slug);
-  const [minWeeks, maxWeeks] = service.timelineWeeks;
+  const timeline = timelineDisplay(service.timelineDays);
 
   const siblings = category.services;
   const position = siblings.findIndex((item) => item.slug === service.slug);
@@ -88,11 +89,11 @@ export default async function ServicePage({ params }: ServicePageProps) {
       </p>
       <h1
         id="service-title"
-        className="mt-3 font-display text-[1.625rem] leading-tight font-medium text-ink md:text-[1.875rem]"
+        className="mt-3 font-display text-title leading-tight font-medium text-ink md:text-title-lg"
       >
         {text.title}
       </h1>
-      <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink/90">{text.summary}</p>
+      <p className="mt-3 text-body leading-relaxed text-ink/90">{text.summary}</p>
 
       <RequestToggle
         serviceRef={ref}
@@ -108,13 +109,13 @@ export default async function ServicePage({ params }: ServicePageProps) {
       <div className="mt-8 flex flex-col gap-6">
         <section>
           <h2 className="mb-2 eyebrow">{t('audience')}</h2>
-          <p className="text-[0.9375rem] leading-relaxed text-muted">{text.audience}</p>
+          <p className="text-body leading-relaxed text-muted">{text.audience}</p>
         </section>
         <section>
           <h2 className="mb-2 eyebrow">{t('features')}</h2>
           <ul className="flex flex-col gap-2">
             {text.features.map((feature) => (
-              <li key={feature} className="flex gap-3 text-[0.9375rem] text-ink/90">
+              <li key={feature} className="flex gap-3 text-body text-ink/90">
                 <span
                   aria-hidden="true"
                   className="mt-[0.6em] h-0.5 w-3 shrink-0 rounded-full bg-[var(--accent)] opacity-80"
@@ -126,15 +127,14 @@ export default async function ServicePage({ params }: ServicePageProps) {
         </section>
         <section>
           <h2 className="mb-2 eyebrow">{t('example')}</h2>
-          <p className="border-l border-[color-mix(in_srgb,var(--accent)_50%,transparent)] pl-4 text-[0.9375rem] leading-relaxed text-muted">
+          <p className="border-l border-[color-mix(in_srgb,var(--accent)_50%,transparent)] pl-4 text-body leading-relaxed text-muted">
             {text.example}
           </p>
         </section>
         <section>
           <h2 className="mb-2 eyebrow">{t('timeline')}</h2>
-          <p className="font-display text-lg text-ink">
-            {t('timelineValue', { min: minWeeks, max: maxWeeks })}
-          </p>
+          <p className="font-display text-lg text-ink">{t('timelineValue', { ...timeline })}</p>
+          <p className="mt-1 text-xs text-muted">{t('timelineNote')}</p>
         </section>
       </div>
 

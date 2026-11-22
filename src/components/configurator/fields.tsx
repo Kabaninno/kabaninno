@@ -79,7 +79,7 @@ export function OptionGroup({
   const errorId = error ? `${id}-error` : undefined;
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-1 text-[0.9375rem] font-medium text-ink">{legend}</legend>
+      <legend className="mb-1 text-body font-medium text-ink">{legend}</legend>
       {hint ? (
         <p id={hintId} className="mb-3 text-sm leading-relaxed text-muted">
           {hint}
@@ -164,7 +164,7 @@ export function YesNoGroup({
 }
 
 export const inputClass =
-  'w-full rounded-xl border bg-[rgb(255_255_255/0.03)] px-3.5 py-2.5 text-[0.9375rem] text-ink placeholder:text-faint ' +
+  'w-full rounded-xl border bg-[rgb(255_255_255/0.03)] px-3.5 py-2.5 text-body text-ink placeholder:text-faint ' +
   'transition-colors duration-150 ease-calm hover:border-white/25 focus-visible:border-[var(--color-brand)] ';
 
 export function inputBorder(error?: string): string {

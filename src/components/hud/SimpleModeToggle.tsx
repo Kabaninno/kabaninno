@@ -92,10 +92,7 @@ export function SimpleModeToggle({ variant = 'compact', className = '' }: Simple
         onClick={toggle}
         className={`inline-flex h-9 items-center gap-2 rounded-full px-2.5 text-muted transition-colors duration-150 ease-calm hover:bg-white/[0.06] hover:text-ink active:bg-white/10 aria-disabled:cursor-not-allowed pointer-coarse:h-11 ${className}`}
       >
-        <span
-          aria-hidden="true"
-          className="font-mono text-[0.6875rem] font-medium tracking-[0.12em]"
-        >
+        <span aria-hidden="true" className="font-mono text-label font-medium tracking-[0.12em]">
           2D
         </span>
         {track}
